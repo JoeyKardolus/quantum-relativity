@@ -956,7 +956,7 @@ rerun it. Misses are reported. The one calibration is the drift, set on even spa
 3. **Gravity test**: with the attraction rule off, do lumps of energy still move toward each other from the network's shape alone?
 4. **Expansion test**: does drift give accelerating expansion while dense clusters stay bound?
 5. **Space test**: does the network settle into something that behaves like 3D space?
-6. **Quantum**: superposition and entanglement without signalling (later). Lead: the network as a superposition of configurations, with each connection holding a few numbers rather than one, so several fields are different ways the same network moves (Levin and Wen, string-net condensation, 2005). There the quantum part is assumed, not derived, and gravity does not emerge; the geometry rules here would supply it.
+6. **Quantum**: superposition and entanglement without signalling (later). Lead: different kinds of vibration of the same grid (volumes swelling and shrinking, joints pushing back and forth, energy sloshing along seams) are the different fields, each with any number of frequencies. Lead: the network as a superposition of configurations, with each connection holding a few numbers rather than one, so several fields are different ways the same network moves (Levin and Wen, string-net condensation, 2005). There the quantum part is assumed, not derived, and gravity does not emerge; the geometry rules here would supply it.
 
 Success tiers: (1) known physics (falling, bending light, expansion) from the rules; (2) space
 and gravity emerge without being forced; (3) a testable prediction that holds, such as the
