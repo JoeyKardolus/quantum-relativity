@@ -1,6 +1,6 @@
 """The FastAPI app: the page at GET / and the live connection at /ws.
 
-Contract: `create_app(joints, seed)` builds the simulation and its Runner when
+Contract: `create_app(cells, seed)` builds the simulation and its Runner when
 the app starts (lifespan), runs the stepping loop as a task until shutdown,
 serves static/index.html at GET / (503 with a plain note while that file is
 missing) and hands each /ws connection to the Runner.
@@ -20,12 +20,12 @@ from physics.app.simulation import Simulation
 PAGE = Path(__file__).parent / "static" / "index.html"
 
 
-def create_app(joints: int = 2500, seed: int = 1) -> FastAPI:
+def create_app(cells: int = 2500, seed: int = 1) -> FastAPI:
     """The app serving the page and the simulation's WebSocket."""
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
-        app.state.runner = Runner(await asyncio.to_thread(Simulation, joints, seed))
+        app.state.runner = Runner(await asyncio.to_thread(Simulation, cells, seed))
         task = asyncio.create_task(app.state.runner.run())
         yield
         task.cancel()

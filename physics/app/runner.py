@@ -3,14 +3,14 @@
 Contract: `Runner(simulation)` serves page connections (`serve(socket)`) and
 runs the stepping loop (`run()`, one asyncio task for the app's life). A new
 page gets settings, mesh and frame at once. Client messages: "start" (step
-at `speed` steps per second, mesh sent), "pause", "reset" (seed, joints
-clamped to JOINT_RANGE; settings, mesh and frame sent), "settings" (values
+at `speed` steps per second, mesh sent), "pause", "reset" (seed, cells
+clamped to CELL_RANGE; settings, mesh and frame sent), "settings" (values
 applied, settings echoed). Every page gets every message (one shared
 simulation). Frames go out at most FRAMES_PER_SECOND; a mesh goes out after
-any step that changed the connection list. Steps, resets and frames run in a
+any step that changed the joint list. Steps, resets and frames run in a
 worker thread under one lock, so the server keeps answering. A bad message or
 a failed step is printed on the console; a failed step pauses the run, and so does a
-step that leaves no connection (every joint fell into one). A page
+step that leaves no joint (every energy volume fell into one). A page
 that disconnects or cannot be sent to is dropped.
 """
 from __future__ import annotations
@@ -28,7 +28,7 @@ from physics.app.settings_message import settings_message
 from physics.app.simulation import Simulation
 
 FRAMES_PER_SECOND = 15
-JOINT_RANGE = (50, 20000)
+CELL_RANGE = (50, 20000)
 
 
 class Runner:
@@ -82,8 +82,8 @@ class Runner:
                 self.started = False
                 return []
             outgoing = [mesh_message(self.simulation)] if changed else []
-            if self.simulation.network.connection_count == 0:
-                print("paused: every joint fell into one, no connection is left", flush=True)
+            if len(self.simulation.grid.joints) == 0:
+                print("paused: every energy volume fell into one, no joint is left", flush=True)
                 self.started = False
             if not self.started or begun - self._last_frame >= 1.0 / FRAMES_PER_SECOND:
                 self._last_frame = begun
@@ -98,7 +98,7 @@ class Runner:
             elif kind == "pause":
                 self.started = False
             elif kind == "reset":
-                await self._reset(int(message["seed"]), int(message["joints"]))
+                await self._reset(int(message["seed"]), int(message["cells"]))
             elif kind == "settings":
                 await self._settings(dict(message["values"]))
             else:
@@ -111,10 +111,10 @@ class Runner:
         self._wake.set()
         await self._broadcast(mesh_message(self.simulation))
 
-    async def _reset(self, seed: int, joints: int) -> None:
-        joints = min(max(joints, JOINT_RANGE[0]), JOINT_RANGE[1])
+    async def _reset(self, seed: int, cells: int) -> None:
+        cells = min(max(cells, CELL_RANGE[0]), CELL_RANGE[1])
         async with self._lock:
-            await asyncio.to_thread(self.simulation.reset, seed, joints)
+            await asyncio.to_thread(self.simulation.reset, seed, cells)
             frame = await asyncio.to_thread(frame_message, self.simulation)
             outgoing = [settings_message(self.simulation), mesh_message(self.simulation), frame]
         for message in outgoing:

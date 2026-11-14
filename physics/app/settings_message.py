@@ -1,8 +1,8 @@
 """The "settings" message: every control's current value and allowed range.
 
 Contract: `settings_message(simulation)` returns {"type": "settings",
-"values": {name: {"value", "min", "max"}}} for every RuleSettings field plus
-"unevenness" and "speed", in RuleSettings order then those two.
+"values": {name: {"value", "min", "max"}}} for every CellSettings field plus
+"unevenness" and "speed", in CellSettings order then those two.
 """
 from __future__ import annotations
 
@@ -14,6 +14,6 @@ def settings_message(simulation: Simulation) -> dict:
     values = {}
     for name, (lowest, highest) in simulation.ranges.items():
         source = simulation.settings if name in RULE_NAMES else simulation
-        values[name] = {"value": getattr(source, name), "min": lowest, "max": highest}
+        values[name] = {"value": float(getattr(source, name)), "min": lowest, "max": highest}
     ordered = [*RULE_NAMES, "unevenness", "speed"]
     return {"type": "settings", "values": {name: values[name] for name in ordered}}

@@ -14,19 +14,21 @@
     --muted: #8593a6;
     --accent: #5b8cff;
     --warn: #ff7a45;
-    --dot: #cfd8e3;
+    --joint: #6f7d94;
+    --joint-hot: #ffd166;
   }
   @media (prefers-color-scheme: light) {
     :root {
       color-scheme: light;
-      --bg: #f4f6f9;
+      --bg: #eef1f5;
       --panel: rgba(255, 255, 255, 0.94);
       --line: #d5dbe4;
       --text: #18202b;
       --muted: #5c6878;
       --accent: #2f5fd8;
       --warn: #c4461a;
-      --dot: #2a3340;
+      --joint: #4a5566;
+      --joint-hot: #e0730b;
     }
   }
   * { box-sizing: border-box; }
@@ -60,9 +62,11 @@
   .setting input { width: 100%; margin: 2px 0 0; accent-color: var(--accent); }
   #stats div { font-variant-numeric: tabular-nums; }
   #stats span { color: var(--muted); }
-  #legend { height: 8px; border-radius: 4px; margin: 4px 0 2px;
-    background: linear-gradient(90deg, rgb(51,102,242), rgb(170,150,200), rgb(255,90,40)); }
+  .legend { height: 8px; border-radius: 4px; margin: 4px 0 2px; }
+  #energyLegend { background: linear-gradient(90deg, rgb(51,102,242), rgb(170,150,200), rgb(255,90,40)); }
+  #squeezeLegend { background: linear-gradient(90deg, color-mix(in srgb, var(--joint) 25%, transparent), var(--joint-hot)); }
   .legend-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+  .caption { font-size: 13px; margin-top: 10px; }
   #state { color: var(--muted); font-size: 12px; margin-left: auto; }
   #offline[hidden] { display: none; }
   #offline { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -93,23 +97,28 @@
   <h2>Reset</h2>
   <div class="row">
     <label for="seed">seed</label><input id="seed" type="number" value="1" step="1">
-    <label for="jointCount">joints</label><input id="jointCount" type="number" value="2500" min="2" step="1">
+    <label for="cellCount">energy volumes</label><input id="cellCount" type="number" value="2500" min="50" step="1">
   </div>
   <div class="row" style="margin-top:8px"><button id="reset" type="button">Reset</button></div>
 
   <h2>Now</h2>
   <div id="stats"><div><span>waiting for the simulation</span></div></div>
 
-  <h2>Energy on a connection</h2>
-  <div id="legend"></div>
-  <div class="legend-ends"><span>low</span><span>high</span></div>
+  <h2>Look</h2>
+  <div class="caption">energy volume: how packed its energy is</div>
+  <div id="energyLegend" class="legend"></div>
+  <div class="legend-ends"><span>thin</span><span>packed</span></div>
+  <div class="caption">joint: how close its push is to the push limit</div>
+  <div id="squeezeLegend" class="legend"></div>
+  <div class="legend-ends"><span>relaxed</span><span>about to collapse</span></div>
   <div class="row" style="margin-top:8px">
     <label><input id="showJoints" type="checkbox" checked> show joints</label>
   </div>
+  <div id="viewSettings"></div>
 
   <h2>Run</h2>
   <div id="runSettings"></div>
-  <h2>Rules</h2>
+  <h2>Rules (all on)</h2>
   <div id="ruleSettings"><div style="color:var(--muted)">settings arrive once connected</div></div>
 </aside>
 <button id="toggle" type="button">controls</button>
@@ -126,20 +135,13 @@
 const LABELS = {
   speed: "speed (steps per second)",
   unevenness: "starting unevenness of energy",
-  energy_length: "energy keeps length matched",
-  energy_flow: "energy flow between neighbours",
-  drift: "drift (all space stretches)",
-  attraction: "attraction (gravity strength)",
-  joint_push: "joint push",
-  push_limit: "push limit before a joint collapses",
-  repulsion: "joint repulsion",
-  rewiring: "rewiring moves per step",
-  target_degree: "connections per joint (aim)",
-  target_triangles: "triangles per joint (aim)",
-  triangle_weight: "triangles against connections",
+  attraction: "pull between energy volumes",
+  joint_push: "joint push (push back per squeeze)",
+  push_limit: "push limit (past it, joint collapse)",
+  drift: "drift (every energy volume grows)",
+  energy_flow: "energy flow through joints",
 };
 const RUN_SETTINGS = new Set(["speed", "unevenness"]);
-const INTEGER_SETTINGS = new Set(["rewiring"]);
 
 /* ---------- three.js scene ---------- */
 const canvas = document.getElementById("view");
@@ -148,102 +150,196 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(50, 1, 0.001, 1e6);
 
-const lineGeometry = new THREE.BufferGeometry();
-const lineMaterial = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 });
-const lines = new THREE.LineSegments(lineGeometry, lineMaterial);
-lines.frustumCulled = false;
-scene.add(lines);
+/* Uniforms every material shares: the cutaway plane and the pixel scale. */
+const shared = {
+  pointScale: { value: 500 },
+  sizeFactor: { value: 1 },
+  cutOrigin: { value: new THREE.Vector3() },
+  cutNormal: { value: new THREE.Vector3(0, 0, 1) },
+  cutDepth: { value: 1e9 },
+  lowColor: { value: new THREE.Color(0.20, 0.40, 0.95) },
+  midColor: { value: new THREE.Color(0.67, 0.59, 0.78) },
+  highColor: { value: new THREE.Color(1.0, 0.35, 0.16) },
+};
 
+const CELL_VERTEX = `
+uniform float pointScale; uniform float sizeFactor; uniform float spread;
+uniform vec3 cutOrigin; uniform vec3 cutNormal; uniform float cutDepth;
+attribute float radius; attribute float energy;
+varying float vEnergy; varying float vCut;
+void main() {
+  vEnergy = energy;
+  vCut = dot(position - cutOrigin, cutNormal) > cutDepth ? 1.0 : 0.0;
+  vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
+  gl_Position = projectionMatrix * viewPosition;
+  gl_PointSize = vCut > 0.5 ? 0.0 : max(1.5, 2.0 * radius * sizeFactor * spread * pointScale / -viewPosition.z);
+}`;
+
+const CELL_FRAGMENT = `
+uniform vec3 lowColor; uniform vec3 midColor; uniform vec3 highColor;
+varying float vEnergy; varying float vCut;
+vec3 ramp(float level) {
+  return level < 0.5 ? mix(lowColor, midColor, level * 2.0) : mix(midColor, highColor, level * 2.0 - 1.0);
+}
+void main() {
+  if (vCut > 0.5) discard;
+  vec2 spot = gl_PointCoord * 2.0 - 1.0;
+  float reach = dot(spot, spot);
+  if (reach > 1.0) discard;
+  vec3 normal = vec3(spot.x, -spot.y, sqrt(1.0 - reach));
+  float light = 0.3 + 0.7 * max(dot(normal, normalize(vec3(-0.35, 0.55, 0.75))), 0.0);
+  float glow = smoothstep(0.55, 1.0, vEnergy);
+  vec3 base = ramp(vEnergy);
+  gl_FragColor = vec4(base * mix(light, 1.0, glow * 0.6) + base * glow * 0.5, 1.0);
+}`;
+
+const GLOW_FRAGMENT = `
+uniform vec3 highColor;
+varying float vEnergy; varying float vCut;
+void main() {
+  if (vCut > 0.5) discard;
+  float reach = length(gl_PointCoord * 2.0 - 1.0);
+  if (reach > 1.0) discard;
+  float fade = (1.0 - reach) * (1.0 - reach);
+  gl_FragColor = vec4(highColor * smoothstep(0.55, 1.0, vEnergy) * fade * 0.55, 1.0);
+}`;
+
+const JOINT_VERTEX = `
+uniform vec3 cutOrigin; uniform vec3 cutNormal; uniform float cutDepth;
+attribute vec3 tint; attribute float alpha;
+varying vec3 vTint; varying float vAlpha; varying float vDepth;
+void main() {
+  vTint = tint; vAlpha = alpha;
+  vDepth = dot(position - cutOrigin, cutNormal) - cutDepth;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+const JOINT_FRAGMENT = `
+varying vec3 vTint; varying float vAlpha; varying float vDepth;
+void main() {
+  if (vDepth > 0.0 || vAlpha < 0.01) discard;
+  gl_FragColor = vec4(vTint, vAlpha);
+}`;
+
+/** Return a ShaderMaterial on the shared uniforms plus `extra`. */
+function shaderMaterial(vertexShader, fragmentShader, extra, options) {
+  return new THREE.ShaderMaterial({ vertexShader, fragmentShader,
+    uniforms: Object.assign({}, shared, extra), ...options });
+}
+
+const cellGeometry = new THREE.BufferGeometry();
+const cellPoints = new THREE.Points(cellGeometry,
+  shaderMaterial(CELL_VERTEX, CELL_FRAGMENT, { spread: { value: 1 } }, {}));
+const glowPoints = new THREE.Points(cellGeometry,
+  shaderMaterial(CELL_VERTEX, GLOW_FRAGMENT, { spread: { value: 2.4 } },
+    { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
 const jointGeometry = new THREE.BufferGeometry();
-const jointMaterial = new THREE.PointsMaterial({ size: 4, sizeAttenuation: false,
-  map: roundDotTexture(), alphaTest: 0.5, transparent: true });
-const jointPoints = new THREE.Points(jointGeometry, jointMaterial);
-jointPoints.frustumCulled = false;
-scene.add(jointPoints);
-
-/** Return a small white disc texture so points draw as round dots. */
-function roundDotTexture() {
-  const dotCanvas = document.createElement("canvas");
-  dotCanvas.width = dotCanvas.height = 32;
-  const context = dotCanvas.getContext("2d");
-  context.fillStyle = "#fff";
-  context.beginPath();
-  context.arc(16, 16, 14, 0, Math.PI * 2);
-  context.fill();
-  return new THREE.CanvasTexture(dotCanvas);
+const jointLines = new THREE.LineSegments(jointGeometry,
+  shaderMaterial(JOINT_VERTEX, JOINT_FRAGMENT, {}, { transparent: true, depthWrite: false }));
+for (const [order, object] of [[0, cellPoints], [1, jointLines], [2, glowPoints]]) {
+  object.frustumCulled = false;
+  object.renderOrder = order;
+  scene.add(object);
 }
 
 /* ---------- mesh state: buffers resized only when a mesh message arrives ---------- */
 const mesh = {
-  jointCount: 0,
-  pairs: new Uint32Array(0),     // i0, j0, i1, j1, ...
+  cellCount: 0,
+  pairs: new Uint32Array(0),          // i0, j0, i1, j1, ... (one joint per pair)
+  cellPositions: new Float32Array(0),
+  cellRadius: new Float32Array(0),
+  cellEnergy: new Float32Array(0),
   linePositions: new Float32Array(0),
-  lineColors: new Float32Array(0),
-  jointPositions: new Float32Array(0),
+  lineTints: new Float32Array(0),
+  lineAlpha: new Float32Array(0),
   hasFrame: false,
 };
 
-/** Install a new connection list: reallocate buffers only when capacity grows. */
+/** Point `geometry`'s attribute `name` at a new buffer of `size` floats per item. */
+function attach(geometry, name, array, size) {
+  geometry.setAttribute(name, new THREE.BufferAttribute(array, size));
+  return array;
+}
+
+mesh.cellPositions = attach(cellGeometry, "position", mesh.cellPositions, 3);
+mesh.cellRadius = attach(cellGeometry, "radius", mesh.cellRadius, 1);
+mesh.cellEnergy = attach(cellGeometry, "energy", mesh.cellEnergy, 1);
+mesh.linePositions = attach(jointGeometry, "position", mesh.linePositions, 3);
+mesh.lineTints = attach(jointGeometry, "tint", mesh.lineTints, 3);
+mesh.lineAlpha = attach(jointGeometry, "alpha", mesh.lineAlpha, 1);
+
+/** Install a new joint list: reallocate buffers only when capacity grows. */
 function applyMesh(message) {
-  const pairCount = Math.floor(message.pairs.length / 2);
-  mesh.jointCount = message.joints;
+  const jointCount = Math.floor(message.pairs.length / 2);
+  mesh.cellCount = message.cells;
   mesh.pairs = Uint32Array.from(message.pairs);
-  if (mesh.linePositions.length < pairCount * 6) {
-    mesh.linePositions = new Float32Array(pairCount * 6);
-    mesh.lineColors = new Float32Array(pairCount * 6);
-    lineGeometry.setAttribute("position", new THREE.BufferAttribute(mesh.linePositions, 3));
-    lineGeometry.setAttribute("color", new THREE.BufferAttribute(mesh.lineColors, 3));
+  if (mesh.cellRadius.length < mesh.cellCount) {
+    mesh.cellPositions = attach(cellGeometry, "position", new Float32Array(mesh.cellCount * 3), 3);
+    mesh.cellRadius = attach(cellGeometry, "radius", new Float32Array(mesh.cellCount), 1);
+    mesh.cellEnergy = attach(cellGeometry, "energy", new Float32Array(mesh.cellCount), 1);
   }
-  if (mesh.jointPositions.length < mesh.jointCount * 3) {
-    mesh.jointPositions = new Float32Array(mesh.jointCount * 3);
-    jointGeometry.setAttribute("position", new THREE.BufferAttribute(mesh.jointPositions, 3));
+  if (mesh.lineAlpha.length < jointCount * 2) {
+    mesh.linePositions = attach(jointGeometry, "position", new Float32Array(jointCount * 6), 3);
+    mesh.lineTints = attach(jointGeometry, "tint", new Float32Array(jointCount * 6), 3);
+    mesh.lineAlpha = attach(jointGeometry, "alpha", new Float32Array(jointCount * 2), 1);
   }
-  lineGeometry.setDrawRange(0, mesh.hasFrame ? pairCount * 2 : 0);
-  jointGeometry.setDrawRange(0, mesh.hasFrame ? mesh.jointCount : 0);
+  jointGeometry.setDrawRange(0, mesh.hasFrame ? jointCount * 2 : 0);
+  cellGeometry.setDrawRange(0, mesh.hasFrame ? mesh.cellCount : 0);
 }
 
-const LOW = [0.20, 0.40, 0.95], MID = [0.67, 0.59, 0.78], HIGH = [1.0, 0.35, 0.16];
+const WRAP_FACTOR = 3;   // a joint this many radius sums long goes across the wrap-around: not drawn
+const jointColors = { relaxed: new THREE.Color(), hot: new THREE.Color() };
 
-/** Write the energy colour for a 0..1 level into `target` at `offset`. */
-function energyColor(level, target, offset) {
-  const clamped = Math.min(1, Math.max(0, level || 0));
-  const [from, to, part] = clamped < 0.5 ? [LOW, MID, clamped * 2] : [MID, HIGH, clamped * 2 - 1];
+/** Write joint `joint`'s line ends, tint and alpha from the positions, radii and its squeeze. */
+function writeJoint(joint, positions, radius, level, relaxed, hot) {
+  const from = mesh.pairs[joint * 2], to = mesh.pairs[joint * 2 + 1], out = joint * 6;
+  for (let axis = 0; axis < 3; axis++) {
+    mesh.linePositions[out + axis] = positions[from * 3 + axis];
+    mesh.linePositions[out + 3 + axis] = positions[to * 3 + axis];
+  }
+  const length = Math.hypot(positions[from * 3] - positions[to * 3],
+    positions[from * 3 + 1] - positions[to * 3 + 1], positions[from * 3 + 2] - positions[to * 3 + 2]);
+  const across = length > WRAP_FACTOR * (radius[from] + radius[to]);
+  const squeeze = Math.min(1, Math.max(0, level || 0));
+  const alpha = across ? 0 : 0.07 + 0.88 * squeeze * squeeze;
   for (let channel = 0; channel < 3; channel++) {
-    target[offset + channel] = from[channel] + (to[channel] - from[channel]) * part;
+    const tint = relaxed[channel] + (hot[channel] - relaxed[channel]) * squeeze;
+    mesh.lineTints[out + channel] = mesh.lineTints[out + 3 + channel] = tint;
   }
+  mesh.lineAlpha[joint * 2] = mesh.lineAlpha[joint * 2 + 1] = alpha;
 }
 
-/** Copy one frame's positions and energies into the existing buffers. */
+/** Copy one frame's positions, radii, energies and squeezes into the existing buffers. */
 function applyFrame(message) {
-  const positions = message.positions, energy = message.energy;
-  if (!positions || positions.length !== mesh.jointCount * 3) return false;
-  const pairCount = mesh.pairs.length / 2;
-  mesh.jointPositions.set(positions);
-  for (let pair = 0; pair < pairCount; pair++) {
-    const from = mesh.pairs[pair * 2] * 3, to = mesh.pairs[pair * 2 + 1] * 3, out = pair * 6;
-    mesh.linePositions[out] = positions[from];
-    mesh.linePositions[out + 1] = positions[from + 1];
-    mesh.linePositions[out + 2] = positions[from + 2];
-    mesh.linePositions[out + 3] = positions[to];
-    mesh.linePositions[out + 4] = positions[to + 1];
-    mesh.linePositions[out + 5] = positions[to + 2];
-    const level = energy && pair < energy.length ? energy[pair] : 0;
-    energyColor(level, mesh.lineColors, out);
-    mesh.lineColors[out + 3] = mesh.lineColors[out];
-    mesh.lineColors[out + 4] = mesh.lineColors[out + 1];
-    mesh.lineColors[out + 5] = mesh.lineColors[out + 2];
+  const { positions, radius, energy, squeeze } = message;
+  if (!positions || positions.length !== mesh.cellCount * 3) return false;
+  if (!radius || radius.length !== mesh.cellCount) return false;
+  mesh.cellPositions.set(positions);
+  mesh.cellRadius.set(radius);
+  if (energy && energy.length === mesh.cellCount) mesh.cellEnergy.set(energy);
+  const jointCount = mesh.pairs.length / 2;
+  const relaxed = jointColors.relaxed.toArray(), hot = jointColors.hot.toArray();
+  for (let joint = 0; joint < jointCount; joint++) {
+    writeJoint(joint, positions, radius, squeeze && joint < squeeze.length ? squeeze[joint] : 0, relaxed, hot);
   }
-  lineGeometry.attributes.position.needsUpdate = true;
-  lineGeometry.attributes.color.needsUpdate = true;
-  jointGeometry.attributes.position.needsUpdate = true;
-  lineGeometry.setDrawRange(0, pairCount * 2);
-  jointGeometry.setDrawRange(0, mesh.jointCount);
+  for (const name of ["position", "radius", "energy"]) cellGeometry.attributes[name].needsUpdate = true;
+  for (const name of ["position", "tint", "alpha"]) jointGeometry.attributes[name].needsUpdate = true;
+  jointGeometry.setDrawRange(0, jointCount * 2);
+  cellGeometry.setDrawRange(0, mesh.cellCount);
   mesh.hasFrame = true;
   return true;
 }
 
-/* ---------- camera: orbit around a target, never auto-fit per frame ---------- */
-const orbit = { target: new THREE.Vector3(), distance: 10, azimuth: 0.6, elevation: 0.4 };
+/* ---------- camera: orbit around a target, never auto-zoom per frame ---------- */
+const orbit = { target: new THREE.Vector3(), distance: 10, azimuth: 0.6, elevation: 0.4, extent: 1 };
+let cutaway = 0;
+
+/** Place the cutaway plane: facing the camera, `cutaway` of the way through the mesh. */
+function placeCut() {
+  shared.cutOrigin.value.copy(orbit.target);
+  shared.cutNormal.value.copy(camera.position).sub(orbit.target).normalize();
+  shared.cutDepth.value = cutaway > 0 ? orbit.extent * (1 - 2 * cutaway) : 1e9;
+}
 
 /** Place the camera from the orbit state. */
 function placeCamera() {
@@ -256,33 +352,35 @@ function placeCamera() {
   camera.far = orbit.distance * 1000;
   camera.updateProjectionMatrix();
   camera.lookAt(orbit.target);
+  placeCut();
   requestDraw();
 }
 
-/** Move the orbit target to the centre of the joints; return their largest distance from it. */
+/** Move the orbit target to the centre of the energy volumes; return their largest distance from it. */
 function recentre() {
-  const count = mesh.jointCount, points = mesh.jointPositions;
+  const count = mesh.cellCount, points = mesh.cellPositions;
   if (!mesh.hasFrame || count === 0) return 0;
   let sumX = 0, sumY = 0, sumZ = 0;
-  for (let joint = 0; joint < count; joint++) {
-    sumX += points[joint * 3]; sumY += points[joint * 3 + 1]; sumZ += points[joint * 3 + 2];
+  for (let cell = 0; cell < count; cell++) {
+    sumX += points[cell * 3]; sumY += points[cell * 3 + 1]; sumZ += points[cell * 3 + 2];
   }
   orbit.target.set(sumX / count, sumY / count, sumZ / count);
-  let radius = 0;
-  for (let joint = 0; joint < count; joint++) {
-    const dx = points[joint * 3] - orbit.target.x, dy = points[joint * 3 + 1] - orbit.target.y,
-      dz = points[joint * 3 + 2] - orbit.target.z;
-    radius = Math.max(radius, Math.sqrt(dx * dx + dy * dy + dz * dz));
+  let extent = 0;
+  for (let cell = 0; cell < count; cell++) {
+    const dx = points[cell * 3] - orbit.target.x, dy = points[cell * 3 + 1] - orbit.target.y,
+      dz = points[cell * 3 + 2] - orbit.target.z;
+    extent = Math.max(extent, Math.sqrt(dx * dx + dy * dy + dz * dz) + mesh.cellRadius[cell]);
   }
+  orbit.extent = extent || 1;
   placeCamera();
-  return radius;
+  return extent;
 }
 
-/** Recentre and zoom so the whole network fills the view. */
+/** Recentre and zoom so the whole grid fills the view. */
 function fit() {
-  const radius = recentre();
-  if (radius > 0) {
-    orbit.distance = radius / Math.sin((camera.fov * Math.PI / 180) / 2) * 1.05;
+  const extent = recentre();
+  if (extent > 0) {
+    orbit.distance = extent / Math.sin((camera.fov * Math.PI / 180) / 2) * 1.05;
     placeCamera();
   }
 }
@@ -340,11 +438,13 @@ function requestDraw() {
   requestAnimationFrame(() => { drawPending = false; renderer.render(scene, camera); });
 }
 
-/** Match renderer size and camera aspect to the window. */
+/** Match renderer size, camera aspect and point scale to the window. */
 function resize() {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   camera.aspect = window.innerWidth / Math.max(1, window.innerHeight);
   camera.updateProjectionMatrix();
+  const pixels = window.innerHeight * renderer.getPixelRatio();
+  shared.pointScale.value = pixels / (2 * Math.tan((camera.fov * Math.PI / 180) / 2));
   requestDraw();
 }
 
@@ -352,14 +452,15 @@ function resize() {
 function applyTheme() {
   const style = getComputedStyle(document.documentElement);
   scene.background = new THREE.Color(style.getPropertyValue("--bg").trim());
-  jointMaterial.color = new THREE.Color(style.getPropertyValue("--dot").trim());
+  jointColors.relaxed.set(style.getPropertyValue("--joint").trim());
+  jointColors.hot.set(style.getPropertyValue("--joint-hot").trim());
   requestDraw();
 }
 
 window.addEventListener("resize", resize);
 window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", applyTheme);
 document.getElementById("showJoints").addEventListener("change", (event) => {
-  jointPoints.visible = event.target.checked;
+  jointLines.visible = event.target.checked;
   requestDraw();
 });
 
@@ -385,8 +486,8 @@ runButton.addEventListener("click", () => {
 });
 document.getElementById("reset").addEventListener("click", () => {
   const seed = parseInt(document.getElementById("seed").value, 10) || 0;
-  const joints = Math.max(2, parseInt(document.getElementById("jointCount").value, 10) || 2);
-  send({ type: "reset", seed, joints });
+  const cells = Math.max(50, parseInt(document.getElementById("cellCount").value, 10) || 50);
+  send({ type: "reset", seed, cells });
   setRunning(false);
   lastStep = -1;
   fitOnNextFrame = true;
@@ -408,10 +509,10 @@ const statsBox = document.getElementById("stats");
 function showStats(step, stats) {
   const lines = [
     ["step", step],
-    ["joints", stats.joints],
-    ["collapses", stats.collapsed],
-    ["size vs start", stats.mean_length_vs_start == null ? undefined : formatNumber(stats.mean_length_vs_start) + "x"],
-    ["energy spread", stats.energy_spread],
+    ["energy volumes", stats.cells],
+    ["joint collapses so far", stats.collapses],
+    ["size vs start", stats.size_vs_start == null ? undefined : formatNumber(stats.size_vs_start) + "x"],
+    ["energy spread (packing)", stats.energy_spread],
     ["lumps", stats.lumps],
   ];
   statsBox.replaceChildren(...lines.map(([label, value]) => {
@@ -429,9 +530,7 @@ let activeSlider = null;
 /** Map a slider position 0..1000 to a setting value. */
 function sliderToValue(entry, position) {
   const { min, max } = entry.spec, part = position / 1000;
-  let value = entry.log ? min * Math.pow(max / min, part) : min + (max - min) * part;
-  if (entry.integer) value = Math.round(value);
-  return value;
+  return entry.log ? min * Math.pow(max / min, part) : min + (max - min) * part;
 }
 
 /** Map a setting value to a slider position 0..1000. */
@@ -442,35 +541,38 @@ function valueToSlider(entry, value) {
   return Math.round(part * 1000);
 }
 
-/** Build one labelled slider for a setting and register it. */
-function buildSlider(name, spec, container) {
+/** Build one labelled range slider into `container`; `onValue` gets each new value. */
+function labelledSlider(text, container, onValue) {
   const wrap = document.createElement("div");
   wrap.className = "setting";
   const top = document.createElement("div");
   top.className = "top";
   const label = document.createElement("span");
-  label.textContent = LABELS[name] || name.replace(/_/g, " ");
+  label.textContent = text;
   const valueLabel = document.createElement("span");
   valueLabel.className = "value";
   top.append(label, valueLabel);
   const input = document.createElement("input");
   input.type = "range"; input.min = "0"; input.max = "1000"; input.step = "1";
-  input.setAttribute("aria-label", label.textContent);
+  input.setAttribute("aria-label", text);
   wrap.append(top, input);
   container.append(wrap);
-  const entry = { input, valueLabel, spec,
-    log: spec.min > 0 && spec.max / spec.min >= 100,
-    integer: INTEGER_SETTINGS.has(name) ||
-      (Number.isInteger(spec.min) && Number.isInteger(spec.max) && Number.isInteger(spec.value) && spec.max - spec.min >= 10) };
+  input.addEventListener("input", () => onValue(Number(input.value)));
+  return { input, valueLabel };
+}
+
+/** Build one server setting's slider and register it. */
+function buildSlider(name, spec, container) {
   let sendTimer = 0;
-  input.addEventListener("pointerdown", () => { activeSlider = name; });
-  input.addEventListener("input", () => {
-    const value = sliderToValue(entry, Number(input.value));
-    valueLabel.textContent = formatNumber(value);
+  const entry = { spec, log: spec.min > 0 && spec.max / spec.min >= 100 };
+  Object.assign(entry, labelledSlider(LABELS[name] || name.replace(/_/g, " "), container, (position) => {
+    const value = sliderToValue(entry, position);
+    entry.valueLabel.textContent = formatNumber(value);
     clearTimeout(sendTimer);
     sendTimer = setTimeout(() => send({ type: "settings", values: { [name]: value } }), 80);
-  });
-  input.addEventListener("change", () => { activeSlider = null; });
+  }));
+  entry.input.addEventListener("pointerdown", () => { activeSlider = name; });
+  entry.input.addEventListener("change", () => { activeSlider = null; });
   sliders.set(name, entry);
   return entry;
 }
@@ -492,6 +594,26 @@ function applySettings(values) {
     entry.input.value = String(valueToSlider(entry, entry.spec.value));
     entry.valueLabel.textContent = formatNumber(entry.spec.value);
   }
+}
+
+/** Build the page-only view sliders: cutaway depth and drawn volume size. */
+function buildViewSliders() {
+  const box = document.getElementById("viewSettings");
+  const cut = labelledSlider("cutaway (look inside)", box, (position) => {
+    cutaway = position / 1000 * 0.95;
+    cut.valueLabel.textContent = Math.round(cutaway * 100) + "%";
+    placeCut();
+    requestDraw();
+  });
+  cut.input.value = "0";
+  cut.valueLabel.textContent = "0%";
+  const size = labelledSlider("drawn size of energy volumes", box, (position) => {
+    shared.sizeFactor.value = 0.2 + 0.8 * position / 1000;
+    size.valueLabel.textContent = Math.round(shared.sizeFactor.value * 100) + "%";
+    requestDraw();
+  });
+  size.input.value = "1000";
+  size.valueLabel.textContent = "100%";
 }
 
 /* ---------- connection ---------- */
@@ -558,6 +680,7 @@ function connect() {
   });
 }
 
+buildViewSliders();
 resize();
 applyTheme();
 placeCamera();
