@@ -2489,6 +2489,7 @@ source = { editable = "physics" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
+    { name = "pyvoro2" },
     { name = "scipy" },
 ]
 
@@ -2496,6 +2497,7 @@ dependencies = [
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.9" },
     { name = "numpy", specifier = ">=2.0" },
+    { name = "pyvoro2", specifier = "==0.8.0" },
     { name = "scipy", specifier = ">=1.13" },
 ]
 
@@ -3079,6 +3081,29 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/9f/b7/15b905f6142a9a8a68f66900788da1a32e4d4254452783b37ad1eccb0506/python_multipart-0.0.33.tar.gz", hash = "sha256:b8112424a6abd162ec08d390565dd113ad699f2fe6fef3c987b8bbcbfe9e390d", size = 50499, upload-time = "2026-10-31T14:23:47.461Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/dd/1b/6b1b4164ec734cac911460ab599bfbe46afedd42c5c9627fe4235942c314/python_multipart-0.0.33-py3-none-any.whl", hash = "sha256:8f16c07b36add9da6b2ee87d3efcaf0a45a6de9c3d0a5dd94e9ccf7675a7bc45", size = 32253, upload-time = "2026-10-31T14:23:46.33Z" },
+]
+
+[[package]]
+name = "pyvoro2"
+version = "0.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ca/0a/8c3fb40d6199788fc95592c8ff2329adcd20135b8d1600648d3b3d70db2d/pyvoro2-0.8.0.tar.gz", hash = "sha256:27c525394b0881230cc7f68d8b8d3c695275d349cae37ddce13e34e0232e0c6a", size = 1382585, upload-time = "2026-08-17T19:56:33.822Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/2d/b857564bb1862b9284de50a1e7e40a4243734090e16db5b9a50048f98329/pyvoro2-0.8.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:6ad635a2482bfca7f38d878b61cb099370b287f9ed56b2a3e299cca9120e7c3f", size = 651838, upload-time = "2026-08-17T19:56:17.868Z" },
+    { url = "https://files.pythonhosted.org/packages/94/45/199222f2b0270b895233c8bb0176324ff3097f2d2c94a1b17531fd86672a/pyvoro2-0.8.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:f2d03063f5f0f716b0c1e6ba830a5b764cafe22b7c119185c5bab2263c19a6f6", size = 606985, upload-time = "2026-08-17T19:56:19.49Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/c6/2e9bad8eaab12d61a700b2865cf218360af36ac9e0846dfadb799ee9bb25/pyvoro2-0.8.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:266b996a8379b0a183b73e440b95c7300df560e5349f58492b6f185130a90bf2", size = 711631, upload-time = "2026-08-17T19:56:20.849Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/92/2f86f88698680536b5810b2a0d354cc514b47aab873e946ed6393ee56896/pyvoro2-0.8.0-cp312-cp312-win_amd64.whl", hash = "sha256:c48c8e8349cb7c20eafbe3b7ee0bbd6553f242d5356ddc376729c050240a1071", size = 644022, upload-time = "2026-08-17T19:56:22.163Z" },
+    { url = "https://files.pythonhosted.org/packages/65/60/0af95133b2dd56ab6dfabf689c75d43c3333f08ce1e28a57ec7f04be0191/pyvoro2-0.8.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:ebbd1131d4fd54ef2dd224eb471f56954e9d893219c833686af0201141d847ff", size = 652016, upload-time = "2026-08-17T19:56:23.604Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/36/72a19f19fe3fe4ac83b19361bb0ac3ec98a66357a69c321da8f9ca94231d/pyvoro2-0.8.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:7a1fd066fec9e34cbb7e6f6ed82d10bc1dca31dde5f9daafbc5c15891fca1fa3", size = 607132, upload-time = "2026-08-17T19:56:25.14Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/6b/bfa811c5f189dbd285788325c288fc3cba37637c3a7b9db777a55ec78ab8/pyvoro2-0.8.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:52a18551344079f9fb7c2bc07c2c24126dd6b892b9de20a15961bbe2966b5437", size = 711751, upload-time = "2026-08-17T19:56:26.369Z" },
+    { url = "https://files.pythonhosted.org/packages/df/1d/2b58b32172f5111a8309895ca1fa7ae386289111f07709bcf219f4bf0471/pyvoro2-0.8.0-cp313-cp313-win_amd64.whl", hash = "sha256:5d45ee1a3a284b0ba51791d2749c377c541e33ab1d8d3674b95e8615e4d6968d", size = 644049, upload-time = "2026-08-17T19:56:27.699Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/4f/e50851b7d459e9298aa0b1e9aab14892bb1126465298893cb5e4ad8fe6fa/pyvoro2-0.8.0-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:2b2f7ae06da8147b54790bc3d6a9d8980cc3a4d0d150caa1338937f32d7fcc1c", size = 652159, upload-time = "2026-08-17T19:56:29.101Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/7e/1014f8c034d20cee7e35697c3655aededd42d3b55b65d46185128cdabcd2/pyvoro2-0.8.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:8534f88b253bac9035e2e2d68ab23a1b7d3c2c943b743f3717d0b22f6d9b5a06", size = 607551, upload-time = "2026-08-17T19:56:30.156Z" },
+    { url = "https://files.pythonhosted.org/packages/97/0f/9dfa07088a628b968b5f59eaad1f985e47d98445cbefc3bbf036fc88a304/pyvoro2-0.8.0-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:dd8470cd91b7091fb73bec46ade24889de364b908a747f8caf17151ebf46420a", size = 712220, upload-time = "2026-08-17T19:56:31.295Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/60/fa713444f2b9ea20efc6b4f731af4ac0dfb20c03707decd4f58ba7a7c97f/pyvoro2-0.8.0-cp314-cp314-win_amd64.whl", hash = "sha256:513c4f0d2de1a4ed555c5d62b982f9a3a901d25eb560904d5868466847a7b1ed", size = 653251, upload-time = "2026-08-17T19:56:32.517Z" },
 ]
 
 [[package]]

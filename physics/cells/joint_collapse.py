@@ -2,7 +2,7 @@
 
 Contract: `joint_collapse(grid, giving_way)` takes a boolean per joint and returns
 a new Grid (bible rule 8). Only the joints marked giving way join energy volumes;
-step() marks exactly those whose volume fell below push_limit times their rest volume.
+apply_rules() marks exactly those whose volume fell below push_limit times their rest volume.
   merge     the volumes on both sides of every joint that gives way become one
             energy volume; chains of collapses in one step become one volume
             (connected components of the giving-way joints, i.e. union-find).

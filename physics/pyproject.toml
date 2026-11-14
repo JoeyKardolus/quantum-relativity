@@ -3,7 +3,7 @@ name = "physics"
 version = "0"
 description = "Connection theory simulation: a network of joints and connections, measured without coordinates."
 requires-python = ">=3.12"
-dependencies = ["numpy>=2.0", "scipy>=1.13", "matplotlib>=3.9"]
+dependencies = ["numpy>=2.0", "scipy>=1.13", "matplotlib>=3.9", "pyvoro2==0.8.0"]
 
 [build-system]
 requires = ["setuptools>=69"]

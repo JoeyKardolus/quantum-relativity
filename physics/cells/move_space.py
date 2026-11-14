@@ -1,7 +1,7 @@
 """Move space: pull, push, the energy-volume rule and the leak, without joint collapse.
 
 Contract: `move_space(grid, settings)` returns a new Grid with the same energy
-volumes and joints (merged_into None, squeeze unchanged: step() sets both).
+volumes and joints (merged_into None, squeeze unchanged: apply_rules() sets both).
 Total space S = sum V + sum J. Pull, push and the leak's shares are read from
 the grid at the start:
   1. pull     p = pull_potential(grid); joint (a, b) is pulled by
@@ -41,11 +41,11 @@ from physics.cells.joint_rest import joint_rest
 from physics.cells.leak import leak
 from physics.cells.pull_potential import pull_potential
 from physics.cells.rest_volume import VOLUME_SCALE, rest_volume
-from physics.cells.settings import CellSettings
+from physics.cells.engine_settings import EngineSettings
 from physics.cells.share_space import share_space
 
 
-def move_space(grid: Grid, settings: CellSettings) -> Grid:
+def move_space(grid: Grid, settings: EngineSettings) -> Grid:
     """One round of pull, push, energy-volume rule and leak; joints never give way here."""
     exerted = settings.attraction * pull_potential(grid) / 2
     heads, tails = grid.joints[:, 0], grid.joints[:, 1]
@@ -62,7 +62,7 @@ def move_space(grid: Grid, settings: CellSettings) -> Grid:
                    joint_volume=joint_volume)
 
 
-def _swell(grid: Grid, settings: CellSettings, pulled: np.ndarray) -> np.ndarray:
+def _swell(grid: Grid, settings: EngineSettings, pulled: np.ndarray) -> np.ndarray:
     """Push per joint toward its rest volume, capped so no energy volume gives up over half."""
     heads, tails = grid.joints[:, 0], grid.joints[:, 1]
     degree = np.maximum(np.bincount(grid.joints.ravel(), minlength=grid.cell_count), 1)

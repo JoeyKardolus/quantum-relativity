@@ -1,8 +1,8 @@
 """The "settings" message: every control's current value and allowed range.
 
 Contract: `settings_message(simulation)` returns {"type": "settings",
-"values": {name: {"value", "min", "max"}}} for every CellSettings field plus
-"unevenness" and "speed", in CellSettings order then those two.
+"values": {name: {"value", "min", "max"}}} for every EngineSettings field plus
+"unevenness" and "speed", in EngineSettings order then those two.
 """
 from __future__ import annotations
 

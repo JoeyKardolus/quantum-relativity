@@ -14,41 +14,30 @@
     --muted: #8593a6;
     --accent: #5b8cff;
     --warn: #ff7a45;
-    --glass: #cfe3ff;
-    --joint: #5fd39a;
-    --joint-hot: #ffa552;
-    --plain-wall: #8a8f98;
-    --charge-plus: #ff4f4f;
-    --charge-minus: #4f8dff;
-    --charge-none: #9aa3ae;
+    --volume-clear: #ff8a8a;
+    --volume-solid: #a10a14;
+    --joint-clear: #5a7fe0;
+    --joint-solid: #3aa2ff;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
     font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  #view, #foam { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
-  #view.dragging, #foam.dragging { cursor: grabbing; }
-  canvas[hidden] { display: none; }
-  #inset { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; width: 112px; height: 112px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; pointer-events: none; }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  #scene.dragging { cursor: grabbing; }
   #below { position: fixed; left: 16px; right: 16px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
     display: flex; flex-direction: column; gap: 6px; pointer-events: none; max-width: 640px; }
   #below > * { pointer-events: auto; }
   #hint { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
   #legend { display: flex; gap: 6px 14px; flex-wrap: wrap; align-items: center; font-size: 12px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; width: fit-content; max-width: 100%; }
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px;
+    width: fit-content; max-width: 100%; }
   #legend > span { display: inline-flex; align-items: center; gap: 6px; }
   #legend small { color: var(--muted); }
-  .key { display: inline-block; flex: none; }
-  .key.glass { width: 16px; height: 12px; border: 1px solid color-mix(in srgb, var(--glass) 70%, transparent);
-    background: color-mix(in srgb, var(--glass) 10%, transparent); border-radius: 2px; }
-  .key.joint { width: 16px; height: 6px; border-radius: 2px;
-    background: linear-gradient(90deg, color-mix(in srgb, var(--joint) 55%, transparent), var(--joint-hot)); }
-  .key.dot { width: 9px; height: 9px; border-radius: 50%; }
-  .key.dot.plus { background: var(--charge-plus); }
-  .key.dot.minus { background: var(--charge-minus); }
-  .key.dot.none { background: var(--charge-none); }
-  #viewCaption { font-size: 13px; color: var(--text); background: var(--panel); border: 1px solid var(--line);
-    border-radius: 8px; padding: 6px 10px; }
+  .key { display: inline-block; flex: none; width: 28px; height: 12px; border-radius: 2px; }
+  .key.volume { background: linear-gradient(90deg, color-mix(in srgb, var(--volume-clear) 12%, transparent), var(--volume-solid));
+    border: 1px solid color-mix(in srgb, var(--volume-clear) 45%, transparent); }
+  .key.joint { height: 7px; background: linear-gradient(90deg, color-mix(in srgb, var(--joint-clear) 12%, transparent), var(--joint-solid));
+    border: 1px solid color-mix(in srgb, var(--joint-clear) 45%, transparent); }
   #panel { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px;
     bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: 310px; max-width: calc(100vw - 24px);
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
@@ -62,12 +51,10 @@
   button { font: inherit; color: var(--text); background: transparent; border: 1px solid var(--line);
     border-radius: 6px; padding: 5px 11px; cursor: pointer; }
   button:hover { border-color: var(--accent); }
-  button:disabled { opacity: .45; cursor: not-allowed; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; min-width: 80px; }
   button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .row label, .row .label { color: var(--muted); font-size: 12px; }
-  .section[hidden] { display: none; }
   input[type=number] { width: 78px; font: inherit; color: var(--text); background: transparent;
     border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
   .setting { margin: 8px 0; }
@@ -76,13 +63,7 @@
   .setting input { width: 100%; margin: 2px 0 0; accent-color: var(--accent); }
   #stats div { font-variant-numeric: tabular-nums; }
   #stats span { color: var(--muted); }
-  .legend { height: 8px; border-radius: 4px; margin: 4px 0 2px; }
-  #energyLegend { background: linear-gradient(90deg, rgb(51,102,242), rgb(170,150,200), rgb(255,90,40)); }
-  #squeezeLegend { background: linear-gradient(90deg, color-mix(in srgb, var(--joint) 30%, transparent), var(--joint), var(--joint-hot)); }
-  .legend-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
   .caption { font-size: 13px; margin-top: 10px; }
-  .swatch { display: inline-block; width: 22px; height: 0; border-top: 1px solid var(--plain-wall);
-    opacity: .6; vertical-align: middle; margin-right: 6px; }
   #state { color: var(--muted); font-size: 12px; margin-left: auto; }
   #offline[hidden] { display: none; }
   #offline { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -92,28 +73,24 @@
   #offline code { color: var(--warn); }
   @media (max-width: 700px) {
     #panel:not(.collapsed) ~ #toggle { right: 12px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
-    #inset { width: 84px; height: 84px; }
-    #below { right: 16px; bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+    #below { bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
   }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-<canvas id="foam" aria-label="The grid of energy volumes as 3D glass foam, joints as green layers between them"></canvas>
-<canvas id="view" aria-label="A cut through the grid of energy volumes" hidden></canvas>
-<canvas id="inset" aria-label="Where the cut lies in the grid" hidden></canvas>
+<canvas id="scene" aria-label="Energy volumes as red glass cells and joints as blue glass slabs between them, drawn from the engine's own shapes"></canvas>
 
 <div id="below">
   <div id="hint">
     <button id="fit" type="button">fit</button>
-    <span id="hintText">drag to rotate, wheel or pinch to zoom</span>
+    <span>drag to rotate, wheel or pinch to zoom</span>
   </div>
   <div id="legend">
-    <span><i class="key glass"></i>energy volume (pulls)</span>
-    <span><i class="key joint"></i>joint (pushes)</span>
-    <span><i class="key dot plus"></i><i class="key dot none"></i><i class="key dot minus"></i>charge dot <small>+ red, 0 grey, - blue</small></span>
+    <span><i class="key volume"></i>red glass = energy volume (pulls)</span>
+    <span><i class="key joint"></i>blue glass = joint (pushes)</span>
+    <small>more solid = stronger</small>
   </div>
-  <div id="viewCaption"></div>
 </div>
 
 <aside id="panel">
@@ -126,7 +103,7 @@
   <h2>Reset</h2>
   <div class="row">
     <label for="seed">seed</label><input id="seed" type="number" value="1" step="1">
-    <label for="cellCount">energy volumes</label><input id="cellCount" type="number" value="2500" min="50" step="1">
+    <label for="cellCount">energy volumes</label><input id="cellCount" type="number" value="1000" min="50" step="1">
   </div>
   <div class="row" style="margin-top:8px"><button id="reset" type="button">Reset</button></div>
 
@@ -135,41 +112,13 @@
 
   <h2>View</h2>
   <div class="row">
-    <button type="button" class="mode" data-mode="foam" aria-pressed="true">glass foam</button>
-    <button type="button" class="mode" data-mode="cut" aria-pressed="false">cut</button>
+    <span class="label">show</span>
+    <button type="button" class="show" data-show="volumes" aria-pressed="true">energy volumes</button>
+    <button type="button" class="show" data-show="joints" aria-pressed="true">joints</button>
   </div>
-
-  <div id="foamControls" class="section">
-    <div class="row" style="margin-top:8px">
-      <span class="label">show</span>
-      <button type="button" class="show" data-show="volumes" aria-pressed="true">energy volumes</button>
-      <button type="button" class="show" data-show="joints" aria-pressed="true">joints</button>
-      <button type="button" class="show" data-show="dots" aria-pressed="true">dots</button>
-    </div>
-    <div id="glassSettings"></div>
-  </div>
-
-  <div id="cutControls" class="section" hidden>
-    <div class="row" style="margin-top:8px">
-      <span class="label">across</span>
-      <button type="button" class="axis" data-axis="x" aria-pressed="false">x</button>
-      <button type="button" class="axis" data-axis="y" aria-pressed="false">y</button>
-      <button type="button" class="axis" data-axis="z" aria-pressed="true">z</button>
-    </div>
-    <div id="cutSettings"></div>
-  </div>
-
-  <h2>Look</h2>
-  <div class="caption">joint layer: how far pull has squeezed it toward its push limit</div>
-  <div id="squeezeLegend" class="legend"></div>
-  <div class="legend-ends"><span>at rest</span><span>about to collapse</span></div>
-  <div class="caption">dot in each energy volume: colour by charge, size by energy per volume</div>
-  <div id="cutLook" class="section" hidden>
-    <div class="caption">cell in the cut: how packed its energy is</div>
-    <div id="energyLegend" class="legend"></div>
-    <div class="legend-ends"><span>thin</span><span>packed</span></div>
-    <div class="caption"><span class="swatch"></span>wall between cells that share no joint</div>
-  </div>
+  <div id="viewSettings"></div>
+  <div class="caption">Every shape is the engine's own: each red cell is an energy volume, more solid the harder it pulls.
+    Each blue slab is a joint, a volume of its own on the face two energy volumes share, more solid the closer it is squeezed to its push limit.</div>
 
   <h2>Run</h2>
   <div id="runSettings"></div>
@@ -192,202 +141,75 @@ const LABELS = {
   attraction: "pull between energy volumes",
   joint_push: "joint push (swells a joint back toward rest)",
   push_limit: "push limit (below it, joint collapse)",
+  joint_rest: "joint rest volume",
   leak: "leak (energy flowing to harder-pulling neighbours)",
 };
 const RUN_SETTINGS = new Set(["speed", "unevenness"]);
-
-const CAPTIONS = {
-  foam: "Glass foam: each clear cell is an energy volume, which pulls. Each green layer between two cells is a joint, a volume of its own, which pushes. Pull squeezes a joint thinner and it turns warmer and more solid; only once it falls past its push limit do its two energy volumes fall into each other.",
-  cut: "A cut through space: each cell is an energy volume, each green band a joint between two of them, as wide as its volume. A cell can lose its neighbour in the cut when that neighbour slides out of the plane; that is not a joint collapse.",
-};
-
-/* Energy palette for the cut's cells: thin (cool blue) -> middle -> packed (warm orange). */
-const LOW = [51, 102, 242], MID = [170, 150, 200], HIGH = [255, 90, 40];
-
-/** Mix two rgb triples by `part` 0..1. */
-function mixRgb(from, to, part) {
-  return from.map((channel, index) => Math.round(channel + (to[index] - channel) * part));
-}
+const SHRINK = 0.95;            // each cell's faces drawn this far toward its centre, so they clear the joints
+const DEFAULT_DRAWN = 400;
 
 /** Clamp a value to 0..1, anything not finite to 0. */
 function unit(value) {
   return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 }
 
-/** Fill colour of a cell with energy shade `level` 0..1. */
-function energyColour(level) {
-  const part = unit(level);
-  const rgb = part < 0.5 ? mixRgb(LOW, MID, part * 2) : mixRgb(MID, HIGH, part * 2 - 1);
-  return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+/** Parse a #rrggbb CSS colour into a three.js colour. */
+function cssColour(name) {
+  const clean = getComputedStyle(document.documentElement).getPropertyValue(name).trim().replace("#", "");
+  const [red, green, blue] = [0, 2, 4].map((start) => (parseInt(clean.slice(start, start + 2), 16) || 0) / 255);
+  return new THREE.Color(red, green, blue);
 }
 
-/** Parse a #rrggbb CSS colour into an rgb triple. */
-function hexRgb(text) {
-  const clean = text.trim().replace("#", "");
-  return [0, 2, 4].map((start) => parseInt(clean.slice(start, start + 2), 16) || 0);
-}
-
-const theme = { bg: "#07090d", text: "#dfe6ef", muted: "#8593a6", glass: [207, 227, 255],
-  relaxed: [95, 211, 154], hot: [255, 165, 82], plain: "#8a8f98", line: "#263040",
-  plus: [255, 79, 79], minus: [79, 141, 255], none: [154, 163, 174] };
-
-/** Read the page's theme colours for both views. */
-function applyTheme() {
-  const style = getComputedStyle(document.documentElement);
-  const read = (name) => style.getPropertyValue(name).trim();
-  Object.assign(theme, { bg: read("--bg"), text: read("--text"), muted: read("--muted"),
-    glass: hexRgb(read("--glass")), relaxed: hexRgb(read("--joint")), hot: hexRgb(read("--joint-hot")),
-    plain: read("--plain-wall"), line: read("--line"), plus: hexRgb(read("--charge-plus")),
-    minus: hexRgb(read("--charge-minus")), none: hexRgb(read("--charge-none")) });
-  foamTheme();
-  if (latestFrame) updateDots(latestFrame);
-  requestDraw();
-}
-
-/* ---------- which view is shown ---------- */
-const foamCanvas = document.getElementById("foam");
-const canvas = document.getElementById("view");
-const inset = document.getElementById("inset");
+/* ---------- the 3D scene ---------- */
+const canvas = document.getElementById("scene");
 const THREE_READY = typeof window.THREE === "object" && window.THREE !== null;
-let viewMode = THREE_READY ? "foam" : "cut";
 
-/** Show view `mode` ("foam" or "cut") with its controls, caption and hint. */
-function setViewMode(mode) {
-  viewMode = mode === "foam" && THREE_READY ? "foam" : "cut";
-  const isFoam = viewMode === "foam";
-  foamCanvas.hidden = !isFoam;
-  canvas.hidden = isFoam;
-  inset.hidden = isFoam;
-  document.getElementById("foamControls").hidden = !isFoam;
-  document.getElementById("cutControls").hidden = isFoam;
-  document.getElementById("cutLook").hidden = isFoam;
-  for (const button of document.querySelectorAll("button.mode")) {
-    button.setAttribute("aria-pressed", String(button.dataset.mode === viewMode));
-  }
-  document.getElementById("hintText").textContent = isFoam
-    ? "drag to rotate, wheel or pinch to zoom" : "drag to pan, wheel or pinch to zoom";
-  document.getElementById("viewCaption").textContent = THREE_READY ? CAPTIONS[viewMode]
-    : CAPTIONS.cut + " (The glass foam needs three.js from cdnjs.cloudflare.com, which did not load.)";
-  resize();
-  showStats();
-}
-
-for (const button of document.querySelectorAll("button.mode")) {
-  if (button.dataset.mode === "foam" && !THREE_READY) button.disabled = true;
-  button.addEventListener("click", () => setViewMode(button.dataset.mode));
-}
-
-/** The screen area a view should fill: the window minus the open panel on wide screens. */
-function freeArea() {
-  const panelOpen = !panel.classList.contains("collapsed") && window.innerWidth > 700;
-  return { width: Math.max(80, window.innerWidth - (panelOpen ? 334 : 0)), height: window.innerHeight };
-}
-
-/* ---------- glass foam: the 3D scene ---------- */
-const SLAB_VERTEX = `
+const GLASS_VERTEX = `
   attribute vec3 faceNormal;
-  attribute float squeeze;
-  varying float vSqueeze;
+  attribute float strength;
+  varying float vStrength;
   varying float vFacing;
   void main() {
     vec4 place = modelViewMatrix * vec4(position, 1.0);
-    vec3 turned = normalize(normalMatrix * faceNormal);
-    vFacing = abs(dot(turned, normalize(-place.xyz)));
-    vSqueeze = squeeze;
+    vFacing = abs(dot(normalize(normalMatrix * faceNormal), normalize(-place.xyz)));
+    vStrength = strength;
     gl_Position = projectionMatrix * place;
-  }`;
-const SLAB_FRAGMENT = `
-  uniform vec3 relaxed;
-  uniform vec3 hot;
-  uniform float strength;
-  varying float vSqueeze;
-  varying float vFacing;
-  void main() {
-    float squeezed = clamp(vSqueeze, 0.0, 1.0);
-    vec3 colour = mix(relaxed, hot, smoothstep(0.15, 1.0, squeezed));
-    float alpha = (0.07 + 0.78 * squeezed * squeezed) * (0.45 + 1.1 * strength);
-    alpha *= 0.75 + 0.25 * (1.0 - vFacing);
-    gl_FragColor = vec4(colour, clamp(alpha, 0.0, 0.95));
   }`;
 const GLASS_FRAGMENT = `
-  uniform vec3 glass;
-  uniform float strength;
-  varying float vSqueeze;
+  uniform vec3 clear;
+  uniform vec3 solid;
+  varying float vStrength;
   varying float vFacing;
   void main() {
-    float edge = pow(1.0 - vFacing, 2.0);
-    gl_FragColor = vec4(glass, strength * 0.16 * (0.12 + 0.88 * edge));
-  }`;
-const DOT_VERTEX = `
-  attribute float size;
-  attribute vec3 tint;
-  uniform float scale;
-  varying vec3 vTint;
-  void main() {
-    vTint = tint;
-    vec4 place = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = size > 0.0 ? max(2.0, size * scale / -place.z) : 0.0;
-    gl_Position = projectionMatrix * place;
-  }`;
-const DOT_FRAGMENT = `
-  varying vec3 vTint;
-  void main() {
-    vec2 spot = gl_PointCoord * 2.0 - 1.0;
-    float reach = dot(spot, spot);
-    if (reach > 1.0) discard;
-    gl_FragColor = vec4(vTint * (0.6 + 0.4 * sqrt(1.0 - reach)), 1.0);
+    float strong = clamp(vStrength, 0.0, 1.0);
+    float edge = pow(1.0 - vFacing, 2.0) * (1.0 - strong);
+    float alpha = mix(0.025, 0.93, strong) + 0.12 * edge;
+    gl_FragColor = vec4(mix(clear, solid, smoothstep(0.0, 1.0, strong)), clamp(alpha, 0.0, 0.95));
   }`;
 
-const foam = {
-  renderer: null, scene: null, camera: null, slabMaterial: null, glassMaterial: null, edgeMaterial: null,
-  dotMaterial: null, slabs: null, panes: null, edges: null, dots: null, dotCount: -1,
-  faces: [], faceStart: null, faceCorners: null, faceSqueeze: null, faceJoint: null, squeeze: null,
-  mismatch: undefined, step: undefined,
-  show: { volumes: true, joints: true, dots: true }, strength: 0.35,
-};
+const scene3d = { renderer: null, scene: null, camera: null, volumeMaterial: null, jointMaterial: null,
+  volumes: null, joints: null, show: { volumes: true, joints: true }, drawnCells: 0, drawnJoints: 0 };
 const orbit = { theta: 0.7, phi: 1.15, distance: 10, follow: true, centre: [0, 0, 0], reach: 1 };
+let latest = null;            // the latest shapes message, checked, with each cell's centre
+let drawLimit = DEFAULT_DRAWN;
 
-/** Make the renderer, scene, camera and the four materials (once, when three.js loaded). */
-function createFoam() {
+/** Make the renderer, scene, camera and the two glass materials (once, when three.js loaded). */
+function createScene() {
   if (!THREE_READY) return;
-  foam.renderer = new THREE.WebGLRenderer({ canvas: foamCanvas, antialias: true });
-  foam.scene = new THREE.Scene();
-  foam.camera = new THREE.PerspectiveCamera(40, 1, 0.01, 1000);
-  const blend = { transparent: true, depthWrite: false, side: THREE.DoubleSide };
-  foam.slabMaterial = new THREE.ShaderMaterial({ vertexShader: SLAB_VERTEX, fragmentShader: SLAB_FRAGMENT,
-    uniforms: { relaxed: { value: new THREE.Color() }, hot: { value: new THREE.Color() }, strength: { value: 0.35 } }, ...blend });
-  foam.glassMaterial = new THREE.ShaderMaterial({ vertexShader: SLAB_VERTEX, fragmentShader: GLASS_FRAGMENT,
-    uniforms: { glass: { value: new THREE.Color() }, strength: { value: 0.35 } }, ...blend });
-  foam.edgeMaterial = new THREE.LineBasicMaterial({ transparent: true, depthWrite: false, opacity: 0.2 });
-  foam.dotMaterial = new THREE.ShaderMaterial({ vertexShader: DOT_VERTEX, fragmentShader: DOT_FRAGMENT,
-    uniforms: { scale: { value: 500 } } });
+  scene3d.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  scene3d.renderer.setClearColor(cssColour("--bg"));
+  scene3d.scene = new THREE.Scene();
+  scene3d.camera = new THREE.PerspectiveCamera(40, 1, 0.01, 1000);
+  const glass = (clear, solid) => new THREE.ShaderMaterial({ vertexShader: GLASS_VERTEX,
+    fragmentShader: GLASS_FRAGMENT, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    uniforms: { clear: { value: cssColour(clear) }, solid: { value: cssColour(solid) } } });
+  scene3d.volumeMaterial = glass("--volume-clear", "--volume-solid");
+  scene3d.jointMaterial = glass("--joint-clear", "--joint-solid");
 }
 
-/** Copy the theme colours into the scene. */
-function foamTheme() {
-  if (!foam.renderer) return;
-  const colour = (rgb) => new THREE.Color(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255);
-  foam.renderer.setClearColor(new THREE.Color(theme.bg || "#07090d"));
-  foam.slabMaterial.uniforms.relaxed.value = colour(theme.relaxed);
-  foam.slabMaterial.uniforms.hot.value = colour(theme.hot);
-  foam.glassMaterial.uniforms.glass.value = colour(theme.glass);
-  foam.edgeMaterial.color = colour(theme.glass);
-}
-
-/** Set the glass opacity 0..1 on the panes, the edges and the joint layers. */
-function setStrength(value) {
-  foam.strength = unit(value);
-  if (!foam.renderer) return;
-  foam.glassMaterial.uniforms.strength.value = foam.strength;
-  foam.slabMaterial.uniforms.strength.value = foam.strength;
-  foam.edgeMaterial.opacity = 0.02 + 0.16 * foam.strength;
-  requestDraw();
-}
-
-/** A face whose polygon is at least three finite xyz corners. */
-function goodFace(face) {
-  return face && Array.isArray(face.polygon) && face.polygon.length >= 9 && face.polygon.length % 3 === 0
-    && face.polygon.every(Number.isFinite) && Number.isInteger(face.a) && Number.isInteger(face.b);
+/** A flat list of at least three finite xyz corners. */
+function goodPolygon(points) {
+  return Array.isArray(points) && points.length >= 9 && points.length % 3 === 0 && points.every(Number.isFinite);
 }
 
 /** Unit normal of a flat xyz polygon (Newell's method), [0, 0, 0] when it has no area. */
@@ -404,213 +226,179 @@ function polygonNormal(points) {
   return length > 0 ? [normalX / length, normalY / length, normalZ / length] : [0, 0, 0];
 }
 
-/** Write one face's slab (two caps offset by half its thickness, joined by sides) into the buffers. */
-function writeSlab(face, buffers, cursor) {
-  const points = face.polygon, corners = points.length / 3;
-  const normal = polygonNormal(points);
-  const half = Number.isFinite(face.thickness) && face.thickness > 0 ? face.thickness / 2 : 0;
-  const top = cursor.vertex, bottom = cursor.vertex + corners;
-  for (let corner = 0; corner < corners; corner++) {
-    for (let axis = 0; axis < 3; axis++) {
-      const value = points[corner * 3 + axis];
-      buffers.position[(top + corner) * 3 + axis] = value + normal[axis] * half;
-      buffers.position[(bottom + corner) * 3 + axis] = value - normal[axis] * half;
-      buffers.normal[(top + corner) * 3 + axis] = normal[axis];
-      buffers.normal[(bottom + corner) * 3 + axis] = normal[axis];
-      buffers.edge[(cursor.edge + corner * 2) * 3 + axis] = value;
-      buffers.edge[(cursor.edge + corner * 2 + 1) * 3 + axis] = points[((corner + 1) % corners) * 3 + axis];
+/** Mean of every corner of a cell's faces: the point its faces shrink toward. */
+function cellCentre(faces) {
+  const sum = [0, 0, 0];
+  let count = 0;
+  for (const face of faces) {
+    for (let index = 0; index < face.length; index += 3) {
+      sum[0] += face[index]; sum[1] += face[index + 1]; sum[2] += face[index + 2];
+      count++;
     }
   }
-  for (let corner = 1; corner < corners - 1; corner++) {
-    buffers.slabIndex.set([top, top + corner, top + corner + 1, bottom, bottom + corner + 1, bottom + corner], cursor.pane);
-    cursor.pane += 6;
+  return sum.map((value) => value / count);
+}
+
+/** Keep the cells and joints of a shapes message whose numbers are well formed. */
+function checkShapes(message) {
+  const cells = (Array.isArray(message.cells) ? message.cells : []).filter((cell) =>
+    cell && Number.isInteger(cell.id) && Array.isArray(cell.faces) && cell.faces.length > 0
+    && cell.faces.every(goodPolygon)).map((cell) => ({ ...cell, centre: cellCentre(cell.faces) }));
+  const joints = (Array.isArray(message.joints) ? message.joints : []).filter((joint) =>
+    joint && Number.isInteger(joint.a) && Number.isInteger(joint.b) && goodPolygon(joint.polygon));
+  return { step: message.step, stats: message.stats || {}, cells, joints };
+}
+
+/** Middle of the box around every cell centre: the view centre the drawn cells are nearest to. */
+function viewCentre(cells) {
+  const low = [Infinity, Infinity, Infinity], high = [-Infinity, -Infinity, -Infinity];
+  for (const cell of cells) {
+    cell.centre.forEach((value, axis) => { low[axis] = Math.min(low[axis], value); high[axis] = Math.max(high[axis], value); });
   }
+  return Number.isFinite(low[0]) ? low.map((value, axis) => (value + high[axis]) / 2) : [0, 0, 0];
+}
+
+/** The `limit` cells nearest the view centre. */
+function nearestCells(cells, centre, limit) {
+  const distance = (cell) => Math.hypot(cell.centre[0] - centre[0], cell.centre[1] - centre[1], cell.centre[2] - centre[2]);
+  return cells.map((cell) => ({ cell, away: distance(cell) })).sort((first, second) => first.away - second.away)
+    .slice(0, limit).map((entry) => entry.cell);
+}
+
+/** Empty buffers for `vertexTotal` corners and `indexTotal` triangle indices, with write cursors. */
+function makeBuffers(vertexTotal, indexTotal) {
+  return { position: new Float32Array(vertexTotal * 3), normal: new Float32Array(vertexTotal * 3),
+    strength: new Float32Array(vertexTotal), index: new Uint32Array(indexTotal), vertex: 0, cursor: 0 };
+}
+
+/** Write one polygon, fanned into triangles, with its normal and strength. */
+function writePolygon(points, normal, strength, buffers) {
+  const corners = points.length / 3, start = buffers.vertex;
   for (let corner = 0; corner < corners; corner++) {
-    const next = (corner + 1) % corners;
-    buffers.slabIndex.set([top + corner, top + next, bottom + next, top + corner, bottom + next, bottom + corner], cursor.side);
-    cursor.side += 6;
+    buffers.position.set(points.slice(corner * 3, corner * 3 + 3), (start + corner) * 3);
+    buffers.normal.set(normal, (start + corner) * 3);
+    buffers.strength[start + corner] = strength;
   }
-  cursor.vertex += corners * 2;
-  cursor.edge += corners * 2;
+  for (let corner = 1; corner < corners - 1; corner++) {
+    buffers.index.set([start, start + corner, start + corner + 1], buffers.cursor);
+    buffers.cursor += 3;
+  }
+  buffers.vertex += corners;
 }
 
-/** Drop the three foam objects and free their GPU buffers. */
-function clearFoamGeometry() {
-  for (const name of ["slabs", "panes", "edges"]) {
-    if (!foam[name]) continue;
-    foam.scene.remove(foam[name]);
-    foam[name].geometry.dispose();
-    foam[name] = null;
+/** Write one cell's own faces, each shrunk toward the cell's centre. */
+function writeCell(cell, buffers) {
+  const strength = unit(cell.pull);
+  for (const face of cell.faces) {
+    const shrunk = face.map((value, index) => cell.centre[index % 3] + (value - cell.centre[index % 3]) * SHRINK);
+    writePolygon(shrunk, polygonNormal(face), strength, buffers);
   }
 }
 
-/** Rebuild the joint layers, the glass panes and the edges from a walls message. */
-function applyWalls(message) {
-  foam.mismatch = Number.isFinite(message.mismatch) ? message.mismatch : undefined;
-  foam.step = message.step;
-  if (!foam.renderer) return;
-  const faces = (Array.isArray(message.faces) ? message.faces : []).filter(goodFace);
-  let vertexTotal = 0, paneTotal = 0, sideTotal = 0;
-  for (const face of faces) {
-    const corners = face.polygon.length / 3;
-    vertexTotal += corners * 2; paneTotal += (corners - 2) * 6; sideTotal += corners * 6;
+/** Write one joint as a slab on its face: two caps half its thickness either side, joined by sides. */
+function writeJoint(joint, buffers) {
+  const points = joint.polygon, corners = points.length / 3, normal = polygonNormal(points);
+  const half = Number.isFinite(joint.thickness) && joint.thickness > 0 ? joint.thickness / 2 : 0;
+  const offset = (sign) => points.map((value, index) => value + sign * normal[index % 3] * half);
+  const top = offset(1), bottom = offset(-1), strength = unit(joint.push);
+  writePolygon(top, normal, strength, buffers);
+  writePolygon(bottom, normal, strength, buffers);
+  for (let corner = 0; corner < corners; corner++) {
+    const next = (corner + 1) % corners, pick = (list, at) => list.slice(at * 3, at * 3 + 3);
+    const side = [...pick(top, corner), ...pick(top, next), ...pick(bottom, next), ...pick(bottom, corner)];
+    writePolygon(side, polygonNormal(side), strength, buffers);
   }
-  const buffers = { position: new Float32Array(vertexTotal * 3), normal: new Float32Array(vertexTotal * 3),
-    edge: new Float32Array(vertexTotal * 3), slabIndex: new Uint32Array(paneTotal + sideTotal) };
-  const cursor = { vertex: 0, pane: 0, side: paneTotal, edge: 0 };
-  foam.faceStart = new Int32Array(faces.length);
-  foam.faceCorners = new Int32Array(faces.length);
-  foam.faceSqueeze = new Float32Array(faces.length);
-  faces.forEach((face, index) => {
-    foam.faceStart[index] = cursor.vertex;
-    foam.faceCorners[index] = face.polygon.length / 3;
-    foam.faceSqueeze[index] = unit(face.squeeze);
-    writeSlab(face, buffers, cursor);
-  });
-  foam.faces = faces;
-  foam.squeeze = new THREE.BufferAttribute(new Float32Array(vertexTotal), 1);
-  foam.squeeze.setUsage(THREE.DynamicDrawUsage);
-  matchFacesToJoints();
-  paintSqueeze();
-  clearFoamGeometry();
-  const shape = new THREE.BufferGeometry();
-  shape.setAttribute("position", new THREE.BufferAttribute(buffers.position, 3));
-  shape.setAttribute("faceNormal", new THREE.BufferAttribute(buffers.normal, 3));
-  shape.setAttribute("squeeze", foam.squeeze);
-  const panes = new THREE.BufferGeometry();
-  for (const name of ["position", "faceNormal", "squeeze"]) panes.setAttribute(name, shape.getAttribute(name));
-  shape.setIndex(new THREE.BufferAttribute(buffers.slabIndex, 1));
-  panes.setIndex(new THREE.BufferAttribute(buffers.slabIndex.slice(0, paneTotal), 1));
-  const edges = new THREE.BufferGeometry();
-  edges.setAttribute("position", new THREE.BufferAttribute(buffers.edge, 3));
-  foam.slabs = new THREE.Mesh(shape, foam.slabMaterial);
-  foam.panes = new THREE.Mesh(panes, foam.glassMaterial);
-  foam.edges = new THREE.LineSegments(edges, foam.edgeMaterial);
-  [foam.slabs, foam.panes, foam.edges].forEach((object, order) => {
-    object.frustumCulled = false;
-    object.renderOrder = order + 1;
-    foam.scene.add(object);
-  });
-  showFoamParts();
 }
 
-/** Show or hide the panes, edges, layers and dots by the show toggles. */
-function showFoamParts() {
-  if (foam.panes) foam.panes.visible = foam.show.volumes;
-  if (foam.edges) foam.edges.visible = foam.show.volumes;
-  if (foam.slabs) foam.slabs.visible = foam.show.joints;
-  if (foam.dots) foam.dots.visible = foam.show.dots;
+/** One mesh from written buffers, with the glass material. */
+function glassMesh(buffers, material, order) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(buffers.position.subarray(0, buffers.vertex * 3), 3));
+  geometry.setAttribute("faceNormal", new THREE.BufferAttribute(buffers.normal.subarray(0, buffers.vertex * 3), 3));
+  geometry.setAttribute("strength", new THREE.BufferAttribute(buffers.strength.subarray(0, buffers.vertex), 1));
+  geometry.setIndex(new THREE.BufferAttribute(buffers.index.subarray(0, buffers.cursor), 1));
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = order;
+  return mesh;
+}
+
+/** Drop the two meshes and free their GPU buffers. */
+function clearMeshes() {
+  for (const name of ["volumes", "joints"]) {
+    if (!scene3d[name]) continue;
+    scene3d.scene.remove(scene3d[name]);
+    scene3d[name].geometry.dispose();
+    scene3d[name] = null;
+  }
+}
+
+/** Rebuild the drawn cells and joints from the latest shapes: the nearest cells and the joints between them. */
+function rebuild() {
+  if (!scene3d.renderer || !latest) return;
+  orbit.centre = viewCentre(latest.cells);
+  const drawn = nearestCells(latest.cells, orbit.centre, drawLimit);
+  const drawnIds = new Set(drawn.map((cell) => cell.id));
+  const joints = latest.joints.filter((joint) => drawnIds.has(joint.a) && drawnIds.has(joint.b));
+  let cellCorners = 0, cellIndex = 0, jointCorners = 0, jointIndex = 0;
+  for (const cell of drawn) {
+    for (const face of cell.faces) { cellCorners += face.length / 3; cellIndex += (face.length / 3 - 2) * 3; }
+  }
+  for (const joint of joints) {
+    const corners = joint.polygon.length / 3;
+    jointCorners += corners * 6; jointIndex += (corners - 2) * 6 + corners * 6;
+  }
+  const cellBuffers = makeBuffers(cellCorners, cellIndex), jointBuffers = makeBuffers(jointCorners, jointIndex);
+  drawn.forEach((cell) => writeCell(cell, cellBuffers));
+  joints.forEach((joint) => writeJoint(joint, jointBuffers));
+  clearMeshes();
+  scene3d.volumes = glassMesh(cellBuffers, scene3d.volumeMaterial, 1);
+  scene3d.joints = glassMesh(jointBuffers, scene3d.jointMaterial, 2);
+  scene3d.scene.add(scene3d.volumes, scene3d.joints);
+  scene3d.drawnCells = drawn.length;
+  scene3d.drawnJoints = joints.length;
+  orbit.reach = drawnReach(drawn, orbit.centre);
+  showParts();
+}
+
+/** Distance from the view centre to the farthest drawn corner. */
+function drawnReach(cells, centre) {
+  let reach = 1e-6;
+  for (const cell of cells) {
+    for (const face of cell.faces) {
+      for (let index = 0; index < face.length; index += 3) {
+        reach = Math.max(reach, Math.hypot(face[index] - centre[0], face[index + 1] - centre[1], face[index + 2] - centre[2]));
+      }
+    }
+  }
+  return reach;
+}
+
+/** Show or hide the energy volumes and the joints by the show toggles. */
+function showParts() {
+  if (scene3d.volumes) scene3d.volumes.visible = scene3d.show.volumes;
+  if (scene3d.joints) scene3d.joints.visible = scene3d.show.joints;
   requestDraw();
 }
 
-/* ---------- the joint list, to give each face the live squeeze of its joint ---------- */
-let jointOf = new Map();   // lower cell * 2^21 + higher cell -> joint index
-
-/** Key of the unordered pair of energy volumes `first`, `second`. */
-function pairKey(first, second) {
-  return Math.min(first, second) * 2097152 + Math.max(first, second);
+/* ---------- camera: orbit around the view centre ---------- */
+/** The screen area the scene should fill: the window minus the open panel on wide screens. */
+function freeArea() {
+  const panelOpen = !panel.classList.contains("collapsed") && window.innerWidth > 700;
+  return { width: Math.max(80, window.innerWidth - (panelOpen ? 334 : 0)), height: window.innerHeight };
 }
 
-/** Index the joint list of a mesh message by pair. */
-function applyMesh(message) {
-  const pairs = Array.isArray(message.pairs) ? message.pairs : [];
-  jointOf = new Map();
-  for (let index = 0; index + 1 < pairs.length; index += 2) jointOf.set(pairKey(pairs[index], pairs[index + 1]), index / 2);
-  matchFacesToJoints();
-}
-
-/** Find each drawn face's joint in the current joint list (-1 when it has none now). */
-function matchFacesToJoints() {
-  foam.faceJoint = Int32Array.from(foam.faces, (face) => {
-    const joint = jointOf.get(pairKey(face.a, face.b));
-    return joint === undefined ? -1 : joint;
-  });
-}
-
-/** Colour every layer by its joint's latest squeeze, or the squeeze it came with. */
-function paintSqueeze(liveSqueeze) {
-  if (!foam.squeeze || !foam.faceJoint) return;
-  const values = foam.squeeze.array;
-  for (let face = 0; face < foam.faces.length; face++) {
-    const joint = foam.faceJoint[face];
-    const live = Array.isArray(liveSqueeze) && joint >= 0 ? liveSqueeze[joint] : undefined;
-    const squeeze = Number.isFinite(live) ? unit(live) : foam.faceSqueeze[face];
-    values.fill(squeeze, foam.faceStart[face], foam.faceStart[face] + foam.faceCorners[face] * 2);
-  }
-  foam.squeeze.needsUpdate = true;
-}
-
-/* ---------- dots: one per energy volume ---------- */
-let latestFrame = null;
-
-/** Rgb 0..1 of a charge: red positive, blue negative, grey zero, deeper with |charge| / `largest`. */
-function chargeColour(charge, largest) {
-  if (!Number.isFinite(charge) || charge === 0 || !(largest > 0)) return theme.none.map((channel) => channel / 255);
-  const target = charge > 0 ? theme.plus : theme.minus;
-  return mixRgb(theme.none, target, 0.35 + 0.65 * Math.min(1, Math.abs(charge) / largest)).map((channel) => channel / 255);
-}
-
-/** Middle of the radii above zero, the dots' size unit. */
-function typicalRadius(radius) {
-  const alive = radius.filter((value) => Number.isFinite(value) && value > 0).sort((first, second) => first - second);
-  return alive.length ? alive[Math.floor(alive.length / 2)] : 1;
-}
-
-/** Place, colour and size the dots from a frame, and recentre the orbit on them. */
-function updateDots(frame) {
-  if (!foam.renderer) return;
-  const positions = Array.isArray(frame.positions) ? frame.positions : [];
-  const radius = Array.isArray(frame.radius) ? frame.radius : [];
-  const energy = Array.isArray(frame.energy) ? frame.energy : [];
-  const charge = Array.isArray(frame.charge) ? frame.charge : [];
-  const count = Math.min(Math.floor(positions.length / 3), radius.length);
-  if (count !== foam.dotCount) {
-    if (foam.dots) { foam.scene.remove(foam.dots); foam.dots.geometry.dispose(); }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(count * 3), 3));
-    geometry.setAttribute("tint", new THREE.BufferAttribute(new Float32Array(count * 3), 3));
-    geometry.setAttribute("size", new THREE.BufferAttribute(new Float32Array(count), 1));
-    foam.dots = new THREE.Points(geometry, foam.dotMaterial);
-    foam.dots.frustumCulled = false;
-    foam.dots.renderOrder = 0;
-    foam.dots.visible = foam.show.dots;
-    foam.scene.add(foam.dots);
-    foam.dotCount = count;
-  }
-  const place = foam.dots.geometry.attributes.position, tint = foam.dots.geometry.attributes.tint;
-  const size = foam.dots.geometry.attributes.size;
-  const unitSize = typicalRadius(radius.slice(0, count));
-  const largest = charge.reduce((most, value) => (Number.isFinite(value) ? Math.max(most, Math.abs(value)) : most), 0);
-  const low = [Infinity, Infinity, Infinity], high = [-Infinity, -Infinity, -Infinity];
-  let widest = 0;
-  for (let cell = 0; cell < count; cell++) {
-    const point = [positions[cell * 3], positions[cell * 3 + 1], positions[cell * 3 + 2]];
-    const alive = point.every(Number.isFinite) && Number.isFinite(radius[cell]) && radius[cell] > 0;
-    place.array.set(alive ? point : [0, 0, 0], cell * 3);
-    tint.array.set(chargeColour(charge[cell], largest), cell * 3);
-    size.array[cell] = alive ? unitSize * (0.22 + 0.55 * unit(energy[cell])) : 0;
-    if (!alive) continue;
-    point.forEach((value, axis) => { low[axis] = Math.min(low[axis], value); high[axis] = Math.max(high[axis], value); });
-    widest = Math.max(widest, radius[cell]);
-  }
-  place.needsUpdate = true; tint.needsUpdate = true; size.needsUpdate = true;
-  if (!Number.isFinite(low[0])) return;
-  orbit.centre = low.map((value, axis) => (value + high[axis]) / 2);
-  orbit.reach = Math.max(1e-6, Math.hypot(high[0] - low[0], high[1] - low[1], high[2] - low[2]) / 2 + widest);
-}
-
-/* ---------- foam camera: orbit around the middle of the energy volumes ---------- */
-/** Camera distance at which the whole foam fills the free area. */
+/** Camera distance at which the drawn cells fill the free area. */
 function fitDistance() {
   const area = freeArea();
-  const vertical = THREE.MathUtils.degToRad(foam.camera.fov);
+  const vertical = THREE.MathUtils.degToRad(scene3d.camera.fov);
   const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * area.width / area.height);
   return 1.04 * orbit.reach / Math.sin(Math.min(vertical, horizontal) / 2);
 }
 
-/** Point the camera at the foam's middle from the orbit's angles and distance. */
+/** Point the camera at the view centre from the orbit's angles and distance. */
 function placeCamera() {
-  const camera = foam.camera, width = window.innerWidth, height = window.innerHeight;
+  const camera = scene3d.camera, width = window.innerWidth, height = window.innerHeight;
   if (orbit.follow) orbit.distance = fitDistance();
   const [centreX, centreY, centreZ] = orbit.centre, { theta, phi, distance } = orbit;
   camera.position.set(centreX + distance * Math.sin(phi) * Math.cos(theta), centreY + distance * Math.cos(phi),
@@ -621,288 +409,85 @@ function placeCamera() {
   camera.aspect = width / height;
   camera.setViewOffset(width, height, (width - freeArea().width) / 2, 0, width, height);
   camera.updateProjectionMatrix();
-  foam.dotMaterial.uniforms.scale.value = height * foam.renderer.getPixelRatio() / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
 }
 
-/** Draw the foam. */
-function drawFoam() {
-  if (!foam.renderer) return;
-  placeCamera();
-  foam.renderer.render(foam.scene, foam.camera);
-}
-
-/* ---------- the cut: the latest slice message, checked ---------- */
-const cut = { axis: "z", depth: 0.5, cells: [], walls: [], step: -1, has: false };
-
-/** Keep the cells and walls of a slice message whose numbers are well formed. */
-function applySlice(message) {
-  const cells = (Array.isArray(message.cells) ? message.cells : []).filter((cell) =>
-    cell && Array.isArray(cell.polygon) && cell.polygon.length >= 6 && cell.polygon.length % 2 === 0);
-  const walls = (Array.isArray(message.walls) ? message.walls : []).filter((wall) =>
-    wall && Array.isArray(wall.line) && wall.line.length === 4);
-  walls.sort((first, second) => wallOrder(first) - wallOrder(second));
-  Object.assign(cut, { cells, walls, step: message.step, has: true });
-  if (Number.isFinite(message.depth) && !depthSlider.held) showDepth(message.depth);
-  return true;
-}
-
-/** Whether a cut wall is a joint (it carries a squeeze). */
-function isJoint(wall) {
-  return wall.squeeze !== null && wall.squeeze !== undefined;
-}
-
-/** Draw order of a wall: plain walls first, then joints from relaxed to squeezed. */
-function wallOrder(wall) {
-  return isJoint(wall) ? wall.squeeze : -1;
-}
-
-/* ---------- 2D cut view: world (the plane's own frame) to screen ---------- */
-const context = canvas.getContext("2d");
-const view = { scale: 100, centreX: 0, centreY: 0, follow: true };
-let pixelRatio = 1;
-
-/** Bounds of every polygon in the cut, or null when there is none. */
-function cutBounds() {
-  let left = Infinity, right = -Infinity, bottom = Infinity, top = -Infinity;
-  for (const cell of cut.cells) {
-    for (let index = 0; index < cell.polygon.length; index += 2) {
-      left = Math.min(left, cell.polygon[index]); right = Math.max(right, cell.polygon[index]);
-      bottom = Math.min(bottom, cell.polygon[index + 1]); top = Math.max(top, cell.polygon[index + 1]);
-    }
-  }
-  return Number.isFinite(left) && right > left && top > bottom ? { left, right, bottom, top } : null;
-}
-
-/** Centre and zoom so the whole cut fills the free area; with `follow` it keeps doing so each frame. */
-function fit(follow) {
-  view.follow = follow;
-  const bounds = cutBounds();
-  if (!bounds) { requestDraw(); return; }
-  const area = freeArea();
-  view.scale = 0.92 * Math.min(area.width / (bounds.right - bounds.left), area.height / (bounds.top - bounds.bottom));
-  view.centreX = (bounds.left + bounds.right) / 2 + (window.innerWidth - area.width) / 2 / view.scale;
-  view.centreY = (bounds.bottom + bounds.top) / 2;
-  requestDraw();
-}
-
-/** Screen x of plane coordinate `worldX`. */
-function screenX(worldX) { return (worldX - view.centreX) * view.scale + window.innerWidth / 2; }
-/** Screen y of plane coordinate `worldY` (up on the plane is up on screen). */
-function screenY(worldY) { return window.innerHeight / 2 - (worldY - view.centreY) * view.scale; }
-
-/** Fill every cell of the cut with its energy colour. */
-function drawCells() {
-  for (const cell of cut.cells) {
-    const points = cell.polygon;
-    context.beginPath();
-    context.moveTo(screenX(points[0]), screenY(points[1]));
-    for (let index = 2; index < points.length; index += 2) context.lineTo(screenX(points[index]), screenY(points[index + 1]));
-    context.closePath();
-    context.fillStyle = energyColour(cell.energy);
-    context.globalAlpha = 0.8;
-    context.fill();
-  }
-  context.globalAlpha = 1;
-}
-
-/** Stroke every wall: a joint as a green band (as wide as its layer when the slice gives one), a plain wall faint. */
-function drawWalls() {
-  for (const wall of cut.walls) {
-    const [fromX, fromY, toX, toY] = wall.line;
-    if (!isJoint(wall)) {
-      context.lineCap = "round";
-      context.strokeStyle = theme.plain;
-      context.globalAlpha = 0.35;
-      context.lineWidth = 0.7;
-    } else {
-      const squeeze = unit(wall.squeeze);
-      const rgb = mixRgb(theme.relaxed, theme.hot, squeeze);
-      const band = Number.isFinite(wall.thickness) && wall.thickness > 0 ? wall.thickness * view.scale : 2 + 3 * (1 - squeeze);
-      context.lineCap = "butt";
-      context.strokeStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
-      context.globalAlpha = 0.55 + 0.45 * squeeze;
-      context.lineWidth = Math.max(1.5, band);
-    }
-    context.beginPath();
-    context.moveTo(screenX(fromX), screenY(fromY));
-    context.lineTo(screenX(toX), screenY(toY));
-    context.stroke();
-  }
-  context.globalAlpha = 1;
-}
-
-/** Draw the whole cut view. */
-function drawCut() {
-  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-  context.fillStyle = theme.bg;
-  context.fillRect(0, 0, window.innerWidth, window.innerHeight);
-  if (!cut.has) {
-    context.fillStyle = theme.muted;
-    context.font = "13px system-ui, sans-serif";
-    context.textAlign = "center";
-    context.fillText("waiting for the first cut", freeArea().width / 2, window.innerHeight / 2);
-    return;
-  }
-  drawCells();
-  drawWalls();
-}
-
-/* ---------- inset: where the cut lies in the grid's box ---------- */
-const insetContext = inset.getContext("2d");
-
-/** Project a unit-box point to inset pixels (a fixed oblique view). */
-function insetPoint(point, size) {
-  const [x, y, z] = point.map((value) => value - 0.5);
-  return [size / 2 + (x * 0.82 - z * 0.42) * size * 0.62, size / 2 - (y * 0.82 + z * 0.3 - x * 0.12) * size * 0.62];
-}
-
-/** Draw the box, the axis letters and the cut plane at its depth. */
-function drawInset() {
-  const size = inset.clientWidth;
-  insetContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-  insetContext.clearRect(0, 0, size, size);
-  const corners = [];
-  for (let index = 0; index < 8; index++) corners.push([index & 1, (index >> 1) & 1, (index >> 2) & 1]);
-  insetContext.strokeStyle = theme.muted;
-  insetContext.globalAlpha = 0.6;
-  insetContext.lineWidth = 1;
-  for (const [from, to] of [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]]) {
-    const start = insetPoint(corners[from], size), end = insetPoint(corners[to], size);
-    insetContext.beginPath(); insetContext.moveTo(...start); insetContext.lineTo(...end); insetContext.stroke();
-  }
-  insetContext.globalAlpha = 1;
-  const axisIndex = { x: 0, y: 1, z: 2 }[cut.axis];
-  const others = [0, 1, 2].filter((index) => index !== axisIndex);
-  const plane = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([first, second]) => {
-    const point = [0, 0, 0];
-    point[axisIndex] = cut.depth; point[others[0]] = first; point[others[1]] = second;
-    return insetPoint(point, size);
-  });
-  insetContext.beginPath();
-  plane.forEach((point, index) => (index ? insetContext.lineTo(...point) : insetContext.moveTo(...point)));
-  insetContext.closePath();
-  insetContext.fillStyle = "rgba(91, 140, 255, 0.35)";
-  insetContext.fill();
-  insetContext.strokeStyle = "rgb(91, 140, 255)";
-  insetContext.stroke();
-  insetContext.fillStyle = theme.text;
-  insetContext.font = "11px system-ui, sans-serif";
-  insetContext.textAlign = "center";
-  for (const [index, letter] of [[0, "x"], [1, "y"], [2, "z"]]) {
-    const tip = [0, 0, 0]; tip[index] = 1.18;
-    insetContext.globalAlpha = index === axisIndex ? 1 : 0.55;
-    insetContext.fillText(letter, ...insetPoint(tip, size));
-  }
-  insetContext.globalAlpha = 1;
-}
-
-/* ---------- drawing loop ---------- */
 let drawPending = false;
 
-/** Ask for one redraw of the shown view on the next animation frame. */
+/** Ask for one redraw on the next animation frame. */
 function requestDraw() {
-  if (drawPending) return;
+  if (drawPending || !scene3d.renderer) return;
   drawPending = true;
   requestAnimationFrame(() => {
     drawPending = false;
-    if (viewMode === "foam") drawFoam(); else { drawCut(); drawInset(); }
+    placeCamera();
+    scene3d.renderer.render(scene3d.scene, scene3d.camera);
   });
 }
 
-/** Match the canvases' pixel sizes to the window. */
+/** Match the canvas's pixel size to the window. */
 function resize() {
-  pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-  if (foam.renderer) {
-    foam.renderer.setPixelRatio(Math.min(pixelRatio, 1.5));
-    foam.renderer.setSize(window.innerWidth, window.innerHeight, false);
-  }
-  canvas.width = Math.round(window.innerWidth * pixelRatio);
-  canvas.height = Math.round(window.innerHeight * pixelRatio);
-  inset.width = Math.round(inset.clientWidth * pixelRatio);
-  inset.height = Math.round(inset.clientHeight * pixelRatio);
-  if (view.follow) fit(true); else requestDraw();
+  if (!scene3d.renderer) return;
+  scene3d.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  scene3d.renderer.setSize(window.innerWidth, window.innerHeight, false);
+  requestDraw();
 }
 
 window.addEventListener("resize", resize);
 
-/* ---------- gestures: drag rotates the foam or pans the cut; wheel and pinch zoom ---------- */
-/** Move the shown view by a drag of (`moveX`, `moveY`) pixels. */
+/* ---------- gestures: drag rotates, wheel and pinch zoom ---------- */
+/** Rotate the view by a drag of (`moveX`, `moveY`) pixels. */
 function dragView(moveX, moveY) {
-  if (viewMode === "foam") {
-    orbit.theta += moveX * 0.006;
-    orbit.phi = Math.min(Math.PI - 0.05, Math.max(0.05, orbit.phi - moveY * 0.006));
-  } else {
-    view.centreX -= moveX / view.scale;
-    view.centreY += moveY / view.scale;
-    view.follow = false;
-  }
+  orbit.theta += moveX * 0.006;
+  orbit.phi = Math.min(Math.PI - 0.05, Math.max(0.05, orbit.phi - moveY * 0.006));
   requestDraw();
 }
 
-/** Zoom the shown view by `factor` (above 1 is closer) around screen (`atX`, `atY`). */
-function zoomView(factor, atX, atY) {
-  if (viewMode === "foam") {
-    orbit.distance = Math.min(orbit.reach * 50, Math.max(orbit.reach * 0.02, orbit.distance / factor));
-    orbit.follow = false;
-  } else {
-    const worldX = view.centreX + (atX - window.innerWidth / 2) / view.scale;
-    const worldY = view.centreY - (atY - window.innerHeight / 2) / view.scale;
-    view.scale = Math.min(1e7, Math.max(1e-4, view.scale * factor));
-    view.centreX = worldX - (atX - window.innerWidth / 2) / view.scale;
-    view.centreY = worldY + (atY - window.innerHeight / 2) / view.scale;
-    view.follow = false;
-  }
+/** Zoom the view by `factor` (above 1 is closer). */
+function zoomView(factor) {
+  orbit.distance = Math.min(orbit.reach * 50, Math.max(orbit.reach * 0.02, orbit.distance / factor));
+  orbit.follow = false;
   requestDraw();
 }
 
 const pointers = new Map();
 let lastSpread = 0;
 
-/** Distance and midpoint of the first two active pointers. */
-function pinchState() {
+/** Distance between the first two active pointers. */
+function pinchSpread() {
   const [first, second] = [...pointers.values()];
-  return { spread: Math.hypot(first.x - second.x, first.y - second.y),
-    middleX: (first.x + second.x) / 2, middleY: (first.y + second.y) / 2 };
+  return Math.hypot(first.x - second.x, first.y - second.y);
 }
 
-/** Hook drag, pinch and wheel on one canvas to the shown view. */
-function listenForGestures(surface) {
-  surface.addEventListener("pointerdown", (event) => {
-    surface.setPointerCapture(event.pointerId);
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    surface.classList.add("dragging");
-    if (pointers.size === 2) lastSpread = pinchState().spread;
-  });
-  surface.addEventListener("pointermove", (event) => {
-    const previous = pointers.get(event.pointerId);
-    if (!previous) return;
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (pointers.size === 1) {
-      dragView(event.clientX - previous.x, event.clientY - previous.y);
-    } else if (pointers.size === 2 && lastSpread > 0) {
-      const state = pinchState();
-      zoomView(state.spread / lastSpread, state.middleX, state.middleY);
-      lastSpread = Math.max(1, state.spread);
-    }
-  });
-  for (const name of ["pointerup", "pointercancel"]) {
-    surface.addEventListener(name, (event) => {
-      pointers.delete(event.pointerId);
-      if (pointers.size < 2) lastSpread = 0;
-      if (pointers.size === 0) surface.classList.remove("dragging");
-    });
-  }
-  surface.addEventListener("wheel", (event) => {
-    event.preventDefault();
-    zoomView(Math.exp(-event.deltaY * 0.0012), event.clientX, event.clientY);
-  }, { passive: false });
-}
-
-listenForGestures(foamCanvas);
-listenForGestures(canvas);
-document.getElementById("fit").addEventListener("click", () => {
-  if (viewMode === "foam") { orbit.follow = true; requestDraw(); } else fit(true);
+canvas.addEventListener("pointerdown", (event) => {
+  canvas.setPointerCapture(event.pointerId);
+  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  canvas.classList.add("dragging");
+  if (pointers.size === 2) lastSpread = pinchSpread();
 });
+canvas.addEventListener("pointermove", (event) => {
+  const previous = pointers.get(event.pointerId);
+  if (!previous) return;
+  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (pointers.size === 1) {
+    dragView(event.clientX - previous.x, event.clientY - previous.y);
+  } else if (pointers.size === 2 && lastSpread > 0) {
+    const spread = pinchSpread();
+    zoomView(spread / lastSpread);
+    lastSpread = Math.max(1, spread);
+  }
+});
+for (const name of ["pointerup", "pointercancel"]) {
+  canvas.addEventListener(name, (event) => {
+    pointers.delete(event.pointerId);
+    if (pointers.size < 2) lastSpread = 0;
+    if (pointers.size === 0) canvas.classList.remove("dragging");
+  });
+}
+canvas.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  zoomView(Math.exp(-event.deltaY * 0.0012));
+}, { passive: false });
+document.getElementById("fit").addEventListener("click", () => { orbit.follow = true; requestDraw(); });
 
 /* ---------- panel ---------- */
 const panel = document.getElementById("panel");
@@ -913,7 +498,7 @@ let running = false, lastStep = -1;
 if (window.innerWidth <= 700) panel.classList.add("collapsed");
 document.getElementById("toggle").addEventListener("click", () => {
   panel.classList.toggle("collapsed");
-  if (view.follow) fit(true); else requestDraw();
+  requestDraw();
 });
 
 /** Show whether the simulation runs, on the button and the label. */
@@ -933,16 +518,15 @@ document.getElementById("reset").addEventListener("click", () => {
   send({ type: "reset", seed, cells });
   setRunning(false);
   lastStep = -1;
-  view.follow = true;
   orbit.follow = true;
 });
 
 for (const button of document.querySelectorAll("button.show")) {
   button.addEventListener("click", () => {
     const part = button.dataset.show;
-    foam.show[part] = !foam.show[part];
-    button.setAttribute("aria-pressed", String(foam.show[part]));
-    showFoamParts();
+    scene3d.show[part] = !scene3d.show[part];
+    button.setAttribute("aria-pressed", String(scene3d.show[part]));
+    showParts();
   });
 }
 
@@ -956,55 +540,23 @@ function formatNumber(value) {
   return String(parseFloat(value.toPrecision(3)));
 }
 
-/** Format a share 0..1 as a percentage, or undefined when it is none. */
-function formatShare(value) {
-  return Number.isFinite(value) ? formatNumber(value * 100) + "%" : undefined;
-}
-
 const statsBox = document.getElementById("stats");
-let latestStats = { step: undefined, stats: {} };
-const SHOWN_STATS = new Set(["cells", "collapsed", "collapses", "size_vs_start", "energy_spread", "lumps",
-  "walls_not_matching_joints"]);
-
-/** Count the cut's walls that are joints and those that are not. */
-function wallCounts() {
-  if (!cut.has) return { joints: undefined, plain: undefined };
-  const plain = cut.walls.filter((wall) => !isJoint(wall)).length;
-  return { joints: cut.walls.length - plain, plain };
-}
-
-/** Sum of the latest frame's per-joint volume shares, or undefined without them. */
-function jointSpace() {
-  const shares = latestFrame && Array.isArray(latestFrame.joint_volume) ? latestFrame.joint_volume : null;
-  return shares && shares.length ? shares.reduce((total, value) => total + (Number.isFinite(value) ? value : 0), 0) : undefined;
-}
-
-/** The view's own lines: the foam's layers and mismatch share, or the cut's cells and walls. */
-function viewStatLines(stats) {
-  if (viewMode === "foam") {
-    return [["joint layers drawn", foam.renderer ? foam.faces.length : undefined],
-      ["walls not matching joints", formatShare(foam.mismatch)]];
-  }
-  const walls = wallCounts();
-  return [["cells in this cut", cut.has ? cut.cells.length : undefined],
-    ["walls that are joints", walls.joints],
-    ["walls not matching joints", stats.walls_not_matching_joints ?? walls.plain]];
-}
+const SHOWN_STATS = new Set(["cells", "joints", "collapses", "size_vs_start", "energy_spread", "lumps"]);
 
 /** Write the live stats as plain lines. */
 function showStats() {
-  const { step, stats } = latestStats;
-  const space = jointSpace();
+  const stats = latest ? latest.stats : {};
   const lines = [
-    ["step", step],
+    ["step", latest ? latest.step : undefined],
     ["energy volumes", stats.cells],
+    ["joints", stats.joints],
     ["joint collapses so far", stats.collapses],
     ["size vs start", stats.size_vs_start == null ? undefined : formatNumber(stats.size_vs_start) + "x"],
-    ["joint volume shares, summed", space],
     ["energy spread (packing)", stats.energy_spread],
     ["lumps", stats.lumps],
     ...Object.keys(stats).filter((name) => !SHOWN_STATS.has(name)).map((name) => [name.replace(/_/g, " "), stats[name]]),
-    ...viewStatLines(stats),
+    ["energy volumes drawn", scene3d.renderer ? scene3d.drawnCells : undefined],
+    ["joints drawn", scene3d.renderer ? scene3d.drawnJoints : undefined],
   ];
   statsBox.replaceChildren(...lines.map(([label, value]) => {
     const line = document.createElement("div");
@@ -1087,50 +639,24 @@ function applySettings(values) {
   }
 }
 
-/* ---------- foam controls: glass opacity ---------- */
-const glassSlider = labelledSlider("glass opacity", document.getElementById("glassSettings"), (position) => {
-  setStrength(position / 1000);
-  glassSlider.valueLabel.textContent = Math.round(foam.strength * 100) + "%";
+/* ---------- view control: how many cells to draw, nearest the view centre first ---------- */
+const DRAW_RANGE = [10, 5000];
+let rebuildTimer = 0;
+const drawSlider = labelledSlider("cells to draw (nearest the view centre)", document.getElementById("viewSettings"), (position) => {
+  drawLimit = Math.round(DRAW_RANGE[0] * Math.pow(DRAW_RANGE[1] / DRAW_RANGE[0], position / 1000));
+  showDrawLimit();
+  clearTimeout(rebuildTimer);
+  rebuildTimer = setTimeout(() => { rebuild(); showStats(); }, 60);
 });
-glassSlider.input.value = String(Math.round(foam.strength * 1000));
-glassSlider.valueLabel.textContent = Math.round(foam.strength * 100) + "%";
 
-/* ---------- cut controls: depth slider and axis buttons ---------- */
-let sliceTimer = 0;
-const depthSlider = labelledSlider("cut depth", document.getElementById("cutSettings"), (position) => {
-  cut.depth = position / 1000;
-  depthSlider.valueLabel.textContent = cut.depth.toFixed(2);
-  requestDraw();
-  clearTimeout(sliceTimer);
-  sliceTimer = setTimeout(sendSlice, 60);
-});
-depthSlider.held = false;
-depthSlider.input.addEventListener("pointerdown", () => { depthSlider.held = true; });
-depthSlider.input.addEventListener("change", () => { depthSlider.held = false; });
-
-/** Show depth `value` 0..1 on the slider and the inset. */
-function showDepth(value) {
-  cut.depth = Math.min(1, Math.max(0, value));
-  depthSlider.input.value = String(Math.round(cut.depth * 1000));
-  depthSlider.valueLabel.textContent = cut.depth.toFixed(2);
+/** Show the draw limit on its slider, "all" once it reaches every energy volume. */
+function showDrawLimit() {
+  const total = latest ? latest.cells.length : Infinity;
+  drawSlider.valueLabel.textContent = drawLimit >= total ? `all ${total}` : String(drawLimit);
 }
 
-/** Tell the server where the cut lies. */
-function sendSlice() {
-  send({ type: "slice", depth: cut.depth, axis: cut.axis });
-}
-
-const axisButtons = [...document.querySelectorAll("button.axis")];
-for (const button of axisButtons) {
-  button.addEventListener("click", () => {
-    cut.axis = button.dataset.axis;
-    for (const other of axisButtons) other.setAttribute("aria-pressed", String(other === button));
-    view.follow = true;
-    sendSlice();
-    requestDraw();
-  });
-}
-showDepth(0.5);
+drawSlider.input.value = String(Math.round(1000 * Math.log(DEFAULT_DRAWN / DRAW_RANGE[0]) / Math.log(DRAW_RANGE[1] / DRAW_RANGE[0])));
+showDrawLimit();
 
 /* ---------- connection ---------- */
 const offline = document.getElementById("offline");
@@ -1156,37 +682,21 @@ function showOffline() {
   offline.hidden = false;
 }
 
-/** Take in a frame: step, stats, dots and the joints' live squeeze. */
-function applyFrame(message) {
+/** Take in a shapes message: draw exactly its cells and joints, show its stats. */
+function applyShapes(message) {
   if (message.step > lastStep && lastStep >= 0 && !running) setRunning(true);
   lastStep = message.step;
-  latestFrame = message;
-  latestStats = { step: message.step, stats: message.stats || {} };
-  updateDots(message);
-  paintSqueeze(message.squeeze);
+  latest = checkShapes(message);
+  if (latest.stats.joints === 0) setRunning(false);
+  rebuild();
+  showDrawLimit();
   showStats();
-  requestDraw();
 }
 
 /** Route one server message to its handler. */
 function handleMessage(message) {
-  if (message.type === "frame") {
-    applyFrame(message);
-  } else if (message.type === "walls") {
-    applyWalls(message);
-    if (latestFrame) paintSqueeze(latestFrame.squeeze);
-    showStats();
-    requestDraw();
-  } else if (message.type === "mesh") {
-    applyMesh(message);
-    if (latestFrame) paintSqueeze(latestFrame.squeeze);
-  } else if (message.type === "slice") {
-    applySlice(message);
-    if (view.follow) fit(true); else requestDraw();
-    showStats();
-  } else if (message.type === "settings") {
-    applySettings(message.values || {});
-  }
+  if (message.type === "shapes") applyShapes(message);
+  else if (message.type === "settings") applySettings(message.values || {});
 }
 
 /** Open the socket and keep retrying until the server answers. */
@@ -1195,12 +705,10 @@ function connect() {
   socket.addEventListener("open", () => {
     everConnected = true;
     retryDelay = 1000;
-    offline.hidden = true;
+    if (THREE_READY) offline.hidden = true; else showNoThree();
     setRunning(false);
     lastStep = -1;
-    view.follow = true;
     orbit.follow = true;
-    sendSlice();
   });
   socket.addEventListener("message", (event) => {
     let message;
@@ -1214,10 +722,16 @@ function connect() {
   });
 }
 
-createFoam();
-setStrength(foam.strength);
-applyTheme();
-setViewMode(viewMode);
+/** Say the 3D view cannot draw because three.js did not load. */
+function showNoThree() {
+  offlineText.textContent = "The 3D view needs three.js from cdnjs.cloudflare.com, which did not load.";
+  offline.hidden = false;
+}
+
+if (!THREE_READY) showNoThree();
+createScene();
+resize();
+showStats();
 connect();
 </script>
 </body>

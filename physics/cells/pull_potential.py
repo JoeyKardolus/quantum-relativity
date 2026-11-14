@@ -10,12 +10,16 @@ Contract: `pull_potential(grid)` returns one potential per energy volume, >= 0:
                is symmetric positive definite. The full energy is the source, not
                its unevenness: even space feels a background pull of
                energy / GROUND everywhere.
+  numerics     conjugate gradients with a Jacobi preconditioner to a relative
+               residual of 1e-12 (the matrix is symmetric positive definite and
+               diagonally dominant), started from energy / GROUND. Raises
+               RuntimeError if it does not converge.
 """
 from __future__ import annotations
 
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import cg
 
 from physics.cells.grid import Grid
 
@@ -32,4 +36,9 @@ def pull_potential(grid: Grid) -> np.ndarray:
                               (np.concatenate([heads, tails]), np.concatenate([tails, heads]))),
                              shape=(count, count)).tocsr()
     total = np.asarray(coupling.sum(axis=1)).ravel() + GROUND
-    return spsolve((sp.diags(total) - coupling).tocsc(), grid.energy)
+    system = (sp.diags(total) - coupling).tocsr()
+    potential, failed = cg(system, grid.energy, x0=grid.energy / GROUND, rtol=1e-12,
+                           M=sp.diags(1.0 / total), maxiter=10 * count)
+    if failed:
+        raise RuntimeError("pull potential did not converge")
+    return potential

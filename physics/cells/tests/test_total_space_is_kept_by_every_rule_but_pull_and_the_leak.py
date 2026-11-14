@@ -13,24 +13,24 @@ from __future__ import annotations
 
 import numpy as np
 
-from physics.cells import CellSettings, build_grid, move_space, pull_potential, rest_volume
+from physics.cells import EngineSettings, new_engine, move_space, pull_potential, rest_volume
 
 
 def test_total_space_kept_but_for_pull_and_the_leak():
-    grid, _ = build_grid(400, seed=7, unevenness=0.3)
+    grid = new_engine(400, seed=7, unevenness=0.3).grid
     for _ in range(5):
-        grid = move_space(grid, CellSettings.all_on())
+        grid = move_space(grid, EngineSettings.all_on())
     start = grid.total_space()
-    still = move_space(grid, CellSettings.all_on(attraction=0.0))
+    still = move_space(grid, EngineSettings.all_on(attraction=0.0))
     assert np.isclose(still.total_space(), start, rtol=1e-12)
     assert not np.allclose(still.joint_volume, grid.joint_volume)
-    settings = CellSettings.all_on(leak=0.0)
+    settings = EngineSettings.all_on(leak=0.0)
     potential = pull_potential(grid)
     pull = settings.attraction * (potential[grid.joints[:, 0]] + potential[grid.joints[:, 1]]) / 2
     squeezed_out = float((grid.joint_volume * (1 - np.exp(-pull))).sum())
     pulled = move_space(grid, settings)
     assert np.isclose(pulled.total_space(), start - squeezed_out, rtol=1e-12)
-    leaked = move_space(grid, CellSettings.all_on())
+    leaked = move_space(grid, EngineSettings.all_on())
     assert np.array_equal(leaked.joint_volume, pulled.joint_volume)
     assert np.array_equal(leaked.volume, rest_volume(leaked.energy))
     assert not np.allclose(leaked.energy, pulled.energy)

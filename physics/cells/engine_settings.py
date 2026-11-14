@@ -1,6 +1,6 @@
-"""CellSettings: the strength of each cell rule; every rule is always on in a scene.
+"""EngineSettings: the strength of each cell rule; every rule is always on in a scene.
 
-Contract: frozen record of floats, read by step():
+Contract: frozen record of floats, read by apply_rules() (step.py runs it each step):
   attraction   pull a joint gets per unit of pull potential (rule 7): each step it
                keeps exp(-attraction * mean potential of its two volumes) of its volume
   joint_push   share of the gap to its rest volume a joint swells back each step,
@@ -11,7 +11,7 @@ Contract: frozen record of floats, read by step():
   leak         share of its energy every energy volume leaks to its neighbours each
                step, split by their pull (rule 6, leak.py); in [0, 1]. With
                attraction 0 nothing pulls and nothing leaks.
-`CellSettings.all_on(**overrides)` gives the defaults below:
+`EngineSettings.all_on(**overrides)` gives the defaults below:
   attraction   0.005  even background (potential 10) pulls each joint by 0.05 a step
   joint_push   0.1    with that pull a joint settles near 0.7 of its rest volume
                       (k / (1 - (1 - k) exp(-pull)), k = joint_push)
@@ -26,7 +26,7 @@ from dataclasses import dataclass, replace
 
 
 @dataclass(frozen=True)
-class CellSettings:
+class EngineSettings:
     """Strengths of attraction, joint push, push limit, joint rest and leak."""
 
     attraction: float
@@ -36,10 +36,10 @@ class CellSettings:
     leak: float
 
     @classmethod
-    def all_on(cls, **overrides: float) -> "CellSettings":
+    def all_on(cls, **overrides: float) -> "EngineSettings":
         """Defaults with every rule on, plus the given overrides."""
         return replace(_ALL_ON, **overrides)
 
 
-_ALL_ON = CellSettings(attraction=0.005, joint_push=0.1, push_limit=0.5, joint_rest=0.2,
+_ALL_ON = EngineSettings(attraction=0.005, joint_push=0.1, push_limit=0.5, joint_rest=0.2,
                        leak=0.05)

@@ -20,7 +20,7 @@ from physics.app.simulation import Simulation
 PAGE = Path(__file__).parent / "static" / "index.html"
 
 
-def create_app(cells: int = 2500, seed: int = 1) -> FastAPI:
+def create_app(cells: int = 1000, seed: int = 1) -> FastAPI:
     """The app serving the page and the simulation's WebSocket."""
 
     @contextlib.asynccontextmanager

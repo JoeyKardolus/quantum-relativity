@@ -16,11 +16,11 @@ import numpy as np
 import scipy.sparse as sp
 from scipy.sparse.csgraph import connected_components
 
-from physics.cells import CellSettings, build_grid, joint_collapse, step
+from physics.cells import EngineSettings, new_engine, joint_collapse, apply_rules
 
 
 def test_joint_collapse_keeps_energy_and_space():
-    grid, _ = build_grid(500, seed=2, unevenness=0.1)
+    grid = new_engine(500, seed=2, unevenness=0.1).grid
     grid = replace(grid, charge=np.linspace(-1.0, 1.0, grid.cell_count))
     giving_way = np.zeros(len(grid.joints), dtype=bool)
     first = grid.joints[0, 0]
@@ -40,7 +40,7 @@ def test_joint_collapse_keeps_energy_and_space():
     assert len(np.unique(collapsed.joints, axis=0)) == len(collapsed.joints)
     assert collapsed.merged_into[grid.joints[0, 0]] == collapsed.merged_into[grid.joints[0, 1]]
 
-    stepped = step(grid, CellSettings.all_on(push_limit=0.99))
+    stepped = apply_rules(grid, EngineSettings.all_on(push_limit=0.99))
     assert stepped.cell_count < grid.cell_count
     assert len(stepped.merged_into) == grid.cell_count
     assert stepped.merged_into.max() == stepped.cell_count - 1

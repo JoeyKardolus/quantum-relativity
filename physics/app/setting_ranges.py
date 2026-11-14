@@ -1,7 +1,7 @@
 """Allowed range of every control the page can set.
 
 Contract: `setting_ranges(calibrated)` returns {name: (minimum, maximum)} for
-every CellSettings field plus "unevenness" and "speed". A rule's range runs
+every EngineSettings field plus "unevenness" and "speed". A rule's range runs
 from 0 to SCALED times its calibrated value (a negative value flips the range;
 a zero value gets 0 to ZERO_REACH), since its sensible size depends on the
 rules' own units. Leak and joint push are shares per step, so they never
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import fields
 
-from physics.cells import CellSettings
+from physics.cells import EngineSettings
 
 SCALED = 5.0
 ZERO_REACH = 0.01
@@ -23,10 +23,10 @@ _FIXED = {
 }
 
 
-def setting_ranges(calibrated: CellSettings) -> dict[str, tuple[float, float]]:
+def setting_ranges(calibrated: EngineSettings) -> dict[str, tuple[float, float]]:
     """Minimum and maximum per control, rules scaled to their calibrated values."""
     ranges = {}
-    for field in fields(CellSettings):
+    for field in fields(EngineSettings):
         reach = SCALED * float(getattr(calibrated, field.name)) or ZERO_REACH
         if field.name in _CAPS:
             reach = min(reach, _CAPS[field.name])
