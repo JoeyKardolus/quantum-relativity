@@ -166,6 +166,22 @@ function unit(value) {
   return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 }
 
+/** The typical joint push in the latest shapes message: every joint rests well above 0, so
+ *  drawing push as it is turns all joints solid. Joints are drawn by how far above this they push. */
+let typicalPush = 0;
+
+/** Median push over a message's joints. */
+function medianPush(joints) {
+  if (!joints.length) return 0;
+  const values = joints.map((joint) => joint.push).sort((low, high) => low - high);
+  return values[Math.floor(values.length / 2)];
+}
+
+/** How much harder than typical a joint pushes: 0 at or below typical, 1 at the push limit. */
+function pushAboveTypical(push) {
+  return unit((push - typicalPush) / Math.max(1 - typicalPush, 1e-6));
+}
+
 /** Parse a #rrggbb CSS colour into a three.js colour. */
 function cssColour(name) {
   const clean = getComputedStyle(document.documentElement).getPropertyValue(name).trim().replace("#", "");
@@ -397,7 +413,7 @@ function writeJoint(joint, shift, buffers) {
   const points = shifted(joint.polygon, shift), corners = points.length / 3, normal = polygonNormal(points);
   const half = Number.isFinite(joint.thickness) && joint.thickness > 0 ? joint.thickness / 2 : 0;
   const offset = (sign) => points.map((value, index) => value + sign * normal[index % 3] * half);
-  const top = offset(1), bottom = offset(-1), strength = unit(joint.push);
+  const top = offset(1), bottom = offset(-1), strength = pushAboveTypical(joint.push);
   writePolygon(top, normal, strength, buffers);
   writePolygon(bottom, normal, strength, buffers);
   for (let corner = 0; corner < corners; corner++) {
@@ -414,7 +430,7 @@ function writeJoint(joint, shift, buffers) {
 function outlineLines(joints, shifts, material, order) {
   const corners = [], strengths = [];
   for (const joint of joints) {
-    const points = shifted(joint.polygon, shifts.get(joint.a)), count = points.length / 3, strength = unit(joint.push);
+    const points = shifted(joint.polygon, shifts.get(joint.a)), count = points.length / 3, strength = pushAboveTypical(joint.push);
     for (let corner = 0; corner < count; corner++) {
       const next = (corner + 1) % count;
       corners.push(...points.slice(corner * 3, corner * 3 + 3), ...points.slice(next * 3, next * 3 + 3));
@@ -842,6 +858,7 @@ function applyShapes(message) {
   lastStep = message.step;
   const previous = latest;
   latest = checkShapes(message);
+  typicalPush = medianPush(latest.joints || []);
   if (latest.stats.joints === 0) setRunning(false);
   if (reselect || !previous || tracked.size === 0) {
     selectTracked();
