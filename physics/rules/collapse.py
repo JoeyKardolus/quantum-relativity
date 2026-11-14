@@ -9,9 +9,10 @@ a new Network (bible rule 8):
   energy     a connection between two joints that merged together would join a
              joint to itself; its energy is shared equally among the merged
              joint's remaining connections. Connections that now join the same
-             two joints combine into one, energies added. Total energy is kept
-             exactly; a collapse that would leave a joint with no connection to
-             hold that energy raises ValueError instead of losing it.
+             two joints combine into one, energies added. A merged joint left
+             with no connection (a whole isolated cluster fell together) keeps
+             that energy as an isolated joint: Network.held. Energy already held
+             moves with its joint. total_energy() is kept exactly; never raises.
   length     every connection whose energy changed re-follows the energy-length
              rule (length = LENGTH_SCALE / energy); others keep their length.
   joints     charges of merged joints add; the causal order, when present, is
@@ -37,14 +38,16 @@ def collapse(network: Network, giving_way: np.ndarray) -> Network:
     joint_count = int(merged_into.max(initial=-1)) + 1
     ends = merged_into[network.pairs]
     looped = ends[:, 0] == ends[:, 1]
-    share = _loop_energy_share(ends, looped, network.energy, joint_count)[~looped]
+    share, stranded = _loop_energy_share(ends, looped, network.energy, joint_count)
+    share = share[~looped]
     energy = network.energy[~looped] + share
     length = np.where(share > 0, energy_length(energy), network.length[~looped])
     pairs, energy, length = _combine(np.sort(ends[~looped], axis=1), energy, length)
     charge = np.bincount(merged_into, network.charge, joint_count)
     return replace(network, joint_count=joint_count, pairs=pairs, energy=energy,
                    length=length, charge=charge, causal=_causal(network, merged_into, joint_count),
-                   merged_into=merged_into)
+                   merged_into=merged_into,
+                   held=_held(network, merged_into, joint_count, stranded))
 
 
 def _merge_map(network: Network, giving_way: np.ndarray) -> np.ndarray:
@@ -65,19 +68,24 @@ def _merge_map(network: Network, giving_way: np.ndarray) -> np.ndarray:
 
 
 def _loop_energy_share(ends: np.ndarray, looped: np.ndarray, energy: np.ndarray,
-                       joint_count: int) -> np.ndarray:
-    """Energy each surviving connection gains from the loops at its two joints."""
+                       joint_count: int) -> tuple[np.ndarray, np.ndarray]:
+    """Energy each surviving connection gains from the loops at its two joints, and the
+    loop energy of each new joint left with no connection to give it to."""
     loop_energy = np.bincount(ends[looped, 0], energy[looped], joint_count)
     kept = ends[~looped]
     holders = np.bincount(kept.ravel(), minlength=joint_count)
-    stranded = (loop_energy > 0) & (holders == 0)
-    if stranded.any():
-        raise ValueError(f"joint collapse left {int(stranded.sum())} joint(s) holding energy "
-                         "with no connection to keep it in")
+    stranded = np.where(holders == 0, loop_energy, 0.0)
     per_holder = np.divide(loop_energy, holders, out=np.zeros(joint_count), where=holders > 0)
     share = np.zeros(len(ends))
     share[~looped] = per_holder[kept[:, 0]] + per_holder[kept[:, 1]]
-    return share
+    return share, stranded
+
+
+def _held(network: Network, merged_into: np.ndarray, joint_count: int, stranded: np.ndarray):
+    """Energy each new isolated joint holds: what its old joints held plus stranded loops."""
+    before = np.zeros(network.joint_count) if network.held is None else network.held
+    held = np.bincount(merged_into, before, joint_count) + stranded
+    return held if held.any() else None
 
 
 def _combine(pairs: np.ndarray, energy: np.ndarray, length: np.ndarray):

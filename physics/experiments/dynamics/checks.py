@@ -9,8 +9,12 @@ sparse one and fades the more connections lie between (rule 7), joint push
 never exceeds push_limit and equals joint_push x squeeze below it (rule 8),
 joint collapse keeps all energy (rule 8), repulsion leaves uncharged
 connections alone, rewiring keeps the connection count, the energy-length
-rule restores energy * length = LENGTH_SCALE. Pass bands are fixed here,
-before any run. `pull_profile` is the pull-fade profile the checks used.
+rule restores energy * length = LENGTH_SCALE, the balancing drift keeps an
+even network's mean length within 1% over 20 steps with all rules on (and the
+same run without drift shrinks by more than 1%), an isolated cluster that
+collapses keeps its energy on the joint it falls into, and one step with all
+rules on runs on a scattered network. Pass bands are fixed here, before any
+run. `pull_profile` is the pull-fade profile the checks used.
 """
 from __future__ import annotations
 
@@ -19,11 +23,14 @@ from dataclasses import replace
 import numpy as np
 
 from physics.network import LENGTH_SCALE, Network, random_network, spatial_reference
-from physics.rules import RuleSettings, collapse, push, step
+from physics.rules import RuleSettings, all_rules_on, balancing_drift, collapse, pull, push, step
 
 _JOINTS = 2000
 _DRIFT = 0.01
 _DRIFT_STEPS = 10
+_BALANCE_STEPS = 20
+_BALANCE_BAND = 0.01
+_BACKGROUND_SHORTENING = 0.01
 
 
 def rule_checks(seed: int, pull_profile: dict) -> tuple[list[dict], list[bool]]:
@@ -31,7 +38,8 @@ def rule_checks(seed: int, pull_profile: dict) -> tuple[list[dict], list[bool]]:
     base = spatial_reference(_JOINTS, 3, seed=seed)[0]
     results = [_energy_length(base, seed), _drift(base), _flow(base), _attraction(seed),
                _pull_fades(pull_profile), _push_cap(seed), _collapse_keeps_energy(base, seed),
-               _repulsion(base), _rewiring(seed)]
+               _repulsion(base), _rewiring(seed), _balancing(base, seed), _isolated_collapse(),
+               _all_rules_step(base, seed)]
     numbers = [entry for entries, _ in results for entry in entries]
     return numbers, [passed for _, passed in results]
 
@@ -61,7 +69,7 @@ def _drift(base: Network):
 
 def _flow(base: Network):
     after = step(base, RuleSettings(energy_flow=0.5, energy_length=0.0))
-    total = float(after.energy.sum() / base.energy.sum())
+    total = after.total_energy() / base.total_energy()
     spread = float(after.energy.std() / base.energy.std())
     numbers = [_entry("energy flow: total energy after / before", round(total, 12), 1.0,
                       "flow conserves energy"),
@@ -114,12 +122,13 @@ def _push_cap(seed: int):
 def _collapse_keeps_energy(base: Network, seed: int):
     giving_way = np.random.default_rng(seed).random(base.joint_count) < 0.05
     after = collapse(base, giving_way)
-    total = float(after.energy.sum() / base.energy.sum())
+    total = after.total_energy() / base.total_energy()
     numbers = [_entry("joint collapse: total energy after / before", round(total, 12), 1.0,
                       f"{int(giving_way.sum())} of {base.joint_count} joints gave way"),
                _entry("joint collapse: joints after / before", after.joint_count / base.joint_count, None,
                       "below 1: joints merged into a neighbour")]
     return numbers, abs(total - 1) < 1e-12 and after.joint_count < base.joint_count
+
 
 def _repulsion(base: Network):
     charge = np.zeros(base.joint_count)
@@ -146,6 +155,67 @@ def _rewiring(seed: int):
                _entry("rewiring: action after / before", round(after_action / before_action, 4), None,
                       "below 1 means the moves lowered the action")]
     return numbers, after.connection_count == network.connection_count and after_action < before_action
+
+
+def _even(base: Network) -> Network:
+    return Network.from_lengths(base.joint_count, base.pairs,
+                                np.full(base.connection_count, base.length.mean()))
+
+
+def _scene_settings(network: Network):
+    background = float(np.median(pull(network, network.energy, network.length)))
+    return all_rules_on(attraction=_BACKGROUND_SHORTENING / background)
+
+
+def _size_after(network: Network, settings: RuleSettings, seed: int) -> float:
+    rng = np.random.default_rng(seed)
+    current = network
+    for _ in range(_BALANCE_STEPS):
+        current = step(current, settings, rng)
+    return float(current.length.mean() / network.length.mean())
+
+
+def _balancing(base: Network, seed: int):
+    even = _even(base)
+    settings = _scene_settings(even)
+    drift = balancing_drift(even, settings, np.random.default_rng(seed))
+    balanced = _size_after(even, replace(settings, drift=drift), seed)
+    undrifted = _size_after(even, settings, seed)
+    nudged = Network.from_lengths(even.joint_count, even.pairs, even.length * 1.01)
+    nudged_size = 1.01 * _size_after(nudged, replace(settings, drift=drift), seed)
+    numbers = [_entry("balancing drift: drift that holds even space steady (calibration)",
+                      round(drift, 6), None, "computed from the even network, all rules on"),
+               _entry(f"balancing drift: even space mean length after / before, {_BALANCE_STEPS} steps",
+                      round(balanced, 6), 1.0, f"all rules on plus the balancing drift; band {_BALANCE_BAND:.0%}"),
+               _entry("balancing drift: same run without drift, mean length after / before",
+                      round(undrifted, 4), None, "below 0.99 shows the check can fail"),
+               _entry("balancing drift: same run started 1% larger, mean length after / even start",
+                      round(nudged_size, 4), None, "above 1.01 means the balance is unstable, like "
+                      "Einstein's static universe")]
+    return numbers, abs(balanced - 1) < _BALANCE_BAND and undrifted < 1 - _BALANCE_BAND
+
+
+def _isolated_collapse():
+    pairs = np.array([[0, 1], [1, 2], [0, 2], [3, 4], [4, 5], [5, 6]])
+    network = Network.from_lengths(7, pairs, 1.0 / np.array([1.0, 2.0, 3.0, 1.0, 1.0, 1.0]))
+    triangle = np.arange(7) < 3
+    fallen = collapse(network, triangle)
+    held = float(fallen.held[fallen.merged_into[0]])
+    numbers = [_entry("isolated collapse: energy held by the joint a lone triangle fell into",
+                      held, 6.0, "triangle energies 1 + 2 + 3; no connection left"),
+               _entry("isolated collapse: total energy after / before",
+                      fallen.total_energy() / network.total_energy(), 1.0, "collapse does not stop the run")]
+    return numbers, held == 6.0 and fallen.total_energy() == network.total_energy()
+
+
+def _all_rules_step(base: Network, seed: int):
+    settings = _scene_settings(base)
+    after = step(base, settings, np.random.default_rng(seed))
+    finite = bool(np.isfinite(after.length).all() and np.isfinite(after.energy).all())
+    total = after.total_energy() / base.total_energy()
+    numbers = [_entry("all rules on: one step on a scattered network, total energy after / before",
+                      round(total, 4), None, "drift 0, so pull and push change energy; must run and stay finite")]
+    return numbers, finite and after.joint_count > 0
 
 
 def _action(network: Network, settings: RuleSettings) -> float:

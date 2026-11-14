@@ -9,6 +9,9 @@ network: a sparse boolean matrix with causal[i, j] true when joint i precedes
 joint j (the full transitive relation, not only the links). `merged_into` is
 set by a rules step: merged_into[old_joint] is that joint's index in this
 network (identity when no joint collapsed); None on a freshly built network.
+`held` is None until a joint collapse leaves a joint with energy and no
+connection to keep it in; then held[joint] is the energy that isolated joint
+holds, so total_energy() = energy.sum() + held.sum() is kept exactly.
 Rules return a new Network via `dataclasses.replace`; nothing mutates one in place.
 """
 from __future__ import annotations
@@ -23,7 +26,7 @@ from physics.network.energy_length import energy_length
 
 @dataclass(frozen=True)
 class Network:
-    """Joints, connections with energy and length, charges, optional causal order, merge map."""
+    """Joints, connections with energy and length, charges, causal order, merge map, held energy."""
 
     joint_count: int
     pairs: np.ndarray
@@ -32,6 +35,7 @@ class Network:
     charge: np.ndarray = field(default=None)
     causal: sp.csr_matrix | None = None
     merged_into: np.ndarray | None = None
+    held: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         if self.charge is None:
@@ -42,6 +46,8 @@ class Network:
             raise ValueError("energy, length and pairs disagree on the connection count")
         if len(self.charge) != self.joint_count:
             raise ValueError("charge needs one value per joint")
+        if self.held is not None and len(self.held) != self.joint_count:
+            raise ValueError("held needs one value per joint")
         if np.any(self.pairs[:, 0] == self.pairs[:, 1]):
             raise ValueError("a connection cannot join a joint to itself")
         if self.merged_into is not None and len(self.merged_into) and (
@@ -69,6 +75,11 @@ class Network:
              (np.concatenate([heads, tails]), np.concatenate([tails, heads]))),
             shape=(self.joint_count, self.joint_count))
         return matrix.tocsr()
+
+    def total_energy(self) -> float:
+        """Energy in every connection plus any energy isolated joints hold."""
+        held = 0.0 if self.held is None else float(self.held.sum())
+        return float(self.energy.sum()) + held
 
     def degree(self) -> np.ndarray:
         """Number of connections at each joint."""

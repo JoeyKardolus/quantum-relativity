@@ -2,6 +2,8 @@
 
 Module map:
   settings.py  RuleSettings: per-rule strengths, 0 = off
+  all_rules_on.py   all_rules_on: settings with every rule on (rewiring, drift 0)
+  balancing_drift.py balancing_drift: drift that cancels the even background pull
   step.py      step: energy flow, drift, attraction, joint push, repulsion,
                energy-length, joint collapse, rewiring
   pull.py      pull: per-joint pull from energy volume, spread through the connections
@@ -15,5 +17,8 @@ from physics.rules.pull import pull
 from physics.rules.push import push
 from physics.rules.rewire import rewire
 from physics.rules.step import step
+from physics.rules.all_rules_on import all_rules_on
+from physics.rules.balancing_drift import balancing_drift
 
-__all__ = ["RuleSettings", "step", "pull", "push", "collapse", "rewire"]
+__all__ = ["RuleSettings", "step", "pull", "push", "collapse", "rewire", "all_rules_on",
+           "balancing_drift"]

@@ -6,10 +6,13 @@ triples and writes one HTML file starting with <title> then <style>, no
 three.js r128 from cdnjs. Frame data is embedded as compact JSON: positions
 and joint energies as integers in thousandths (positions of the frame-0 RMS
 radius, energies of the frame-0 median joint energy), so three decimals of
-precision. Every second step is embedded, plus every step where the joint
+precision. Positions keep the frame-0 scale and the camera never re-fits, so
+a shrink of all of space shows as the drawing shrinking; the status line gives
+each frame's far-background mean connection length relative to frame 0. Every second step is embedded, plus every step where the joint
 count changed and the last step, to keep the page small. Each scene shows
 its "watch for" sentence, the "what happened" sentence and its seed and
-switched-on rule strengths. Returns out_path.
+switched-on rule strengths, the drift marked as the balancing calibration.
+Returns out_path.
 """
 from __future__ import annotations
 
@@ -49,11 +52,13 @@ def _scene_data(scene: Scene, recording: Recording, happened: str) -> dict:
     unit = float(np.median(first.energy))
     kept = _kept_frames(recording.frames)
     pooled = np.concatenate([np.log10(np.maximum(frame.energy / unit, 1e-9)) for frame in kept])
+    ruler = first.background_length
     return {"name": scene.name, "title": scene.title, "watch": scene.watch_for,
             "happened": happened, "seed": scene.seed, "rules": _switched_on(scene.settings),
-            "missing": list(scene.missing_rules), "steps": recording.frames[-1].step,
+            "charge": "" if np.any(scene.network.charge) else " No joint carries charge, so repulsion has nothing to act on.",
+            "steps": recording.frames[-1].step,
             "low": round(float(np.percentile(pooled, 2)), 3), "high": round(float(np.percentile(pooled, 99.5)), 3),
-            "frames": [_frame_data(frame, radius, unit) for frame in kept]}
+            "frames": [_frame_data(frame, radius, unit, ruler) for frame in kept]}
 
 
 def _kept_frames(frames: tuple[Frame, ...]) -> list[Frame]:
@@ -62,8 +67,9 @@ def _kept_frames(frames: tuple[Frame, ...]) -> list[Frame]:
             or frame.joint_count != frames[index - 1].joint_count]
 
 
-def _frame_data(frame: Frame, radius: float, unit: float) -> dict:
-    return {"s": frame.step, "n": frame.joint_count,
+def _frame_data(frame: Frame, radius: float, unit: float, ruler: float) -> dict:
+    size = frame.background_length / ruler
+    return {"s": frame.step, "n": frame.joint_count, "g": round(size, 4) if np.isfinite(size) else None,
             "p": np.rint(frame.positions.ravel() / radius * 1000).astype(int).tolist(),
             "e": np.rint(frame.energy / unit * 1000).astype(np.int64).tolist(),
             "b": frame.bright.ravel().astype(int).tolist(), "m": list(frame.marked)}
@@ -116,7 +122,8 @@ background:linear-gradient(90deg,#2f4fb5,#2fa7b8,#f0c44c,#e0462a)}
 _BODY = """<div class="wrap">
 <h1>Quantum-relativity viewer</h1>
 <p class="lede">Joints coloured by the energy they hold, brightest connections as faint lines,
-followed joints in white or black. Positions are a drawing of network distances only; the network has none.</p>
+followed joints in white or black. Positions are a drawing of network distances only; the network has none.
+The camera stays put, so if all of space shrinks or grows the whole drawing does too.</p>
 <div class="picker" id="picker"></div>
 <div class="view" id="view"><div class="legend">low <i></i> high joint energy</div></div>
 <div class="controls">
@@ -192,7 +199,8 @@ function show(index) {
   });
   markGeometry.setDrawRange(0, Math.min(frame.m.length, 10)); markGeometry.attributes.position.needsUpdate = true;
   slider.value = index;
-  status.textContent = 'step ' + frame.s + ' of ' + scene.steps + ', ' + frame.n + ' joints';
+  const space = frame.g === null ? 'far space collapsed' : 'far space ' + (frame.g * 100).toFixed(1) + '% of start size';
+  status.textContent = 'step ' + frame.s + ' of ' + scene.steps + ', ' + frame.n + ' joints, ' + space;
   draw();
 }
 function pick(index) {
@@ -200,8 +208,8 @@ function pick(index) {
   document.querySelectorAll('#picker button').forEach((button, at) => button.setAttribute('aria-pressed', at === index));
   document.getElementById('watch').textContent = scene.watch;
   document.getElementById('happened').textContent = scene.happened;
-  const missing = scene.missing.length ? ' Not available in these rules, so not run: ' + scene.missing.join(', ') + '.' : '';
-  document.getElementById('rules').textContent = 'Seed ' + scene.seed + '. Rules: ' + scene.rules + '.' + missing;
+  document.getElementById('rules').textContent = 'Seed ' + scene.seed + '. All rules on: ' + scene.rules +
+    '. The drift is calibrated so even space keeps its size.' + scene.charge;
   slider.max = scene.frames.length - 1; clock = 0; show(0);
 }
 scenes.forEach((scene, index) => {

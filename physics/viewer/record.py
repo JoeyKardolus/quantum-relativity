@@ -6,7 +6,9 @@ frame 0 plus one frame per completed step. Display positions start from
 `initial_layout` relaxed START_ITERATIONS times, then each step are carried
 over collapses (`carry_positions`, energy-weighted, via the stepped network's
 merged_into when it has one) and relaxed FRAME_ITERATIONS times toward the new
-lengths. Positions live only in the frames, never on a network. A step that
+lengths. The far background (`background_joints`, FAR mean lengths from every
+marked joint at the start) is carried over collapses too and gives each
+frame's background_length. Positions live only in the frames, never on a network. A step that
 raises ValueError or leaves a length that is not finite and positive ends the
 recording; its message goes in `stopped`.
 """
@@ -18,6 +20,7 @@ from scipy.sparse.csgraph import dijkstra
 from physics.measure import mean_length
 from physics.network import Network
 from physics.rules import step
+from physics.viewer.background import background_joints
 from physics.viewer.carry_positions import carry_positions
 from physics.viewer.frame import Frame
 from physics.viewer.initial_layout import initial_layout
@@ -29,14 +32,16 @@ from physics.viewer.scene import Scene
 START_ITERATIONS = 60
 FRAME_ITERATIONS = 6
 BRIGHT_CONNECTIONS = 800
+FAR = 4.0               # far background: mean lengths from every marked joint at the start
 
 
 def record(scene: Scene, steps: int) -> Recording:
     """Step the scene, laying out and measuring every frame; stop on a rules failure."""
     rng = np.random.default_rng(scene.seed)
     network, marked = scene.network, scene.marked
+    far = background_joints(network, marked, FAR)
     positions = relax_layout(network, initial_layout(network), rng, START_ITERATIONS)
-    frames = [_frame(0, network, positions, marked)]
+    frames = [_frame(0, network, positions, marked, far)]
     for number in range(1, steps + 1):
         try:
             with np.errstate(all="ignore"):
@@ -49,17 +54,26 @@ def record(scene: Scene, steps: int) -> Recording:
         positions = carry_positions(positions, joint_energy(network), merged_into, stepped.joint_count)
         if merged_into is not None:
             marked = tuple(int(merged_into[joint]) for joint in marked)
+            far = np.unique(merged_into[far])
         network = stepped
         positions = relax_layout(network, positions, rng, FRAME_ITERATIONS)
-        frames.append(_frame(number, network, positions, marked))
+        frames.append(_frame(number, network, positions, marked, far))
     return Recording(tuple(frames), None)
 
 
-def _frame(number: int, network: Network, positions: np.ndarray, marked: tuple[int, ...]) -> Frame:
+def _frame(number: int, network: Network, positions: np.ndarray, marked: tuple[int, ...],
+           far: np.ndarray) -> Frame:
     brightest = np.argsort(network.energy)[::-1][:BRIGHT_CONNECTIONS]
     return Frame(number, network.joint_count, positions - positions.mean(axis=0),
                  joint_energy(network), network.pairs[brightest], marked,
-                 _gap(network, marked), float(mean_length(network)))
+                 _gap(network, marked), float(mean_length(network)), _background_length(network, far))
+
+
+def _background_length(network: Network, far: np.ndarray) -> float:
+    inside = np.zeros(network.joint_count, dtype=bool)
+    inside[far] = True
+    held = inside[network.pairs[:, 0]] & inside[network.pairs[:, 1]]
+    return float(network.length[held].mean()) if held.any() else float("nan")
 
 
 def _gap(network: Network, marked: tuple[int, ...]) -> float | None:

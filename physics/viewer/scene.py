@@ -1,8 +1,7 @@
 """A scene: a starting network, the rules it runs under, and what to watch for.
 
 Contract: `Scene` is a frozen value. `network` is the starting Network,
-`settings` the RuleSettings stepped each frame, `missing_rules` the strengths
-the installed RuleSettings lacks (see rule_settings.py), `marked` the joints
+`settings` the RuleSettings stepped each frame, `marked` the joints
 the scene follows (lump centres), `watch_for` one plain sentence for the page,
 `seed` the seed for its build and steps.
 """
@@ -22,7 +21,6 @@ class Scene:
     title: str
     network: Network
     settings: RuleSettings
-    missing_rules: tuple[str, ...]
     marked: tuple[int, ...]
     watch_for: str
     seed: int

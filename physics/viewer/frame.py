@@ -6,7 +6,8 @@ layout only, never part of the network. `energy` is each joint's energy
 connections, drawn as lines; `marked` the scene's followed joints renumbered
 into this frame; `marked_gap` the network distance between the first two
 marked joints (None with fewer than two); `mean_length` the mean connection
-length.
+length; `background_length` the mean length of the connections inside the far
+background (`background_joints`), the ruler for the size of space.
 """
 from __future__ import annotations
 
@@ -27,3 +28,4 @@ class Frame:
     marked: tuple[int, ...]
     marked_gap: float | None
     mean_length: float
+    background_length: float

@@ -2,13 +2,14 @@
 
 Module map:
   scene.py            Scene: starting network, rules, followed joints, what to watch for
-  two_lumps.py        two_lumps: two lumps of extra energy, attraction and joint push on
+  two_lumps.py        two_lumps: two lumps of extra energy, every rule on
   collapse.py         collapse: one heavy lump whose squeeze passes the push limit
-  reference_ball.py   reference_ball: a ball of a 3D reference network (no wrap-around)
+  reference_ball.py   reference_ball: an even ball of a 3D reference network (no wrap-around)
   region.py           carve_ball: the joints nearest a centre, as a network of their own
-  rule_settings.py    rule_settings: RuleSettings from the strengths it knows
+  scene_rules.py      scene_rules: all rules on, drift balancing the even background
   record.py           record: step a scene, one Frame per step
   frame.py            Frame: display positions, joint energies, measurements for one step
+  background.py       background_joints: joints far from every followed joint, the size ruler
   recording.py        Recording: the frames and why the run stopped, if it did
   initial_layout.py   initial_layout: landmark MDS of network distances into 3D
   relax_layout.py     relax_layout: sparse stress majorization toward current lengths

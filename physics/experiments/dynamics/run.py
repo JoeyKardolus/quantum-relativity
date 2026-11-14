@@ -25,13 +25,14 @@ def run(seed: int, out_dir: str) -> dict:
     picture = plot_pull_fade(profile, out_dir)
     plots = [picture, plot_drift(seed, out_dir)]
     failed = len(passed) - sum(passed)
-    summary = ("Each rule was switched on alone on a small network. "
+    summary = ("Each rule was switched on alone on a small network, then all rules together. "
                + (f"All {len(passed)} checks (energy-length, drift, energy flow, attraction, pull "
-                  "fade, joint push cap, joint collapse energy, repulsion, rewiring) came out the "
-                  "way the rule's definition says."
+                  "fade, joint push cap, joint collapse energy, repulsion, rewiring, balancing "
+                  "drift, isolated collapse, one step with all rules on) came out the way the "
+                  "rule's definition says."
                   if not failed else f"{failed} of {len(passed)} checks did not do what the rule says.")
                + " This checks that the code does what the rules say, not that the rules are right.")
-    meaning = _meaning(failed, len(passed), profile)
+    meaning = _meaning(failed, len(passed), profile, _balance(numbers))
     return {
         "milestone": 2,
         "title": "Grid dynamics",
@@ -47,22 +48,30 @@ def run(seed: int, out_dir: str) -> dict:
         "settings": {"joints": 2000, "dimension": 3, "drift": 0.01, "drift_steps": 10,
                      "energy_flow": 0.5, "attraction": 0.05, "repulsion": 0.1,
                      "rewiring_attempts": 5000, "joint_push": 0.8, "push_limit": 1.0,
-                     "collapse_share": 0.05, "pull_fade_profile": profile},
+                     "collapse_share": 0.05, "all_rules_on": "attraction = 0.01 / background pull",
+                     "balance_steps": 20, "balance_band": "1%", "pull_fade_profile": profile},
         "seed": seed,
         "seconds": round(time.time() - started, 1),
     }
 
 
-def _meaning(failed: int, checks: int, profile: dict) -> str:
+def _balance(numbers: list[dict]) -> dict:
+    return {entry["name"].split(",")[0].split(": ")[1]: entry["measured"] for entry in numbers
+            if entry["name"].startswith("balancing drift")}
+
+
+def _meaning(failed: int, checks: int, profile: dict, balance: dict) -> str:
     excess = profile["excess"]
-    first = (f"All {checks} rule checks passed: the v2 pull is strongest at a packed lump and falls "
+    first = (f"All {checks} rule checks passed: the pull is strongest at a packed lump and falls "
              f"with every connection in between (to {excess[-1] / excess[0]:.0%} of its centre value "
-             f"{profile['hops'][-1]} connections out), a joint never pushes past its limit, and joint "
-             "collapse keeps every bit of energy."
+             f"{profile['hops'][-1]} connections out), joint collapse keeps every bit of energy even "
+             "when a cluster falls into a lone joint, and all rules run together."
              if not failed else f"{failed} of {checks} rule checks failed, so some rule does not do what it says.")
-    share = excess[0] / profile["background"]
-    if share >= 1:
-        return first + f" A packed lump more than doubles the pull at its centre ({share:.0%} extra)."
-    return (first + f" But a packed lump adds only {share:.0%} to the pull every joint already feels, "
-            "so the pull mostly squeezes all of space at once; that is a property of the rule as "
-            "written, which the gravity and expansion tests then run into.")
+    drift = balance["drift that holds even space steady (calibration)"]
+    nudged = balance["same run started 1% larger"]
+    return (first + f" The background pull alone shrinks even space (to "
+            f"{balance['same run without drift']:.1%} in 20 steps), and a calibrated drift of "
+            f"{drift:.4f} per step holds it at {balance['even space mean length after / before']:.1%}, "
+            + (f"but a network started 1% larger kept growing (to {nudged:.1%} in 20 steps), so the "
+               "balance is unstable, like Einstein's static universe." if nudged > 1.01 else
+               f"and a network started 1% larger did not grow further ({nudged:.1%} after 20 steps)."))

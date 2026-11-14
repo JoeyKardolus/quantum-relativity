@@ -4,14 +4,16 @@ Contract: `track(network, settings, steps, checkpoints, seed)` applies
 `physics.rules.step` `steps` times and, at each step listed in `checkpoints`
 (0 = before any step), records the ball-growth and spectral dimension (seed fixed, default fit
 windows), the steps across the network (mean largest distance / median
-connection length) and the moves the rewiring accepted since the last record.
+connection length), the joint count (joint collapse lowers it) and the
+connections the rewiring moved since the last record; a step in which a joint
+collapsed renumbers the connections, so its moves are not counted.
 A dimension is recorded as None, never as a number, when its measurement has
 no valid range, by rules fixed before any run:
   ball      the fit range spans less than a factor 2 in radius (or none);
   spectral  the walk's return probability at the window end is within a factor
             2 of its equilibrium floor 1/N (the walk has already filled the
             network, so the slope says nothing about dimension).
-Returns {"step", "ball", "spectral", "across", "accepted"} as lists.
+Returns {"step", "ball", "spectral", "across", "joints", "accepted"} as lists.
 """
 from __future__ import annotations
 
@@ -26,7 +28,7 @@ def track(network: Network, settings: RuleSettings, steps: int,
           checkpoints: list[int], seed: int) -> dict:
     """Dimension, size and rewiring activity over `steps` steps of the rules."""
     rng = np.random.default_rng(seed)
-    history = {"step": [], "ball": [], "spectral": [], "across": [], "accepted": []}
+    history = {"step": [], "ball": [], "spectral": [], "across": [], "joints": [], "accepted": []}
     accepted = 0
     for index in range(steps + 1):
         if index in checkpoints:
@@ -34,11 +36,13 @@ def track(network: Network, settings: RuleSettings, steps: int,
             history["ball"].append(_ball(network, seed))
             history["spectral"].append(_spectral(network, seed))
             history["across"].append(_across(network, seed))
+            history["joints"].append(network.joint_count)
             history["accepted"].append(accepted)
             accepted = 0
         if index < steps:
             stepped = step(network, settings, rng)
-            accepted += int(np.any(stepped.pairs != network.pairs, axis=1).sum())
+            if stepped.pairs.shape == network.pairs.shape and stepped.joint_count == network.joint_count:
+                accepted += int(np.any(stepped.pairs != network.pairs, axis=1).sum())
             network = stepped
     return history
 

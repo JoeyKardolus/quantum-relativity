@@ -6,7 +6,8 @@ Connection theory simulation. Rules: `docs/bible.md#physicsconnection-theory`; w
 ## Must not get wrong
 
 - **Joints store no coordinates.** `Network` holds joint count, connection pairs, energy, length,
-  charge and an optional causal order, nothing else. A builder may scatter points to decide which
+  charge, an optional causal order, the merge map and `held` (energy an isolated joint keeps
+  after a whole cluster collapses; count it with `total_energy()`), nothing else. A builder may scatter points to decide which
   joints connect, then must drop them; known answers go back separately, never on the Network.
 - **Every measurement reads only the network**: length-weighted paths, neighbour counts, random
   walks, the causal order. If a measure needs a coordinate, it is measuring the wrong thing.

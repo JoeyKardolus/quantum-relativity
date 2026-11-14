@@ -1,9 +1,12 @@
-"""PNG curves for the expansion test.
+"""The expansion test's one picture.
 
-Contract: `draw_plots(runs, drift, out_dir)` takes the per-run summaries (each
-with its `evolve` record) and writes three PNGs into out_dir (scale factor,
-growth rate, cluster size), each with the known drift-only value dashed.
-Returns the file names.
+Contract: `draw_picture(runs, out_dir)` writes one PNG with two panels and
+returns its file name. Left, the runs at the highest push limit: sparse-space
+scale factor (solid) and mean cluster size (dashed), each over its start, one
+colour per drift excess, drawn down to FLOOR; a run that fell in gets an x at
+its breakdown step. Right, every run at the lowest (house) push limit:
+the share of sparse joints not yet fallen into a collapsed region, per step,
+with the v2 runaway marked.
 """
 from __future__ import annotations
 
@@ -15,69 +18,59 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-
-def draw_plots(runs: list[dict], drift: float, out_dir: str) -> list[str]:
-    """Write the four figures; return their file names."""
-    colours = plt.cm.viridis(np.linspace(0, 0.9, len(runs)))
-    return [_scale_plot(runs, drift, colours, out_dir), _rate_plot(runs, drift, colours, out_dir),
-            _cluster_plot(runs, colours, out_dir)]
+NAME = "expansion.png"
+V2_RUNAWAY = (4, 184 / 5600)   # v2 page, seed 1: step, share of joints left
+FLOOR = 0.5                    # left panel: lowest size drawn; a run that fell in is marked here
 
 
-def _label(run: dict) -> str:
-    if not run["attraction_multiple"]:
-        return "drift only"
-    tail = f", broke down at step {run['record']['breakdown_step']}" if run["record"]["breakdown_step"] else ""
-    return (f"pull x{run['attraction_multiple']:g}, limit x{run['limit_multiple']:g}, "
-            f"push {run['joint_push']:g}{tail}")
-
-
-def _save(figure, out_dir: str, name: str) -> str:
+def draw_picture(runs: list[dict], out_dir: str) -> str:
+    """Write the two-panel figure; return its file name."""
+    excesses = sorted({entry["drift_excess"] for entry in runs})
+    colours = dict(zip(excesses, plt.cm.viridis(np.linspace(0, 0.85, len(excesses)))))
+    highest = max(entry["limit_multiple"] for entry in runs)
+    lowest = min(entry["limit_multiple"] for entry in runs)
+    figure, (left, right) = plt.subplots(1, 2, figsize=(12, 4.8))
+    _sizes(left, [entry for entry in runs if entry["limit_multiple"] == highest], colours, highest)
+    _survivors(right, [entry for entry in runs if entry["limit_multiple"] == lowest], colours, lowest)
     figure.tight_layout()
-    figure.savefig(os.path.join(out_dir, name), dpi=110)
+    figure.savefig(os.path.join(out_dir, NAME), dpi=110)
     plt.close(figure)
-    return name
+    return NAME
 
 
-def _scale_plot(runs, drift, colours, out_dir) -> str:
-    figure, axis = plt.subplots(figsize=(7, 4.5))
-    for run, colour in zip(runs, colours):
-        steps, scale = np.array(run["record"]["step"]), np.array(run["record"]["scale"])
-        axis.plot(steps, scale / scale[0], color=colour, label=_label(run))
-    longest = max(run["record"]["step"][-1] for run in runs)
-    grid = np.arange(longest + 1)
-    axis.plot(grid, (1 + drift) ** grid, "k--", label=f"pure exponential (1+h)^t, h = {drift}")
-    axis.set_yscale("log")
+def _tag(entry: dict) -> str:
+    return f"drift = balance {entry['drift_excess']:+.0%}"
+
+
+def _sizes(axis, runs: list[dict], colours: dict, multiple: float) -> None:
+    for entry in runs:
+        steps = entry["record"]["step"]
+        scale = np.array(entry["record"]["scale"])
+        sizes = np.nanmean(np.array(entry["record"]["cluster_size"])
+                           / np.array(entry["record"]["cluster_size"][0]), axis=1)
+        colour = colours[entry["drift_excess"]]
+        axis.plot(steps, scale / scale[0], color=colour, label=f"{_tag(entry)}: space")
+        axis.plot(steps, sizes, color=colour, ls="--", label=f"{_tag(entry)}: clusters")
+        if entry["record"]["breakdown_step"]:
+            axis.plot(entry["record"]["breakdown_step"], FLOOR, "x", color=colour, ms=9)
+    axis.axhline(1.0, color="k", lw=0.8, ls=":")
+    axis.set_ylim(FLOOR - 0.05, 1.5)
     axis.set_xlabel("step")
-    axis.set_ylabel("scale factor a(t)/a(0)  (sparse-space path distance)")
-    axis.set_title("Sparse space: distance between far-apart joints")
+    axis.set_ylabel("size / size at start (path distance); x = fell in")
+    axis.set_title(f"Push limit {multiple:g}x background push: space (solid), clusters (dashed)",
+                   fontsize=10)
     axis.legend(fontsize=7)
-    return _save(figure, out_dir, "scale_factor.png")
 
 
-def _rate_plot(runs, drift, colours, out_dir) -> str:
-    figure, axis = plt.subplots(figsize=(7, 4.5))
-    for run, colour in zip(runs, colours):
-        axis.plot(run["record"]["step"], run["rate"], color=colour, marker=".", label=_label(run))
-    axis.axhline(np.log(1 + drift), color="k", ls="--", label=f"drift only: ln(1+h) = {np.log(1 + drift):.4f}")
+def _survivors(axis, runs: list[dict], colours: dict, multiple: float) -> None:
+    for entry in runs:
+        left = np.array(entry["record"]["sparse_by_step"])
+        axis.plot(np.arange(len(left)), left / left[0], color=colours[entry["drift_excess"]],
+                  marker=".", label=_tag(entry))
+    axis.plot(*V2_RUNAWAY, "rx", ms=10, label="v2: all but 184 of 5600 joints gone at step 4")
     axis.set_xlabel("step")
-    axis.set_ylabel("growth rate H = d ln a / dt  (per step)")
-    axis.set_title("Expansion rate: rising = accelerating faster than exponential")
+    axis.set_ylabel("share of sparse joints still standing")
+    axis.set_ylim(-0.05, 1.05)
+    axis.set_title(f"Clusters past the push limit ({multiple:g}x, house value): does space survive?",
+                   fontsize=10)
     axis.legend(fontsize=7)
-    return _save(figure, out_dir, "growth_rate.png")
-
-
-def _cluster_plot(runs, colours, out_dir) -> str:
-    figure, axis = plt.subplots(figsize=(7, 4.5))
-    for run, colour in zip(runs, colours):
-        steps = run["record"]["step"]
-        sizes = np.array(run["record"]["cluster_size"])
-        scale = np.array(run["record"]["scale"])
-        axis.plot(steps, (sizes / sizes[0]).mean(axis=1), color=colour, label=_label(run))
-        axis.plot(steps, scale / scale[0], color=colour, ls=":", lw=1)
-    axis.axhline(1.0, color="k", ls="--", label="bound: size stays 1")
-    axis.set_yscale("log")
-    axis.set_xlabel("step")
-    axis.set_ylabel("cluster internal size / start  (solid)\nscale factor (dotted)")
-    axis.set_title("Dense clusters: do they grow with space or stay bound?")
-    axis.legend(fontsize=7)
-    return _save(figure, out_dir, "cluster_size.png")

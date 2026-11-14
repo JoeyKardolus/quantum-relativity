@@ -1,9 +1,8 @@
 """One rules step that reports a breakdown instead of passing on an unreadable network.
 
 Contract: `safe_step(network, settings)` returns (stepped, None) when the step
-gives a readable network, else (None, reason): the step raised ValueError
-(joint collapse left energy with no connection to hold it), or a length came
-out non-finite or not above zero (Dijkstra cannot read it).
+gives a readable network, else (None, reason): the step raised ValueError,
+or a length came out non-finite or not above zero (Dijkstra cannot read it).
 """
 from __future__ import annotations
 

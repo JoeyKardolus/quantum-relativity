@@ -12,13 +12,15 @@ from physics.viewer.scene import Scene
 def test_the_recorder_gives_one_frame_per_step_and_keeps_positions_out_of_the_network():
     network, _ = spatial_reference(200, 3, seed=3)
     before = network.energy.copy()
-    scene = Scene("tiny", "Tiny", network, RuleSettings(energy_length=1.0, drift=0.01), (), (0, 5),
+    scene = Scene("tiny", "Tiny", network, RuleSettings(energy_length=1.0, drift=0.01), (0, 5),
                   "nothing", seed=3)
     recording = record(scene, 4)
     assert recording.stopped is None
     assert [frame.step for frame in recording.frames] == [0, 1, 2, 3, 4]
     assert all(frame.positions.shape == (200, 3) for frame in recording.frames)
     assert {field.name for field in fields(Network)} <= {
-        "joint_count", "pairs", "energy", "length", "charge", "causal", "merged_into"}
+        "joint_count", "pairs", "energy", "length", "charge", "causal", "merged_into", "held"}
     assert np.array_equal(scene.network.energy, before)
     assert recording.frames[-1].mean_length > recording.frames[0].mean_length
+    growth = recording.frames[-1].background_length / recording.frames[0].background_length
+    assert abs(growth - 1.01 ** 4) < 1e-9

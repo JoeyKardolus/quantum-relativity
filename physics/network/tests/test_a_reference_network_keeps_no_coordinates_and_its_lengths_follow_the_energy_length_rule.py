@@ -2,9 +2,10 @@
 
 WHAT IT PINS. physics/network through its public builders: spatial_reference,
 causal_reference and random_network return a Network whose only fields are
-joint count, connection pairs, energy, length, charge and the causal order
-(no place to hide a coordinate), whose connections are well formed, and whose
-energy * length equals LENGTH_SCALE on every connection.
+joint count, connection pairs, energy, length, charge, the causal order, the
+merge map and energy held by isolated joints (no place to hide a coordinate),
+whose connections are well formed, and whose energy * length equals
+LENGTH_SCALE on every connection.
 
 HOW THE EXPECTED ANSWER IS DERIVED WITHOUT THE CODE UNDER TEST. Properties that
 hold whatever the seed: rule 4 of the bible (energy * length is the one
@@ -30,7 +31,8 @@ import pytest
 
 from physics.network import LENGTH_SCALE, causal_reference, random_network, spatial_reference
 
-_FIELDS = {"joint_count", "pairs", "energy", "length", "charge", "causal", "merged_into"}
+_FIELDS = {"joint_count", "pairs", "energy", "length", "charge", "causal", "merged_into",
+           "held"}
 
 
 def _spatial():

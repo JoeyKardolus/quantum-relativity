@@ -2,36 +2,50 @@
 
 Contract: `run(seed, out_dir)` builds four starts of JOINTS joints: a random
 network (no geometry), a 6D and a 4D spatial reference, and a 3D spatial
-reference as a control (is 3D space kept?). Each runs STEPS steps of the rules
-with energy flow, the energy-length rule and RewIRING_ATTEMPTS rewiring attempts
-per step (target degree = the start's own mean degree, since rewiring keeps the
-connection count; target triangles 0, the core default guess). Drift, attraction
-and repulsion are off: drift scales every length alike and cannot change a
-dimension, and this test asks what the rewiring does to shape. It measures
-ball-growth and spectral dimension at CHECKPOINTS, log-spaced so the fast
-early change is resolved (`track`), writes
-the plots into out_dir and returns the result dict. Verdict, fixed in advance:
-pass if some start ends with both dimensions within 10% of 3, unclear if one of
-them does, fail otherwise. Picture: the steps-across plot; meaning: two plain
-sentences.
+reference as a control (is 3D space kept?). Every start runs STEPS steps with
+rewiring only (energy flow, the energy-length rule and REWIRING_ATTEMPTS
+rewiring attempts per step; target degree = the start's own mean degree,
+since rewiring keeps the connection count; target triangles 0, the core
+default guess). The ALL_RULES starts also run ALL_RULES_STEPS steps with all
+rules on (`all_rules_on`, owner 2026-11-14) plus the same rewiring: attraction
+= BACKGROUND_SHORTENING / the start's median pull, drift = `balancing_drift`
+on the same connections all at the start's mean length (the one calibration,
+reported), charges 0 so repulsion has nothing to act on. Only the 3D control
+runs all rules: the pull's exact sparse solve takes about 8 s (4D), 16 s
+(random) and 37 s (6D) per step at JOINTS joints against 1.4 s on 3D, which
+does not fit the ~3 minute budget; those starts are reported as rewiring only.
+The 3D control crumples within 10 steps under rewiring alone, so
+ALL_RULES_STEPS (a checkpoint) is long enough to see whether the other rules
+change that (33 steps took 5 minutes, the pull's solve slowing as the
+network crumples). Rewiring reads only which joints connect, so the other
+rules can change its outcome only through joint collapse. Dimension is measured at CHECKPOINTS, log-spaced (`track`).
+Plots: out_dir holds the 3D control under both rule sets (picture: steps
+across), out_dir/rewiring_only every start under rewiring only. Verdict, fixed
+in advance, from the all-rules runs: pass if some start ends with both
+dimensions within 10% of 3, unclear if one of them does, fail otherwise.
 """
 from __future__ import annotations
 
+import os
 import time
+from dataclasses import replace
 
 import numpy as np
 
 from physics.experiments.space.high_dimensional import high_dimensional_reference
 from physics.experiments.space.plots import plot_tracks
 from physics.experiments.space.track import track
-from physics.network import random_network, spatial_reference
-from physics.rules import RuleSettings
+from physics.network import Network, random_network, spatial_reference
+from physics.rules import RuleSettings, all_rules_on, balancing_drift, pull
 
 JOINTS = 10_000
 STEPS = 120
 REWIRING_ATTEMPTS = 5_000
 CHECKPOINTS = sorted({0, *np.unique(np.geomspace(1, STEPS, 16).round().astype(int)).tolist()})
+ALL_RULES = ("3D reference (control)",)
+ALL_RULES_STEPS = 13
 ENERGY_FLOW = 0.1
+BACKGROUND_SHORTENING = 0.01
 TARGET = 3.0
 BAND = 0.10
 
@@ -40,16 +54,27 @@ def run(seed: int, out_dir: str) -> dict:
     """Run the space test and return its JSON-serialisable result."""
     began = time.time()
     starts = _starts(seed)
-    tracks, used = {}, {}
+    tracks, alone, used = {}, {}, {}
     for name, (network, _known) in starts.items():
-        settings = RuleSettings(energy_length=1.0, energy_flow=ENERGY_FLOW,
-                                rewiring=REWIRING_ATTEMPTS,
-                                target_degree=float(round(network.degree().mean())))
-        used[name] = {"target_degree": settings.target_degree,
+        rewiring_only = RuleSettings(energy_length=1.0, energy_flow=ENERGY_FLOW,
+                                     rewiring=REWIRING_ATTEMPTS,
+                                     target_degree=float(round(network.degree().mean())))
+        used[name] = {"target_degree": rewiring_only.target_degree,
                       "connections": int(network.connection_count)}
-        tracks[name] = track(network, settings, STEPS, CHECKPOINTS, seed)
-    plots = plot_tracks(tracks, out_dir)
-    numbers = _numbers(starts, tracks)
+        alone[name] = track(network, rewiring_only, STEPS, CHECKPOINTS, seed)
+        if name in ALL_RULES:
+            settings = _all_rules(network, rewiring_only, seed)
+            used[name] |= {"attraction": settings.attraction,
+                           "balancing_drift (calibration)": settings.drift}
+            tracks[name] = track(network, settings, ALL_RULES_STEPS,
+                                 [at for at in CHECKPOINTS if at <= ALL_RULES_STEPS], seed)
+    side_by_side = {f"{name}, {label}": history for name in tracks
+                    for label, history in (("all rules on", tracks[name]),
+                                           ("rewiring only", alone[name]))}
+    plots = plot_tracks(side_by_side, out_dir)
+    plots += [os.path.join("rewiring_only", name)
+              for name in plot_tracks(alone, os.path.join(out_dir, "rewiring_only"))]
+    numbers = _numbers(starts, alone) + _comparison(tracks, alone)
     verdict = _verdict(tracks)
     return {
         "milestone": 5,
@@ -58,21 +83,53 @@ def run(seed: int, out_dir: str) -> dict:
                     "do the rules with rewiring settle it into something that behaves "
                     "like 3D space?",
         "verdict": verdict,
-        "summary": _summary(verdict, tracks),
-        "meaning": _meaning(verdict, tracks),
+        "summary": "With rewiring only, all four starts: " + _summary(_verdict(alone), alone),
+        "meaning": _meaning(tracks, alone),
         "numbers": numbers,
         "plots": plots,
         "picture": "space_steps_across.png",
         "settings": {"joints": JOINTS, "steps": STEPS, "checkpoints": CHECKPOINTS,
+                     "all_rules_starts": ALL_RULES, "all_rules_steps": ALL_RULES_STEPS,
                      "rewiring_attempts_per_step": REWIRING_ATTEMPTS,
-                     "energy_flow": ENERGY_FLOW, "energy_length": 1.0, "drift": 0.0,
-                     "attraction": 0.0, "repulsion": 0.0, "target_triangles": 0.0,
-                     "triangle_weight": 1.0, "per_start": used,
+                     "rules": "all_rules_on plus rewiring (3D control only; pull too slow on "
+                              "the others at this size); attraction = "
+                              f"{BACKGROUND_SHORTENING} / median pull; drift = balancing_drift; "
+                              "charges 0",
+                     "comparison": "rewiring only: energy flow 0.1, energy-length 1",
+                     "target_triangles": 0.0, "triangle_weight": 1.0, "per_start": used,
                      "measures": "ball_dimension and spectral_dimension, default windows, "
                                  f"seed {seed}"},
         "seed": seed,
         "seconds": round(time.time() - began, 1),
     }
+
+
+def _all_rules(network: Network, rewiring_only: RuleSettings, seed: int) -> RuleSettings:
+    even = Network.from_lengths(network.joint_count, network.pairs,
+                                np.full(network.connection_count, network.length.mean()))
+    background = float(np.median(pull(even, even.energy, even.length)))
+    settings = all_rules_on(attraction=BACKGROUND_SHORTENING / background,
+                            target_degree=rewiring_only.target_degree)
+    drift = balancing_drift(even, settings, np.random.default_rng(seed))
+    return replace(settings, drift=drift, rewiring=rewiring_only.rewiring)
+
+
+def _comparison(tracks: dict, alone: dict) -> list[dict]:
+    rows = []
+    for name, history in tracks.items():
+        at = alone[name]["step"].index(history["step"][-1])
+        rows += [
+            {"name": f"{name}, step {history['step'][-1]}: ball / spectral dimension, all rules on vs "
+                     "rewiring only",
+             "measured": [[_round(history["ball"][-1]), _round(history["spectral"][-1])],
+                          [_round(alone[name]["ball"][at]), _round(alone[name]["spectral"][at])]],
+             "known": [TARGET, TARGET], "note": "None = no valid fit range (small-world)"},
+            {"name": f"{name}, step {history['step'][-1]}: steps across, all rules on vs rewiring only",
+             "measured": [round(history["across"][-1], 2), round(alone[name]["across"][at], 2)],
+             "known": None, "note": f"joints left with all rules on: {history['joints'][-1]} of "
+                                    f"{history['joints'][0]}"},
+        ]
+    return rows
 
 
 def _starts(seed: int) -> dict:
@@ -155,15 +212,26 @@ def _summary(verdict: str, tracks: dict) -> str:
                            if verdict == "unclear" else "")
 
 
-def _meaning(verdict: str, tracks: dict) -> str:
-    lost = [name for name, history in tracks.items()
-            if history["ball"][-1] is None and history["spectral"][-1] is None]
-    if verdict == "pass":
-        return ("Rewiring alone settled at least one start into a network that reads as 3D space by both "
-                "measures. So 3D space can come out of the rules here without being put in.")
-    control = " (even the one that began as real 3D space)" if "3D reference (control)" in lost else ""
-    first = (f"Rewiring did not settle any start into 3D space: {len(lost)} of {len(tracks)} starts{control} "
-             "crumpled into a 'small world' where every joint is a few connections from every other."
-             if lost else
-             "Rewiring did not settle any start into 3D space, though the dimension could still be read.")
-    return first + " So the rewiring rule as written builds shortcuts, not space."
+def _meaning(tracks: dict, alone: dict) -> str:
+    control = "3D reference (control)"
+    mine, theirs = tracks[control], alone[control]
+    at = mine["step"][-1]
+    other = theirs["step"].index(at)
+    crumpled = mine["ball"][-1] is None and mine["spectral"][-1] is None
+    crumpled_alone = theirs["ball"][other] is None and theirs["spectral"][other] is None
+    state = ("had crumpled into a 'small world' where every joint is a few connections from "
+             "every other" if crumpled else
+             f"still read as ball {_round(mine['ball'][-1])}, spectral {_round(mine['spectral'][-1])}")
+    first = (f"With all rules on (balancing drift included) plus rewiring, the network that began as "
+             f"real 3D space {state} by step {at}, its steps across falling from "
+             f"{mine['across'][0]:.1f} to {mine['across'][-1]:.1f} against {theirs['across'][other]:.1f} "
+             "with rewiring alone (in the picture the two lines lie on top of each other).")
+    collapsed = mine["joints"][0] - mine["joints"][-1]
+    why = (" (rewiring reads only which joints connect, and no joint collapsed)" if not collapsed
+           else f" ({collapsed} joints collapsed)")
+    second = (("So attraction, push and drift do not change the small-world outcome of the rewiring "
+               "rule" if crumpled == crumpled_alone else
+               "So attraction, push and drift do change the outcome of the rewiring rule")
+              + why + "; the random, 4D and 6D starts ran with rewiring only, because the pull is "
+              "too slow on them at this size.")
+    return first + " " + second
