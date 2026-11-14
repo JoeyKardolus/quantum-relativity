@@ -44,6 +44,11 @@ LAYER_NAMES = frozenset({"core", "gates", "shared", "entrypoints", "inputs"})
 #: on which box you ask, which is exactly what a counted number must not.
 NOT_OURS: tuple[str, ...] = ()
 
+#: Trees of ours the register does not track (owner, 2026-11-14): `physics/` is
+#: a hobby simulation whose tests run with plain pytest, without rows, breaks or
+#: the one-test-per-level rule. Its tests still run; only the bookkeeping goes.
+UNREGISTERED: tuple[str, ...] = ("physics",)
+
 #: Files that make a directory a package or a framework root without being
 #: implementation of their own (ADR-0002's carve-out list).
 _NOT_IMPLEMENTATION = frozenset({"__init__.py", "conftest.py", "manage.py"})
@@ -118,9 +123,14 @@ def _is_not_ours(directory: str) -> bool:
     """True when this path is under, or named after, a tree nobody here counts."""
     if any(segment in NOT_OURS_ANYWHERE for segment in directory.split("/")):
         return True
-    return any(
+    return is_unregistered(directory) or any(
         directory == tree or directory.startswith(f"{tree}/") for tree in NOT_OURS
     )
+
+
+def is_unregistered(path: str) -> bool:
+    """True when a repo-relative path sits in a tree the register does not track."""
+    return any(path == tree or path.startswith(f"{tree}/") for tree in UNREGISTERED)
 
 
 def _is_not_a_module(directory: str) -> bool:

@@ -25,8 +25,7 @@ Connection theory simulation. Rules: `docs/bible.md#physicsconnection-theory`; w
 
 ```
 PYTHONPATH=. .venv/bin/pytest -q physics          # all tests, seconds
-.venv/bin/python -m tools.test_register --replay <test>   # prove a test can fail
 ```
 
-New test: `python3 -m tools.test_register --new physics/<module> --says "<invariant>"` (a path,
-not a dotted name). One test function per file; add cases with `pytest.mark.parametrize`.
+`physics/` is exempt from the test register (owner, 2026-11-14; `UNREGISTERED` in
+`tools/test_register/_modules.py`): write plain pytest files under `<module>/tests/`, no rows.

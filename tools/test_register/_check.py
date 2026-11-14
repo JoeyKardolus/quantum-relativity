@@ -38,7 +38,7 @@ from pathlib import Path
 from ._coverage import untested
 from ._functions import extra_tests
 from ._groups import module_groups
-from ._modules import modules_in
+from ._modules import is_unregistered, modules_in
 from ._row import Row
 from ._second import second_tests
 
@@ -146,11 +146,13 @@ def _test_files(repo: Path) -> tuple[str, ...]:
     """
     listed = _tracked(repo)
     if listed is not None:
-        return listed
+        return tuple(name for name in listed if not is_unregistered(name))
     found: set[str] = set()
     for path in repo.glob(f"**/{_PYTHON_TEST}"):
         relative = path.relative_to(repo).as_posix()
         if any(f"/{relative}".find(f"/{skip}") >= 0 for skip in _SKIP):
+            continue
+        if is_unregistered(relative):
             continue
         found.add(relative)
     return tuple(sorted(found))
