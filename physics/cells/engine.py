@@ -2,8 +2,9 @@
 
 Contract: a frozen record of
   grid          Grid (grid.py): energies, sizes, joints and joint volumes; the rules and
-                every measurement read only this. Its joints are exactly the shared
-                faces of `tessellation`, one joint per pair of neighbouring cells.
+                every measurement read only this. Its joints are the woven neighbour
+                graph: the shared faces of the first tessellation (new_engine.py),
+                changed since only by joint collapse (step.py).
   positions     (n, 3) a working position per energy volume in [0, side)^3, a label
                 for computing shapes only (bible rule 2)
   weights       (n,) a power weight per energy volume, a label like the positions:
@@ -12,9 +13,13 @@ Contract: a frozen record of
   side          side of the periodic cube; side**3 = grid.total_space() (energy
                 volumes plus joints fill all of space)
   tessellation  Tessellation of positions and weights in that cube: the shapes the
-                viewer draws (shapes.py)
+                viewer draws (shapes.py); its faces are the grid's joints except
+                where the shapes changed a pair by themselves (neighbour_changes)
   collapses     energy volumes that fell into others since the start
   start_space   grid.total_space() at the start, for size_vs_start
+  neighbour_changes  neighbour pairs the shapes changed by themselves, outside a
+                joint collapse, since the start (neighbour_changes.py); the grid
+                does not follow them
 Made by new_engine(), advanced by step() (a pure function: Engine -> new Engine).
 """
 from __future__ import annotations
@@ -29,7 +34,7 @@ from physics.cells.tessellation import Tessellation
 
 @dataclass(frozen=True)
 class Engine:
-    """Grid plus working positions, weights and box, and the tessellation they give."""
+    """Grid plus working positions, weights and box, the tessellation they give, and counts."""
 
     grid: Grid
     positions: np.ndarray
@@ -38,3 +43,4 @@ class Engine:
     tessellation: Tessellation
     collapses: int
     start_space: float
+    neighbour_changes: int

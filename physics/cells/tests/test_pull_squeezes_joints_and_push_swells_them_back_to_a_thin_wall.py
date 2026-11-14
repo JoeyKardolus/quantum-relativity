@@ -1,8 +1,9 @@
 """Pull squeezes joints, push swells them back, and a joint at rest is a thin wall.
 
-  rest     a new engine (500 volumes, seed 8, unevenness 0.1, settled) has its
-           joints at about 3% of their two energy volumes' mean volume (default
-           joint_rest 0.03; rule 8: 2 to 5%): median ratio within 0.025..0.035.
+  rest     a new engine (500 volumes, seed 8, unevenness 0.1, settled) starts every
+           joint at its balance (joint_balance, to 1e-9), a thin wall: median 2%
+           to 5% of its two energy volumes' mean volume (rule 8; rest is 3%, the
+           background pull holds a joint near 0.7 of it).
   pull     with joint_push 0, one move_space shrinks every joint and leaves the
            energy volumes' sizes and energies exactly as the leak and rule 4 give
            (leak 0: unchanged).
@@ -15,13 +16,15 @@ from __future__ import annotations
 
 import numpy as np
 
-from physics.cells import EngineSettings, joint_rest, move_space, new_engine
+from physics.cells import EngineSettings, joint_balance, joint_rest, move_space, new_engine
 
 
-def test_joints_rest_near_three_percent():
+def test_joints_start_balanced_as_thin_walls():
     grid = new_engine(500, seed=8, unevenness=0.1).grid
+    assert np.allclose(grid.joint_volume, joint_balance(grid, EngineSettings.all_on()),
+                       rtol=1e-9)
     ratio = grid.joint_volume / joint_rest(grid.volume, grid.joints, 1.0)
-    assert 0.025 <= np.median(ratio) <= 0.035
+    assert 0.02 <= np.median(ratio) <= 0.05
 
 
 def test_pull_squeezes_and_push_swells_back_without_moving_energy():

@@ -686,7 +686,7 @@ function formatNumber(value) {
 }
 
 const statsBox = document.getElementById("stats");
-const SHOWN_STATS = new Set(["cells", "joints", "collapses", "size_vs_start", "energy_spread", "lumps", "sealed_lumps"]);
+const SHOWN_STATS = new Set(["cells", "joints", "collapses", "size_vs_start", "energy_spread", "lumps", "sealed_lumps", "neighbour_changes"]);
 
 /** Write the live stats as plain lines. */
 function showStats() {
@@ -700,6 +700,7 @@ function showStats() {
     ["energy spread (packing)", stats.energy_spread],
     ["lumps", stats.lumps],
     ["sealed lumps", stats.sealed_lumps],
+    ["neighbour changes (drawing only)", stats.neighbour_changes],
     ...Object.keys(stats).filter((name) => !SHOWN_STATS.has(name)).map((name) => [name.replace(/_/g, " "), stats[name]]),
     ["energy volumes drawn", scene3d.renderer ? scene3d.drawnCells : undefined],
     ["joints drawn", scene3d.renderer ? scene3d.drawnJoints : undefined],

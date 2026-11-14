@@ -15,8 +15,8 @@ joint-network milestones.
 - **The engine owns the shapes; positions are labels.** `cells.Engine` = `Grid` (energy, volume,
   charge per energy volume, joints with their volume, seams) plus a seed position and power weight per
   cell, used only to tessellate. Rules and measurements read only the Grid, never a position.
-  `step(engine, settings) -> Engine` is pure. Joints are exactly the shared faces, volumes
-  carried by cell pair; a new face starts at rest, a vanished one returns its volume.
+  `step(engine, settings) -> Engine` is pure. The grid is woven: joints start balanced on the
+  shared faces and change only by collapse; drawn shapes drift off them (`neighbour_changes`).
 - **`tessellate.py` calls pyvoro2's private native function** and does the input checks itself;
   keep `pyvoro2==0.8.0` pinned or re-check that call on an upgrade.
 - **Joints are thin walls holding space** (rest 3% of their volumes' mean, `joint_rest`).
@@ -30,11 +30,11 @@ joint-network milestones.
   (tessellation edges), as open as `cells/seam_openness.py` says (closed past `seal_point`),
   by pull (`p_b / sum p_k`).
 - **Honesty.** Never tune a setting, seed or fit window until a result passes. Report every number
-  with seed and settings; report a miss. Today (seed 1, 1000 cells, defaults, 300 steps): 118
-  collapses, 117 in step 1 (the start leaves joints under the limit); space 0.34 of its start;
-  lumps 21 at step 50, 3 at 300, none sealed.
-- **Speed.** Vectorised numpy and scipy.sparse; a step is about 21 ms at 500 cells, 126 ms at 2500,
-  nearly all tessellation; `shapes()` is a 6 MB message at 1000 cells.
+  with seed and settings; report a miss. Today (seed 1, 1000 cells, unevenness 0.5, defaults, 300
+  steps): 0 collapses; space 0.85 of its start; lumps 17 at step 50, 1 at 300, none sealed;
+  neighbour_changes 7115 (miss: 26% face area off joints); app 3.7 steps/s.
+- **Speed.** Vectorised numpy, scipy.sparse; a step is about 100 ms at 1000 cells,
+  `new_engine` 5 s, nearly all tessellation; `shapes()` is a 6 MB message at 1000 cells.
 - **Layout.** One public function (or type) per file, helpers `_prefixed`, each subpackage
   `__init__.py` holds the module map and `__all__`.
 - **Port 8765** is the owner's own running app; test on another port (`--port 8766`).

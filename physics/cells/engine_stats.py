@@ -8,6 +8,9 @@ Contract: `engine_stats(engine)` returns a dict:
   energy_spread  std / mean of energy per unit volume (packing)
   lumps          lumps now (lumps.py: packed groups of neighbouring energy volumes)
   sealed_lumps   lumps whose outer seams are all closed (lumps.py)
+  neighbour_changes  neighbour pairs the drawn shapes changed by themselves, outside a
+                 joint collapse, since the start (Engine.neighbour_changes); the grid
+                 never follows them, 0 when the shapes stay woven too
 No position, weight or shape is read.
 """
 from __future__ import annotations
@@ -17,7 +20,7 @@ from physics.cells.lumps import lumps
 
 
 def engine_stats(engine: Engine) -> dict:
-    """Cells, joints, collapses so far, size against the start, packing spread, lumps, sealed lumps."""
+    """Cells, joints, collapses, size against the start, packing spread, lumps, sealed, neighbour changes."""
     grid = engine.grid
     packing = grid.energy / grid.volume
     _, sealed = lumps(grid)
@@ -27,4 +30,5 @@ def engine_stats(engine: Engine) -> dict:
             "size_vs_start": float(grid.total_space() / engine.start_space),
             "energy_spread": float(packing.std() / packing.mean()),
             "lumps": len(sealed),
-            "sealed_lumps": int(sealed.sum())}
+            "sealed_lumps": int(sealed.sum()),
+            "neighbour_changes": engine.neighbour_changes}

@@ -9,10 +9,13 @@ Contract: `shapes(engine)` returns
            cell (corners may lie just outside [0, side)); an empty cell has no faces.
   pull     how hard that energy volume pulls: its energy per volume, scaled 0..1 over
            the grid ((packing - min) / (max - min); 0 everywhere on an even grid).
-  joints   one entry per shared face: a < b, the face as cell a has it (in a's image).
-           A pair that shares two faces (across the periodic wrap, only in a box a few
-           cells wide) is one joint drawn as both faces. Every entry is a joint of the
-           grid and every joint of the grid has at least one entry.
+  joints   one entry per shared face whose two cells are a joint of the grid: a < b,
+           the face as cell a has it (in a's image). A pair that shares two faces
+           (across the periodic wrap, only in a box a few cells wide) is one joint
+           drawn as both faces. The grid is woven and the shapes are not bound to it
+           (step.py): a face between two energy volumes that are not neighbours in the
+           grid is drawn as cell faces only, and a joint with no face has no entry
+           (engine_stats' neighbour_changes counts how the shapes drifted from it).
   push     how hard that joint pushes: its squeeze toward its collapse limit, 0..1
            (joint_squeeze.py).
   thickness  the joint's volume / the area of its faces: how thick a slab it is, capped
@@ -47,16 +50,34 @@ def shapes(engine: Engine) -> dict:
         faces[cell].append(polygon)
     cells = [{"id": cell, "faces": faces[cell], "pull": float(pull[cell])}
              for cell in range(grid.cell_count)]
-    thickness = np.minimum(grid.joint_volume / np.maximum(tessellation.pair_area, 1e-300),
+    joint_of = _joint_of_pair(tessellation.pairs, grid.joints, grid.cell_count)
+    area = np.zeros(len(grid.joints))
+    area[joint_of[joint_of >= 0]] = tessellation.pair_area[joint_of >= 0]
+    thickness = np.minimum(grid.joint_volume / np.maximum(area, 1e-300),
                            _THICKEST * np.cbrt(grid.volume.mean()))
     label, sealed = lumps(grid)
     in_sealed = np.append(sealed, False)[label]   # label -1 (no lump) reads the appended False
     wall = in_sealed[grid.joints[:, 0]] != in_sealed[grid.joints[:, 1]]
     joints = []
-    lower = (tessellation.face_joint >= 0) & (tessellation.face_cell < tessellation.face_other)
+    face_joint = np.where(tessellation.face_joint >= 0,
+                          np.append(joint_of, -1)[tessellation.face_joint], -1)
+    lower = (face_joint >= 0) & (tessellation.face_cell < tessellation.face_other)
     for face in np.flatnonzero(lower).tolist():
-        joint = int(tessellation.face_joint[face])
+        joint = int(face_joint[face])
         joints.append({"a": int(grid.joints[joint, 0]), "b": int(grid.joints[joint, 1]),
                        "polygon": flat[face], "push": float(grid.squeeze[joint]),
                        "thickness": float(thickness[joint]), "sealed": bool(wall[joint])})
     return {"cells": cells, "joints": joints}
+
+
+def _joint_of_pair(pairs: np.ndarray, joints: np.ndarray, count: int) -> np.ndarray:
+    """Per tessellation pair, the row of the grid's joint between the same two cells, else -1."""
+    if not len(joints):
+        return np.full(len(pairs), -1)
+    pair_keys = pairs[:, 0].astype(np.int64) * count + pairs[:, 1]
+    sorted_joints = np.sort(joints, axis=1)
+    joint_keys = sorted_joints[:, 0].astype(np.int64) * count + sorted_joints[:, 1]
+    order = np.argsort(joint_keys)
+    found = order[np.minimum(np.searchsorted(joint_keys, pair_keys, sorter=order),
+                             len(order) - 1)]
+    return np.where(joint_keys[found] == pair_keys, found, -1)

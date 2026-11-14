@@ -1,4 +1,4 @@
-"""The engine's shapes fill the periodic box exactly and its joints are exactly the shared faces.
+"""The engine's shapes fill the periodic box exactly and draw the grid's joints on shared faces.
 
 Checked independently of the engine's own sums, on a new engine and after 10
 steps at the default settings (500 energy volumes, seed 4, unevenness 0.1):
@@ -6,10 +6,12 @@ steps at the default settings (500 energy volumes, seed 4, unevenness 0.1):
           of tetrahedra around the mean corner), adds up to the box volume within
           0.5%, and each cell's volume matches the tessellation's own.
   joints  pyvoro2's public compute() run afresh on the engine's positions and
-          weights gives the cell pairs that share a face; the joints in shapes(),
-          the grid's joints and those pairs are the same set (0% mismatch), every
-          joint polygon is one of cell a's faces, and every pair has as many faces
-          seen from a as from b.
+          weights gives the cell pairs that share a face, the same set as the
+          tessellation's pairs. On the new engine the joints in shapes(), the
+          grid's joints and those pairs are one set (0% mismatch); after the steps
+          the grid keeps its own (woven) joints and shapes() draws exactly the
+          joints that still have a face. Every joint polygon is one of cell a's
+          faces, and every pair has as many faces seen from a as from b.
 """
 from __future__ import annotations
 
@@ -49,7 +51,7 @@ def test_shapes_fill_the_box_exactly(engines):
         assert len(drawn["cells"]) == engine.grid.cell_count
 
 
-def test_every_joint_is_a_shared_face_and_every_shared_face_a_joint(engines):
+def test_drawn_joints_are_the_grids_joints_that_share_a_face(engines):
     for engine in engines:
         domain = pyvoro2.OrthorhombicCell(bounds=((0.0, engine.side),) * 3,
                                           periodic=(True, True, True))
@@ -65,7 +67,10 @@ def test_every_joint_is_a_shared_face_and_every_shared_face_a_joint(engines):
         drawn = shapes(engine)
         drawn_pairs = {(joint["a"], joint["b"]) for joint in drawn["joints"]}
         grid_pairs = set(map(tuple, engine.grid.joints.tolist()))
-        assert drawn_pairs == grid_pairs == set(seen_from)
+        assert set(seen_from) == set(map(tuple, engine.tessellation.pairs.tolist()))
+        assert drawn_pairs == grid_pairs & set(seen_from)
+        if engine is engines[0]:
+            assert drawn_pairs == grid_pairs == set(seen_from)
         for (low, high), sides in seen_from.items():
             assert sides.count(low) == sides.count(high)
         for joint in drawn["joints"]:

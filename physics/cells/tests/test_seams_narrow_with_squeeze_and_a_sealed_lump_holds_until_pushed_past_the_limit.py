@@ -1,8 +1,9 @@
 """Seams are the tessellation's edges, narrow as their joints are squeezed, and seal a lump.
 
   edges     every edge of a cell lies on two of its faces, so 3 * seams equals half
-            the faces' corners; every seam's three pairs are joints, before and
-            after a step.
+            the faces' corners; a new engine's seams are its tessellation's edges;
+            every seam's three pairs are joints, before and after a step, and a
+            step that collapses nothing keeps the seams (the grid is woven).
   narrow    with every joint at the same share f of its rest volume, f from 1 down
             to the push limit, no seam ever opens wider; 1 at rest, 0 from the seal
             point (depth 1 - f >= seal_point) on.
@@ -39,7 +40,9 @@ def test_seams_are_the_edges_and_their_pairs_are_joints():
     stepped = step(engine, SETTINGS)
     for grid in (engine.grid, stepped.grid):
         assert seam_joints(grid.joints, grid.seams, grid.cell_count).shape == (len(grid.seams), 3)
-    assert np.array_equal(stepped.grid.seams, stepped.tessellation.seams)
+    assert np.array_equal(engine.grid.seams, engine.tessellation.seams)
+    assert stepped.collapses == 0
+    assert np.array_equal(stepped.grid.seams, engine.grid.seams)
 
 
 def test_openness_falls_as_squeeze_rises():

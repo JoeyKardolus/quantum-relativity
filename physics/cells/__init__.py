@@ -3,13 +3,14 @@ exact, gap-free cell shapes they take in a periodic box.
 
 The rules and every measurement read only energies, sizes and the neighbour graph
 (Grid). A working position and a power weight per energy volume are labels the
-engine keeps only to compute the shapes (a periodic power tessellation); the
-joints are exactly the shared faces of that tessellation.
+engine keeps only to compute the shapes (a periodic power tessellation). The grid
+is woven: its joints are the shared faces of the first tessellation and change only
+by joint collapse; the shapes drawn later may drift from them (neighbour_changes).
 
 Module map:
-  engine.py           Engine: Grid + positions, weights, box side, tessellation, collapses
+  engine.py           Engine: Grid + positions, weights, box side, tessellation, counts
   engine_settings.py  EngineSettings: rule strengths, all_on() defaults
-  new_engine.py       new_engine: seeded uneven energy, random seeds, settled shapes
+  new_engine.py       new_engine: seeded uneven energy, settled shapes, joints balanced
   step.py             step: pure Engine -> Engine; rules, then seeds, box and shapes follow
   shapes.py           shapes: cells' faces with pull, joints' faces with push, for drawing
   engine_stats.py     engine_stats: cells, joints, collapses, size, spread, lumps, sealed
@@ -20,6 +21,7 @@ Module map:
   apply_rules.py      apply_rules: move_space, then collapse of joints below their limit
   rest_volume.py      rest_volume: the energy-volume rule, volume = (VOLUME_SCALE / E) ** 3
   joint_rest.py       joint_rest: a joint's rest volume, a share of its neighbours' mean volume
+  joint_balance.py    joint_balance: the volume where a joint's push cancels its pull
   pull_potential.py   pull_potential: grounded graph-Poisson spread of energy
   seam_joints.py      seam_joints: the three joints that meet at each seam
   seam_openness.py    seam_openness: 1 relaxed .. 0 at the seal point, per seam
@@ -32,12 +34,14 @@ Module map:
   tessellate.py       tessellate: periodic power tessellation of positions (pyvoro2)
   target_size.py      target_size: energy volume plus half its joints, per cell
   fit_weights.py      fit_weights: Newton step of the weights toward the target sizes
-  move_seeds.py       move_seeds: seeds relax to centroids, drawn across squeezed joints
-  reconcile_joints.py reconcile_joints: joints become the new faces, joint volumes kept
+  move_seeds.py       move_seeds: seeds relax to centroids, drawn across squeezed joints, capped
+  reconcile_joints.py reconcile_joints: joints become the new faces (new_engine's settling)
+  neighbour_changes.py neighbour_changes: pairs the shapes changed outside a collapse
 """
 from physics.cells.grid import Grid
 from physics.cells.rest_volume import VOLUME_SCALE, rest_volume
 from physics.cells.joint_rest import joint_rest
+from physics.cells.joint_balance import joint_balance
 from physics.cells.engine_settings import EngineSettings
 from physics.cells.pull_potential import pull_potential
 from physics.cells.seam_joints import seam_joints
@@ -54,6 +58,7 @@ from physics.cells.target_size import target_size
 from physics.cells.fit_weights import fit_weights
 from physics.cells.move_seeds import move_seeds
 from physics.cells.reconcile_joints import reconcile_joints
+from physics.cells.neighbour_changes import neighbour_changes
 from physics.cells.engine import Engine
 from physics.cells.new_engine import new_engine
 from physics.cells.step import step
@@ -61,8 +66,8 @@ from physics.cells.lumps import lumps
 from physics.cells.shapes import shapes
 from physics.cells.engine_stats import engine_stats
 
-__all__ = ["Grid", "VOLUME_SCALE", "rest_volume", "joint_rest", "EngineSettings",
+__all__ = ["Grid", "VOLUME_SCALE", "rest_volume", "joint_rest", "joint_balance", "EngineSettings",
            "pull_potential", "seam_joints", "seam_openness", "leak", "share_space", "move_space", "joint_collapse",
            "joint_squeeze", "apply_rules", "Tessellation", "tessellate", "target_size",
-           "fit_weights", "move_seeds", "reconcile_joints", "Engine", "new_engine", "step",
+           "fit_weights", "move_seeds", "reconcile_joints", "neighbour_changes", "Engine", "new_engine", "step",
            "lumps", "shapes", "engine_stats"]
