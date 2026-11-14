@@ -39,6 +39,14 @@ The core depth/seam vocabulary used by `improve-codebase-architecture`, `tdd`, `
 - **group**: sort a flat pile into named subdirs; no interface change.
 - **no-loose-files rule**: every dir = subdirs only, plus a framework carve-out list. ADR-0002 holds the why and the amendment procedure; the authoritative carve-out list is in root `CLAUDE.md`. _Avoid_: top-layer-cleanup, no-floaters.
 
+## Quantum-relativity theory (physics/)
+
+- **quantum-relativity theory**: the owner's hobby theory that space, matter and forces all come from one network of joints and connections carrying energy. Rules in `docs/bible.md#physicsquantum-relativity`. _Avoid_: connection theory (its earlier name, which covered only the network), string theory, theory of everything, the model.
+- **joint**: a point of the network where connections meet; it carries a type (charge) and pushes on the energy in its connections. _Avoid_: node, vertex, particle, point.
+- **connection**: a link between two joints that holds energy; its length follows from its energy (more energy, shorter). _Avoid_: edge, link, string, bond.
+- **drift**: the small built-in lengthening of every connection in the base state; the proposed cause of expansion. _Avoid_: dark energy (that is what drift may explain, not the rule), inflation, stretch.
+- **reference spacetime**: a network built from points scattered in a flat space or spacetime whose true dimension and proper times are known; used to validate a measurement before it is trusted. _Avoid_: test grid, ground truth, toy universe.
+
 ## Project vocabulary
 
 - **deploy gate**: the step of the deploy cycle in the cluster that runs the tests a commit can reach, against that commit's own tree, as gate Jobs in its gate image, before anything is rolled out. Only a green verdict ships. _Avoid_: CI, pipeline, checks.

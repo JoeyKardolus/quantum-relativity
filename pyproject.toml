@@ -11,6 +11,7 @@ dependencies = [
     "dashkit",
     "documents",
     "gpu-jobs",
+    "physics",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "pydantic>=2.7",
@@ -50,14 +51,15 @@ mcp-tools = [
 package = false
 
 [tool.uv.workspace]
-members = ["lib/dashkit", "apps/documents", "infra/gpu-jobs"]
+members = ["lib/dashkit", "apps/documents", "infra/gpu-jobs", "physics"]
 
 [tool.uv.sources]
 dashkit = { workspace = true }
 documents = { workspace = true }
 gpu-jobs = { workspace = true }
+physics = { workspace = true }
 
 [tool.pytest.ini_options]
 pythonpath = [".", "lib", "apps", "infra/gpu-jobs"]
-testpaths = [".claude", "docs", "tools", "lib", "apps", "infra"]
+testpaths = [".claude", "docs", "tools", "lib", "apps", "infra", "physics"]
 norecursedirs = [".git", ".claude/worktrees", "node_modules", "__pycache__", ".venv"]

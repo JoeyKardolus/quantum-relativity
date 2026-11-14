@@ -1,0 +1,32 @@
+# physics/
+
+Connection theory simulation. Rules: `docs/bible.md#physicsconnection-theory`; words: `CONTEXT.md`
+(joint, connection, drift, reference spacetime; never node, edge or vertex).
+
+## Must not get wrong
+
+- **Joints store no coordinates.** `Network` holds joint count, connection pairs, energy, length,
+  charge and an optional causal order, nothing else. A builder may scatter points to decide which
+  joints connect, then must drop them; known answers go back separately, never on the Network.
+- **Every measurement reads only the network**: length-weighted paths, neighbour counts, random
+  walks, the causal order. If a measure needs a coordinate, it is measuring the wrong thing.
+- **Energy and length are one quantity**: `energy * length = LENGTH_SCALE`
+  (`network/energy_length.py`), restored each step by the energy-length rule. Rules that push or
+  pull change length; the rule moves energy to match.
+- **Honesty.** Never tune a setting, seed or fit window until a result passes. Fit windows in
+  `ball_dimension` and `spectral_dimension` are fixed defaults. Report every number beside its
+  known value with seed and settings; a miss is reported as a miss.
+- **Speed.** Vectorised numpy and scipy.sparse; an experiment runs in under ~3 minutes. Only
+  `rules/rewire.py` loops in Python, one attempt per iteration.
+- **Layout.** One public function (or type) per file, helpers `_prefixed`, each subpackage
+  `__init__.py` holds the module map and `__all__`.
+
+## Run
+
+```
+PYTHONPATH=. .venv/bin/pytest -q physics          # all tests, seconds
+.venv/bin/python -m tools.test_register --replay <test>   # prove a test can fail
+```
+
+New test: `python3 -m tools.test_register --new physics/<module> --says "<invariant>"` (a path,
+not a dotted name). One test function per file; add cases with `pytest.mark.parametrize`.

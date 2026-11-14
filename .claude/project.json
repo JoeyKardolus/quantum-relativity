@@ -1,7 +1,7 @@
 {
   "_comment": "The one place repo, board and people are named. Filled by .claude/scripts/setup-github.py; edit by hand for people, areas and wait_guard. Scripts and hooks read this, nothing is hard-coded. The template ships it empty: setup-github.py writes the repo, owner, board and people of the repo it runs in.",
-  "repo": "",
-  "owner": "",
+  "repo": "JoeyKardolus/quantum-relativity",
+  "owner": "JoeyKardolus",
   "project": {
     "number": 0,
     "owner": ""
@@ -9,7 +9,9 @@
   "backlog_prd": null,
   "area_label_prefix": "area:",
   "areas": [],
-  "people": {},
+  "people": {
+    "Joey": "JoeyKardolus"
+  },
   "wait_guard": {
     "foreground_runs": [],
     "way_out": ""

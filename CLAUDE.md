@@ -37,6 +37,7 @@ Topic to bible chapter ID. Pick the ones the prompt touches and read them before
 | Video calls and recording (the media node) | `infra/media` |
 | Workflow: grill, plan, code, close, the mechanism stack, the board, what to run before pushing, commit style | `workflow/loop` |
 | Workflow: the house module standard (tiers, layout, interface, tests, failure tiers) | `workflow/module-standard` |
+| Quantum-relativity theory simulation (`physics/`) | `physics/quantum-relativity` |
 | Glossary (canonical terms + `_Avoid_` aliases) | `CONTEXT.md` (repo root) |
 
 Per-area overlays: `<area>/CLAUDE.md` auto-loads when files in its directory are touched; read the overlay closest to the file you edit. If a prompt touches 2+ areas, spawn general-purpose subagents in parallel.

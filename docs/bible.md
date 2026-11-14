@@ -911,3 +911,53 @@ The README pictures in `docs/diagrams/images/` are compact layouts of the same p
 `python3 docs/diagrams/tools/linkmap.py` checks the set. The `diagram` MCP server (in `.mcp.json`)
 draws through `draw_module`, `link_module` and `check_diagrams`, with `node` for the archify
 renderer. `BIBLE_BASE_URL` and `DIAGRAM_AUTHORS` are set in `config/harness.env`.
+
+## physics/quantum-relativity
+
+The hobby physics project in `physics/`: a simulation of the owner's **quantum-relativity theory**, which
+tries to unify quantum physics and general relativity starting from a network rather than from
+particles in space. Code that breaks a rule below is simulating something else.
+
+### The rules
+
+1. **Only relations are fundamental.** There is no background space: the network of joints and connections *is* space. The code stores no coordinates for joints; distance, dimension and curvature are measured from the network alone (paths, neighbour counts, random walks).
+2. **Space is filled with energy** held by connections, and energy can travel through the network.
+3. **The network is not uniform and not static**: its shape and size follow the energy in it. Connections have no shape of their own; "shape" is energy being more or less concentrated.
+4. **Energy sets length**: length = constant ÷ energy, so doubling a connection's energy halves its length (like E = hc/λ). Too much energy packs a region tighter.
+5. **Energy oscillates** along a connection between its two joints, slightly differently depending on those joints.
+6. **Drift**: in the base state every connection slowly lengthens. This is the proposed mechanism for the expansion of the universe and for redshift (a longer connection holds less energy). Drift is the same everywhere; dense regions differ only because attraction works against it, so gravitational redshift near a dense region must come out of attraction, not out of a separate drift setting.
+7. **Attraction**: connection energy pulls (gravity-like).
+8. **Joint repulsion**: joints push (electromagnetism-like), not across empty space but by pushing on the energy in their connections. A push stretches a connection, which lowers its energy, so force, energy and length are one thing seen from three sides.
+9. **Entanglement**: two connections can carry the same signal strength, inverted, so their behaviour is linked through the network.
+
+### Open problems
+
+Bell's theorem says a classical network cannot reproduce entanglement, so something
+non-classical is needed later; linked connections must never give a usable faster-than-light
+signal; joints probably need two types (+ and −); a regular grid picks out directions, so the
+network should be irregular; length must be an internal quantity, not a coordinate; drift and
+repulsion must balance attraction so everything does not clump; bound regions (atoms, galaxies)
+must resist the drift while empty space expands; the real expansion first slowed and then sped
+up, which a constant drift alone does not give; and electromagnetism is about 10³⁶ times
+stronger than gravity, so each force needs its own strength.
+
+### How results are trusted
+
+Validation comes first: a measurement is trusted on new rules only after it gives the right
+answer on a known reference spacetime (a network built from points scattered in flat space or
+flat spacetime, whose true dimension and proper times are known). Every result is reported as a
+number beside the known value it should match, with the run's seed and settings, so anyone can
+rerun it. Results that miss are reported as misses.
+
+### Milestones
+
+1. **Validate**: measurements recover known results (dimension, proper time, twin paradox).
+2. **Grid dynamics**: the energy-length, drift, attraction and repulsion rules run.
+3. **Gravity test**: with the attraction rule off, do lumps of energy still move toward each other from the network's shape alone?
+4. **Expansion test**: does drift give accelerating expansion while dense clusters stay bound?
+5. **Space test**: does the network settle into something that behaves like 3D space?
+6. **Quantum**: superposition and entanglement without signalling (later). Lead: the network as a superposition of configurations, with each connection holding a few numbers rather than one, so several fields are different ways the same network moves (Levin and Wen, string-net condensation, 2005). There the quantum part is assumed, not derived, and gravity does not emerge; the geometry rules here would supply it.
+
+Success tiers: (1) known physics (falling, bending light, expansion) from the rules; (2) space
+and gravity emerge without being forced; (3) a testable prediction that holds, such as the
+measured strength of dark energy.
