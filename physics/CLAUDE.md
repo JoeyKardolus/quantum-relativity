@@ -19,19 +19,20 @@ joint-network milestones.
   carried by cell pair; a new face starts at rest, a vanished one returns its volume.
 - **`tessellate.py` calls pyvoro2's private native function** and does the input checks itself;
   keep `pyvoro2==0.8.0` pinned or re-check that call on an upgrade.
-- **Joints hold space.** Total space = energy volumes + joint volumes (`Grid.total_space()`). Every
-  rule keeps it except pull (destroys squeezed-out space) and the leak; the shape steps keep it
-  exactly. Energy is not conserved: the energy-volume rule raises it under push (open). Volumes
-  join only through a joint below `push_limit` times its rest volume.
-- **Energy sets volume**: `cells/rest_volume.py` (`(1/E)^3`), restored each step; in `network/`
-  `energy * length = LENGTH_SCALE`. Push and pull change size; energy moves to match.
+- **Joints are thin walls holding space** (rest 3% of their volumes' mean, `joint_rest`).
+  Pull destroys squeezed-out space; push swells joints back with new space.
+  **Total energy never changes**: only the leak moves it. Volumes join only through a joint
+  below `push_limit` times rest, keeping both energies.
+- **Energy alone sets volume**: `cells/rest_volume.py` (`(1/E)^3`), set after the leak; in
+  `network/` `energy * length = LENGTH_SCALE`. Push and pull never change an energy volume.
 - **All rules are always on, nothing placed by hand.** Energy starts slightly uneven everywhere;
   lumps must form by themselves. Drift is the leak (`cells/leak.py`): it flows only along seams
   (tessellation edges), as open as `cells/seam_openness.py` says (closed past `seal_point`),
   by pull (`p_b / sum p_k`).
 - **Honesty.** Never tune a setting, seed or fit window until a result passes. Report every number
-  with seed and settings; report a miss. Today (seed 1, 1000 cells, defaults) the grid falls to 2
-  volumes by step 78, space to 0.02 of its start; about 15 joints per cell. No lasting lumps.
+  with seed and settings; report a miss. Today (seed 1, 1000 cells, defaults, 300 steps): 118
+  collapses, 117 in step 1 (the start leaves joints under the limit); space 0.34 of its start;
+  lumps 21 at step 50, 3 at 300, none sealed.
 - **Speed.** Vectorised numpy and scipy.sparse; a step is about 21 ms at 500 cells, 126 ms at 2500,
   nearly all tessellation; `shapes()` is a 6 MB message at 1000 cells.
 - **Layout.** One public function (or type) per file, helpers `_prefixed`, each subpackage
