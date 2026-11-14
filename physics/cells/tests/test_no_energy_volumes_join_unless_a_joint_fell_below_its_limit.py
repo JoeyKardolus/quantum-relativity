@@ -1,13 +1,14 @@
 """No two energy volumes ever join unless a joint between them fell below its limit.
 
 For 200 steps of the rules on an engine's neighbour graph, with weak pull
-(attraction 0.001, where no joint reaches its limit in 200 steps) and at the default settings (attraction 0.005: with no drift
-balancing pull, space shrinks until joints give way and collapses happen),
+(attraction 0.001, where no joint reaches its limit in 200 steps) and strong pull
+(attraction 0.02: the background pull alone settles a joint near
+0.1 / (1 - 0.9 exp(-0.2)) = 0.38 of rest, below the 0.5 limit, so joints give way),
 each step's moved grid (move_space) is checked here independently: the joints
 whose volume is below push_limit * joint_rest * (V_a + V_b) / 2 are found, and
 apply_rules's merged_into must group old energy volumes exactly as the connected
 components of those joints do. Two volumes with no chain of below-limit joints
-between them must stay apart. The default run must see collapses and the
+between them must stay apart. The strong-pull run must see collapses and the
 weak-pull run must see none, so both directions are exercised.
 """
 from __future__ import annotations
@@ -31,7 +32,7 @@ def _below_limit_groups(moved, settings):
     return connected_components(links, directed=False)[1]
 
 
-@pytest.mark.parametrize("attraction, collapses", [(0.001, False), (0.005, True)])
+@pytest.mark.parametrize("attraction, collapses", [(0.001, False), (0.02, True)])
 def test_joining_only_through_joints_below_their_limit(attraction, collapses):
     grid = new_engine(600, seed=11, unevenness=0.1).grid
     settings = EngineSettings.all_on(attraction=attraction)

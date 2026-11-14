@@ -8,8 +8,7 @@ an energy volume with more energy ends up smaller.
   energy    the leak (any seam openness), joint collapse and the engine's shape part (seeds, weights,
             box, re-tessellation, reconciling joints) keep the total energy and total
             space: a full step ends with exactly what apply_rules gave, and the box
-            holds exactly that space. (The energy-volume
-            rule inside move_space does not keep it; that is a rule, not the engine.)
+            holds exactly that space.
   smaller   after new_engine has settled the shapes (500 volumes, seed 6,
             unevenness 0.3), tessellated volume falls with energy: correlation
             below -0.8, and the most energetic quarter is smaller on average than

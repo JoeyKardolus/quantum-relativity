@@ -3,8 +3,9 @@
 Contract: frozen record of floats, read by apply_rules() (step.py runs it each step):
   attraction   pull a joint gets per unit of pull potential (rule 7): each step it
                keeps exp(-attraction * mean potential of its two volumes) of its volume
-  joint_push   share of the gap to its rest volume a joint swells back each step,
-               taking that space from its two energy volumes (rule 8); in [0, 1]
+  joint_push   share of the gap to its rest volume a joint swells back each step
+               (rule 8); the swelling is new space, it takes nothing from the energy
+               volumes and moves no energy; in [0, 1]
   push_limit   a joint collapses when its volume falls below push_limit times its
                rest volume; in [0, 1)
   joint_rest   a joint's rest volume as a share of its two energy volumes' mean volume
@@ -21,7 +22,8 @@ Contract: frozen record of floats, read by apply_rules() (step.py runs it each s
                       (k / (1 - (1 - k) exp(-pull)), k = joint_push)
   push_limit   0.5    a joint pulled about 2.4 times as hard as the background
                       settles below half its rest volume and gives way
-  joint_rest   0.2    joints hold about a sixth of space at rest (2 joints per volume)
+  joint_rest   0.03   a joint at rest is 3% of its two energy volumes' mean volume,
+                      a thin wall (rule 8: about 2 to 5%)
   leak         0.05   the rate the removed energy flow had, not tuned to a result
   seal_point   0.4    halfway from the background joint (about 0.7 of rest, depth
                       0.3) to the push limit (depth 0.5): background seams stay a
@@ -49,5 +51,5 @@ class EngineSettings:
         return replace(_ALL_ON, **overrides)
 
 
-_ALL_ON = EngineSettings(attraction=0.005, joint_push=0.1, push_limit=0.5, joint_rest=0.2,
+_ALL_ON = EngineSettings(attraction=0.005, joint_push=0.1, push_limit=0.5, joint_rest=0.03,
                        leak=0.05, seal_point=0.4)

@@ -3,7 +3,7 @@
 Contract: `step(engine, settings)` is pure: it returns a new Engine and leaves the
 old one as it was. Deterministic: the same engine and settings give the same result.
   1. rules     grid = apply_rules(engine.grid, settings): pull, joint push, the
-               energy-volume rule, the leak and joint collapse, exactly as on any
+               leak, sizes from energy and joint collapse, exactly as on any
                grid, on the joints of the current tessellation (apply_rules.py).
                No rule reads positions, weights or shapes.
   2. seeds     positions relax toward their cell centroids and are drawn together
@@ -13,8 +13,8 @@ old one as it was. Deterministic: the same engine and settings give the same res
                all their energy is already in it.
   3. weights   each kept seed's weight takes one Newton step toward its new target
                size (target_size.py, fit_weights.py).
-  4. box       side = total_space() ** (1/3): pull shrinks space and the leak grows
-               it, so the box follows; positions scale by the side ratio, weights by
+  4. box       side = total_space() ** (1/3): pull shrinks space, push and the leak
+               grow it, so the box follows; positions scale by the side ratio, weights by
                its square, which changes no shape.
   5. shapes    the new positions and weights are tessellated (tessellate.py), and
                the grid's joints become exactly its shared faces and its seams

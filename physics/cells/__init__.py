@@ -25,7 +25,7 @@ Module map:
   seam_openness.py    seam_openness: 1 relaxed .. 0 at the seal point, per seam
   leak.py             leak: each volume leaks energy along open seams, by pull
   share_space.py      share_space: an energy volume hands space to its joints by their size
-  move_space.py       move_space: pull, push, energy-volume rule, leak; no collapse
+  move_space.py       move_space: pull, push, leak, size from energy; no collapse
   joint_collapse.py   joint_collapse: joints that gave way, volumes fall into each other
   joint_squeeze.py    joint_squeeze: 0..1 how close each joint is to its limit (its push)
   tessellation.py     Tessellation: volumes, centroids, faces, neighbour pairs, seams

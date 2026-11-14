@@ -3,17 +3,18 @@
 Contract: `apply_rules(grid, settings)` returns a new Grid, possibly with fewer energy
 volumes (joint collapse), merged_into mapping every old volume to its new index:
   1. move     moved = move_space(grid, settings): pull squeezes joints, joints push
-              back taking space from their energy volumes, the energy-volume rule
-              and the leak (move_space.py has the formulas).
+              back toward rest (new space; no energy moves), the leak, and every
+              energy volume's size set by its energy (move_space.py has the formulas).
   2. collapse a joint gives way only when its volume fell below its limit,
               J < push_limit * R, R = joint_rest(moved volume, joints, joint_rest);
               its two energy volumes fall into each other (joint_collapse.py),
               keeping all energy and all space. No other path joins two volumes.
   3. squeeze  set to joint_squeeze(result, settings): how hard each joint pushes;
               seam_open to seam_openness(result, settings).
-Total space changes only by pull (shrinks it) and the leak (drift: volumes
-it drains grow). Deterministic: the same grid and
-settings give the same result.
+Total energy is changed by no rule: the leak moves it, collapse adds it together.
+Total space changes by pull (shrinks it), push (joints swell back) and the leak
+(drift: volumes it drains grow). Deterministic: the same grid and settings give
+the same result.
 """
 from __future__ import annotations
 

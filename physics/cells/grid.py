@@ -15,7 +15,7 @@ Contract: a frozen record of
   seam_open     (m,) derived, for drawing and engine_stats: each seam's openness,
                 1 relaxed, 0 sealed (seam_openness.py)
   merged_into   None at the start; after a step, merged_into[old_cell] = that cell's index now
-total_energy() is the sum of energy, the quantity joint collapse and the leak keep.
+total_energy() is the sum of energy, which no rule changes (the leak moves it, collapse adds it).
 total_space() is the sum of energy volumes plus the sum of joint volumes: all of space,
 since energy volumes and joints fill it with no gaps.
 """
