@@ -15,7 +15,8 @@
     --accent: #5b8cff;
     --warn: #ff7a45;
     --joint: #6f7d94;
-    --joint-hot: #ffd166;
+    --joint-hot: #ffe6c2;
+    --plain-wall: #8a8f98;
   }
   @media (prefers-color-scheme: light) {
     :root {
@@ -29,21 +30,28 @@
       --warn: #c4461a;
       --joint: #4a5566;
       --joint-hot: #e0730b;
+      --plain-wall: #7d8590;
     }
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
     font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  #view { position: fixed; inset: 0; touch-action: none; cursor: grab; }
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
   #view.dragging { cursor: grabbing; }
-  #hint { position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-    display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+  #inset { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; width: 112px; height: 112px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; pointer-events: none; }
+  #below { position: fixed; left: 16px; right: 16px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; gap: 6px; pointer-events: none; max-width: 640px; }
+  #below > * { pointer-events: auto; }
+  #hint { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+  #viewCaption { font-size: 13px; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 10px; }
   #panel { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px;
     bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: 310px; max-width: calc(100vw - 24px);
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-    padding: 14px 16px; overflow-y: auto; backdrop-filter: blur(6px); transition: transform .2s ease; }
+    padding: 14px 16px; overflow-y: auto; backdrop-filter: blur(6px); transition: transform .2s ease; z-index: 3; }
   #panel.collapsed { transform: translateX(calc(100% + 24px)); }
-  #toggle { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px; z-index: 2; }
+  #toggle { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px; z-index: 4; }
   #panel:not(.collapsed) ~ #toggle { right: 334px; }
   h1 { font-size: 15px; margin: 0 0 10px; font-weight: 600; }
   h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
@@ -52,8 +60,9 @@
     border-radius: 6px; padding: 5px 11px; cursor: pointer; }
   button:hover { border-color: var(--accent); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; min-width: 80px; }
+  button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .row label { color: var(--muted); font-size: 12px; }
+  .row label, .row .label { color: var(--muted); font-size: 12px; }
   input[type=number] { width: 78px; font: inherit; color: var(--text); background: transparent;
     border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
   .setting { margin: 8px 0; }
@@ -64,27 +73,35 @@
   #stats span { color: var(--muted); }
   .legend { height: 8px; border-radius: 4px; margin: 4px 0 2px; }
   #energyLegend { background: linear-gradient(90deg, rgb(51,102,242), rgb(170,150,200), rgb(255,90,40)); }
-  #squeezeLegend { background: linear-gradient(90deg, color-mix(in srgb, var(--joint) 25%, transparent), var(--joint-hot)); }
+  #squeezeLegend { background: linear-gradient(90deg, color-mix(in srgb, var(--joint) 35%, transparent), var(--joint-hot)); }
   .legend-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
   .caption { font-size: 13px; margin-top: 10px; }
+  .swatch { display: inline-block; width: 22px; height: 0; border-top: 1px solid var(--plain-wall);
+    opacity: .6; vertical-align: middle; margin-right: 6px; }
   #state { color: var(--muted); font-size: 12px; margin-left: auto; }
   #offline[hidden] { display: none; }
   #offline { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-    pointer-events: none; padding: 0 16px; }
+    pointer-events: none; padding: 0 16px; z-index: 5; }
   #offline div { background: var(--panel); border: 1px solid var(--warn); border-radius: 10px;
     padding: 14px 18px; max-width: 420px; text-align: center; }
   #offline code { color: var(--warn); }
   @media (max-width: 700px) {
     #panel:not(.collapsed) ~ #toggle { right: 12px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+    #inset { width: 84px; height: 84px; }
+    #below { right: 16px; bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
   }
 </style>
 </head>
 <body>
-<canvas id="view"></canvas>
+<canvas id="view" aria-label="A cut through the grid of energy volumes"></canvas>
+<canvas id="inset" aria-label="Where the cut lies in the grid"></canvas>
 
-<div id="hint">
-  <button id="fit" type="button">fit</button>
-  <span>drag to rotate, wheel or pinch to zoom, double-click to recentre</span>
+<div id="below">
+  <div id="hint">
+    <button id="fit" type="button">fit</button>
+    <span>drag to pan, wheel or pinch to zoom</span>
+  </div>
+  <div id="viewCaption">A cut through space: each cell is an energy volume, each wall a joint. Cells hold no set shape; their size comes from their energy and their shape from their neighbours.</div>
 </div>
 
 <aside id="panel">
@@ -104,17 +121,23 @@
   <h2>Now</h2>
   <div id="stats"><div><span>waiting for the simulation</span></div></div>
 
+  <h2>Cut</h2>
+  <div class="row">
+    <span class="label">across</span>
+    <button type="button" class="axis" data-axis="x" aria-pressed="false">x</button>
+    <button type="button" class="axis" data-axis="y" aria-pressed="false">y</button>
+    <button type="button" class="axis" data-axis="z" aria-pressed="true">z</button>
+  </div>
+  <div id="cutSettings"></div>
+
   <h2>Look</h2>
-  <div class="caption">energy volume: how packed its energy is</div>
+  <div class="caption">cell: how packed its energy is</div>
   <div id="energyLegend" class="legend"></div>
   <div class="legend-ends"><span>thin</span><span>packed</span></div>
-  <div class="caption">joint: how close its push is to the push limit</div>
+  <div class="caption">wall that is a joint: how close its push is to the push limit</div>
   <div id="squeezeLegend" class="legend"></div>
   <div class="legend-ends"><span>relaxed</span><span>about to collapse</span></div>
-  <div class="row" style="margin-top:8px">
-    <label><input id="showJoints" type="checkbox" checked> show joints</label>
-  </div>
-  <div id="viewSettings"></div>
+  <div class="caption"><span class="swatch"></span>wall between cells that share no joint</div>
 
   <h2>Run</h2>
   <div id="runSettings"></div>
@@ -127,7 +150,6 @@
   <div id="offlineText">connecting...</div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 "use strict";
 
@@ -143,262 +165,255 @@ const LABELS = {
 };
 const RUN_SETTINGS = new Set(["speed", "unevenness"]);
 
-/* ---------- three.js scene ---------- */
-const canvas = document.getElementById("view");
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(50, 1, 0.001, 1e6);
+/* Energy palette: thin (cool blue) -> middle -> packed (warm orange), as before. */
+const LOW = [51, 102, 242], MID = [170, 150, 200], HIGH = [255, 90, 40];
 
-/* Uniforms every material shares: the cutaway plane and the pixel scale. */
-const shared = {
-  pointScale: { value: 500 },
-  sizeFactor: { value: 1 },
-  cutOrigin: { value: new THREE.Vector3() },
-  cutNormal: { value: new THREE.Vector3(0, 0, 1) },
-  cutDepth: { value: 1e9 },
-  lowColor: { value: new THREE.Color(0.20, 0.40, 0.95) },
-  midColor: { value: new THREE.Color(0.67, 0.59, 0.78) },
-  highColor: { value: new THREE.Color(1.0, 0.35, 0.16) },
-};
-
-const CELL_VERTEX = `
-uniform float pointScale; uniform float sizeFactor; uniform float spread;
-uniform vec3 cutOrigin; uniform vec3 cutNormal; uniform float cutDepth;
-attribute float radius; attribute float energy;
-varying float vEnergy; varying float vCut;
-void main() {
-  vEnergy = energy;
-  vCut = dot(position - cutOrigin, cutNormal) > cutDepth ? 1.0 : 0.0;
-  vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
-  gl_Position = projectionMatrix * viewPosition;
-  gl_PointSize = vCut > 0.5 ? 0.0 : max(1.5, 2.0 * radius * sizeFactor * spread * pointScale / -viewPosition.z);
-}`;
-
-const CELL_FRAGMENT = `
-uniform vec3 lowColor; uniform vec3 midColor; uniform vec3 highColor;
-varying float vEnergy; varying float vCut;
-vec3 ramp(float level) {
-  return level < 0.5 ? mix(lowColor, midColor, level * 2.0) : mix(midColor, highColor, level * 2.0 - 1.0);
-}
-void main() {
-  if (vCut > 0.5) discard;
-  vec2 spot = gl_PointCoord * 2.0 - 1.0;
-  float reach = dot(spot, spot);
-  if (reach > 1.0) discard;
-  vec3 normal = vec3(spot.x, -spot.y, sqrt(1.0 - reach));
-  float light = 0.3 + 0.7 * max(dot(normal, normalize(vec3(-0.35, 0.55, 0.75))), 0.0);
-  float glow = smoothstep(0.55, 1.0, vEnergy);
-  vec3 base = ramp(vEnergy);
-  gl_FragColor = vec4(base * mix(light, 1.0, glow * 0.6) + base * glow * 0.5, 1.0);
-}`;
-
-const GLOW_FRAGMENT = `
-uniform vec3 highColor;
-varying float vEnergy; varying float vCut;
-void main() {
-  if (vCut > 0.5) discard;
-  float reach = length(gl_PointCoord * 2.0 - 1.0);
-  if (reach > 1.0) discard;
-  float fade = (1.0 - reach) * (1.0 - reach);
-  gl_FragColor = vec4(highColor * smoothstep(0.55, 1.0, vEnergy) * fade * 0.55, 1.0);
-}`;
-
-const JOINT_VERTEX = `
-uniform vec3 cutOrigin; uniform vec3 cutNormal; uniform float cutDepth;
-attribute vec3 tint; attribute float alpha;
-varying vec3 vTint; varying float vAlpha; varying float vDepth;
-void main() {
-  vTint = tint; vAlpha = alpha;
-  vDepth = dot(position - cutOrigin, cutNormal) - cutDepth;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`;
-
-const JOINT_FRAGMENT = `
-varying vec3 vTint; varying float vAlpha; varying float vDepth;
-void main() {
-  if (vDepth > 0.0 || vAlpha < 0.01) discard;
-  gl_FragColor = vec4(vTint, vAlpha);
-}`;
-
-/** Return a ShaderMaterial on the shared uniforms plus `extra`. */
-function shaderMaterial(vertexShader, fragmentShader, extra, options) {
-  return new THREE.ShaderMaterial({ vertexShader, fragmentShader,
-    uniforms: Object.assign({}, shared, extra), ...options });
+/** Mix two rgb triples by `part` 0..1. */
+function mixRgb(from, to, part) {
+  return from.map((channel, index) => Math.round(channel + (to[index] - channel) * part));
 }
 
-const cellGeometry = new THREE.BufferGeometry();
-const cellPoints = new THREE.Points(cellGeometry,
-  shaderMaterial(CELL_VERTEX, CELL_FRAGMENT, { spread: { value: 1 } }, {}));
-const glowPoints = new THREE.Points(cellGeometry,
-  shaderMaterial(CELL_VERTEX, GLOW_FRAGMENT, { spread: { value: 2.4 } },
-    { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-const jointGeometry = new THREE.BufferGeometry();
-const jointLines = new THREE.LineSegments(jointGeometry,
-  shaderMaterial(JOINT_VERTEX, JOINT_FRAGMENT, {}, { transparent: true, depthWrite: false }));
-for (const [order, object] of [[0, cellPoints], [1, jointLines], [2, glowPoints]]) {
-  object.frustumCulled = false;
-  object.renderOrder = order;
-  scene.add(object);
+/** Fill colour of a cell with energy shade `level` 0..1. */
+function energyColour(level) {
+  const part = Math.min(1, Math.max(0, Number.isFinite(level) ? level : 0));
+  const rgb = part < 0.5 ? mixRgb(LOW, MID, part * 2) : mixRgb(MID, HIGH, part * 2 - 1);
+  return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
 }
 
-/* ---------- mesh state: buffers resized only when a mesh message arrives ---------- */
-const mesh = {
-  cellCount: 0,
-  pairs: new Uint32Array(0),          // i0, j0, i1, j1, ... (one joint per pair)
-  cellPositions: new Float32Array(0),
-  cellRadius: new Float32Array(0),
-  cellEnergy: new Float32Array(0),
-  linePositions: new Float32Array(0),
-  lineTints: new Float32Array(0),
-  lineAlpha: new Float32Array(0),
-  hasFrame: false,
-};
-
-/** Point `geometry`'s attribute `name` at a new buffer of `size` floats per item. */
-function attach(geometry, name, array, size) {
-  geometry.setAttribute(name, new THREE.BufferAttribute(array, size));
-  return array;
+/** Parse a #rrggbb CSS colour into an rgb triple. */
+function hexRgb(text) {
+  const clean = text.trim().replace("#", "");
+  return [0, 2, 4].map((start) => parseInt(clean.slice(start, start + 2), 16) || 0);
 }
 
-mesh.cellPositions = attach(cellGeometry, "position", mesh.cellPositions, 3);
-mesh.cellRadius = attach(cellGeometry, "radius", mesh.cellRadius, 1);
-mesh.cellEnergy = attach(cellGeometry, "energy", mesh.cellEnergy, 1);
-mesh.linePositions = attach(jointGeometry, "position", mesh.linePositions, 3);
-mesh.lineTints = attach(jointGeometry, "tint", mesh.lineTints, 3);
-mesh.lineAlpha = attach(jointGeometry, "alpha", mesh.lineAlpha, 1);
+const theme = { bg: "#07090d", text: "#dfe6ef", muted: "#8593a6", relaxed: [111, 125, 148],
+  hot: [255, 230, 194], plain: "#8a8f98", line: "#263040" };
 
-/** Install a new joint list: reallocate buffers only when capacity grows. */
-function applyMesh(message) {
-  const jointCount = Math.floor(message.pairs.length / 2);
-  mesh.cellCount = message.cells;
-  mesh.pairs = Uint32Array.from(message.pairs);
-  if (mesh.cellRadius.length < mesh.cellCount) {
-    mesh.cellPositions = attach(cellGeometry, "position", new Float32Array(mesh.cellCount * 3), 3);
-    mesh.cellRadius = attach(cellGeometry, "radius", new Float32Array(mesh.cellCount), 1);
-    mesh.cellEnergy = attach(cellGeometry, "energy", new Float32Array(mesh.cellCount), 1);
-  }
-  if (mesh.lineAlpha.length < jointCount * 2) {
-    mesh.linePositions = attach(jointGeometry, "position", new Float32Array(jointCount * 6), 3);
-    mesh.lineTints = attach(jointGeometry, "tint", new Float32Array(jointCount * 6), 3);
-    mesh.lineAlpha = attach(jointGeometry, "alpha", new Float32Array(jointCount * 2), 1);
-  }
-  jointGeometry.setDrawRange(0, mesh.hasFrame ? jointCount * 2 : 0);
-  cellGeometry.setDrawRange(0, mesh.hasFrame ? mesh.cellCount : 0);
-}
-
-const WRAP_FACTOR = 3;   // a joint this many radius sums long goes across the wrap-around: not drawn
-const jointColors = { relaxed: new THREE.Color(), hot: new THREE.Color() };
-
-/** Write joint `joint`'s line ends, tint and alpha from the positions, radii and its squeeze. */
-function writeJoint(joint, positions, radius, level, relaxed, hot) {
-  const from = mesh.pairs[joint * 2], to = mesh.pairs[joint * 2 + 1], out = joint * 6;
-  for (let axis = 0; axis < 3; axis++) {
-    mesh.linePositions[out + axis] = positions[from * 3 + axis];
-    mesh.linePositions[out + 3 + axis] = positions[to * 3 + axis];
-  }
-  const length = Math.hypot(positions[from * 3] - positions[to * 3],
-    positions[from * 3 + 1] - positions[to * 3 + 1], positions[from * 3 + 2] - positions[to * 3 + 2]);
-  const across = length > WRAP_FACTOR * (radius[from] + radius[to]);
-  const squeeze = Math.min(1, Math.max(0, level || 0));
-  const alpha = across ? 0 : 0.07 + 0.88 * squeeze * squeeze;
-  for (let channel = 0; channel < 3; channel++) {
-    const tint = relaxed[channel] + (hot[channel] - relaxed[channel]) * squeeze;
-    mesh.lineTints[out + channel] = mesh.lineTints[out + 3 + channel] = tint;
-  }
-  mesh.lineAlpha[joint * 2] = mesh.lineAlpha[joint * 2 + 1] = alpha;
-}
-
-/** Copy one frame's positions, radii, energies and squeezes into the existing buffers. */
-function applyFrame(message) {
-  const { positions, radius, energy, squeeze } = message;
-  if (!positions || positions.length !== mesh.cellCount * 3) return false;
-  if (!radius || radius.length !== mesh.cellCount) return false;
-  mesh.cellPositions.set(positions);
-  mesh.cellRadius.set(radius);
-  if (energy && energy.length === mesh.cellCount) mesh.cellEnergy.set(energy);
-  const jointCount = mesh.pairs.length / 2;
-  const relaxed = jointColors.relaxed.toArray(), hot = jointColors.hot.toArray();
-  for (let joint = 0; joint < jointCount; joint++) {
-    writeJoint(joint, positions, radius, squeeze && joint < squeeze.length ? squeeze[joint] : 0, relaxed, hot);
-  }
-  for (const name of ["position", "radius", "energy"]) cellGeometry.attributes[name].needsUpdate = true;
-  for (const name of ["position", "tint", "alpha"]) jointGeometry.attributes[name].needsUpdate = true;
-  jointGeometry.setDrawRange(0, jointCount * 2);
-  cellGeometry.setDrawRange(0, mesh.cellCount);
-  mesh.hasFrame = true;
-  return true;
-}
-
-/* ---------- camera: orbit around a target, never auto-zoom per frame ---------- */
-const orbit = { target: new THREE.Vector3(), distance: 10, azimuth: 0.6, elevation: 0.4, extent: 1 };
-let cutaway = 0;
-
-/** Place the cutaway plane: facing the camera, `cutaway` of the way through the mesh. */
-function placeCut() {
-  shared.cutOrigin.value.copy(orbit.target);
-  shared.cutNormal.value.copy(camera.position).sub(orbit.target).normalize();
-  shared.cutDepth.value = cutaway > 0 ? orbit.extent * (1 - 2 * cutaway) : 1e9;
-}
-
-/** Place the camera from the orbit state. */
-function placeCamera() {
-  const cosElevation = Math.cos(orbit.elevation);
-  camera.position.set(
-    orbit.target.x + orbit.distance * cosElevation * Math.sin(orbit.azimuth),
-    orbit.target.y + orbit.distance * Math.sin(orbit.elevation),
-    orbit.target.z + orbit.distance * cosElevation * Math.cos(orbit.azimuth));
-  camera.near = orbit.distance / 1000;
-  camera.far = orbit.distance * 1000;
-  camera.updateProjectionMatrix();
-  camera.lookAt(orbit.target);
-  placeCut();
+/** Read the page's theme colours for the canvases. */
+function applyTheme() {
+  const style = getComputedStyle(document.documentElement);
+  const read = (name) => style.getPropertyValue(name).trim();
+  Object.assign(theme, { bg: read("--bg"), text: read("--text"), muted: read("--muted"),
+    relaxed: hexRgb(read("--joint")), hot: hexRgb(read("--joint-hot")), plain: read("--plain-wall"),
+    line: read("--line") });
   requestDraw();
 }
 
-/** Move the orbit target to the centre of the energy volumes; return their largest distance from it. */
-function recentre() {
-  const count = mesh.cellCount, points = mesh.cellPositions;
-  if (!mesh.hasFrame || count === 0) return 0;
-  let sumX = 0, sumY = 0, sumZ = 0;
-  for (let cell = 0; cell < count; cell++) {
-    sumX += points[cell * 3]; sumY += points[cell * 3 + 1]; sumZ += points[cell * 3 + 2];
-  }
-  orbit.target.set(sumX / count, sumY / count, sumZ / count);
-  let extent = 0;
-  for (let cell = 0; cell < count; cell++) {
-    const dx = points[cell * 3] - orbit.target.x, dy = points[cell * 3 + 1] - orbit.target.y,
-      dz = points[cell * 3 + 2] - orbit.target.z;
-    extent = Math.max(extent, Math.sqrt(dx * dx + dy * dy + dz * dz) + mesh.cellRadius[cell]);
-  }
-  orbit.extent = extent || 1;
-  placeCamera();
-  return extent;
+/* ---------- the cut: the latest slice message, checked ---------- */
+const cut = { axis: "z", depth: 0.5, cells: [], walls: [], step: -1, has: false };
+
+/** Keep the cells and walls of a slice message whose numbers are well formed. */
+function applySlice(message) {
+  const cells = (Array.isArray(message.cells) ? message.cells : []).filter((cell) =>
+    cell && Array.isArray(cell.polygon) && cell.polygon.length >= 6 && cell.polygon.length % 2 === 0);
+  const walls = (Array.isArray(message.walls) ? message.walls : []).filter((wall) =>
+    wall && Array.isArray(wall.line) && wall.line.length === 4);
+  walls.sort((first, second) => wallOrder(first) - wallOrder(second));
+  Object.assign(cut, { cells, walls, step: message.step, has: true });
+  if (Number.isFinite(message.depth) && !depthSlider.held) showDepth(message.depth);
+  return true;
 }
 
-/** Recentre and zoom so the whole grid fills the view. */
-function fit() {
-  const extent = recentre();
-  if (extent > 0) {
-    orbit.distance = extent / Math.sin((camera.fov * Math.PI / 180) / 2) * 1.05;
-    placeCamera();
+/** Draw order of a wall: plain walls first, then joints from relaxed to squeezed. */
+function wallOrder(wall) {
+  return wall.squeeze === null || wall.squeeze === undefined ? -1 : wall.squeeze;
+}
+
+/* ---------- 2D view: world (the plane's own frame) to screen ---------- */
+const canvas = document.getElementById("view");
+const context = canvas.getContext("2d");
+const view = { scale: 100, centreX: 0, centreY: 0, follow: true };
+let pixelRatio = 1;
+
+/** The screen area the cut should fill: the window minus the open panel on wide screens. */
+function freeArea() {
+  const panelOpen = !panel.classList.contains("collapsed") && window.innerWidth > 700;
+  return { width: Math.max(80, window.innerWidth - (panelOpen ? 334 : 0)), height: window.innerHeight };
+}
+
+/** Bounds of every polygon in the cut, or null when there is none. */
+function cutBounds() {
+  let left = Infinity, right = -Infinity, bottom = Infinity, top = -Infinity;
+  for (const cell of cut.cells) {
+    for (let index = 0; index < cell.polygon.length; index += 2) {
+      left = Math.min(left, cell.polygon[index]); right = Math.max(right, cell.polygon[index]);
+      bottom = Math.min(bottom, cell.polygon[index + 1]); top = Math.max(top, cell.polygon[index + 1]);
+    }
+  }
+  return Number.isFinite(left) && right > left && top > bottom ? { left, right, bottom, top } : null;
+}
+
+/** Centre and zoom so the whole cut fills the free area; with `follow` it keeps doing so each frame. */
+function fit(follow) {
+  view.follow = follow;
+  const bounds = cutBounds();
+  if (!bounds) { requestDraw(); return; }
+  const area = freeArea();
+  view.scale = 0.92 * Math.min(area.width / (bounds.right - bounds.left), area.height / (bounds.top - bounds.bottom));
+  view.centreX = (bounds.left + bounds.right) / 2 + (window.innerWidth - area.width) / 2 / view.scale;
+  view.centreY = (bounds.bottom + bounds.top) / 2;
+  requestDraw();
+}
+
+/** Screen x of plane coordinate `worldX`. */
+function screenX(worldX) { return (worldX - view.centreX) * view.scale + window.innerWidth / 2; }
+/** Screen y of plane coordinate `worldY` (up on the plane is up on screen). */
+function screenY(worldY) { return window.innerHeight / 2 - (worldY - view.centreY) * view.scale; }
+
+/** Fill every cell of the cut with its energy colour. */
+function drawCells() {
+  for (const cell of cut.cells) {
+    const points = cell.polygon;
+    context.beginPath();
+    context.moveTo(screenX(points[0]), screenY(points[1]));
+    for (let index = 2; index < points.length; index += 2) context.lineTo(screenX(points[index]), screenY(points[index + 1]));
+    context.closePath();
+    context.fillStyle = energyColour(cell.energy);
+    context.fill();
   }
 }
 
+/** Stroke every wall: a joint by its squeeze, a wall that is no joint plain and faint. */
+function drawWalls() {
+  context.lineCap = "round";
+  for (const wall of cut.walls) {
+    const [fromX, fromY, toX, toY] = wall.line;
+    const plain = wall.squeeze === null || wall.squeeze === undefined;
+    if (plain) {
+      context.strokeStyle = theme.plain;
+      context.globalAlpha = 0.35;
+      context.lineWidth = 0.7;
+    } else {
+      const squeeze = Math.min(1, Math.max(0, wall.squeeze));
+      const rgb = mixRgb(theme.relaxed, theme.hot, squeeze);
+      context.strokeStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      context.globalAlpha = 0.45 + 0.55 * squeeze;
+      context.lineWidth = 0.9 + 2.2 * squeeze * squeeze;
+    }
+    context.beginPath();
+    context.moveTo(screenX(fromX), screenY(fromY));
+    context.lineTo(screenX(toX), screenY(toY));
+    context.stroke();
+  }
+  context.globalAlpha = 1;
+}
+
+/** Draw the whole main view. */
+function drawView() {
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  context.fillStyle = theme.bg;
+  context.fillRect(0, 0, window.innerWidth, window.innerHeight);
+  if (!cut.has) {
+    context.fillStyle = theme.muted;
+    context.font = "13px system-ui, sans-serif";
+    context.textAlign = "center";
+    context.fillText("waiting for the first cut", freeArea().width / 2, window.innerHeight / 2);
+    return;
+  }
+  drawCells();
+  drawWalls();
+}
+
+/* ---------- inset: where the cut lies in the grid's box ---------- */
+const inset = document.getElementById("inset");
+const insetContext = inset.getContext("2d");
+
+/** Project a unit-box point to inset pixels (a fixed oblique view). */
+function insetPoint(point, size) {
+  const [x, y, z] = point.map((value) => value - 0.5);
+  return [size / 2 + (x * 0.82 - z * 0.42) * size * 0.62, size / 2 - (y * 0.82 + z * 0.3 - x * 0.12) * size * 0.62];
+}
+
+/** Draw the box, the axis letters and the cut plane at its depth. */
+function drawInset() {
+  const size = inset.clientWidth;
+  insetContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  insetContext.clearRect(0, 0, size, size);
+  const corners = [];
+  for (let index = 0; index < 8; index++) corners.push([index & 1, (index >> 1) & 1, (index >> 2) & 1]);
+  insetContext.strokeStyle = theme.muted;
+  insetContext.globalAlpha = 0.6;
+  insetContext.lineWidth = 1;
+  for (const [from, to] of [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]]) {
+    const start = insetPoint(corners[from], size), end = insetPoint(corners[to], size);
+    insetContext.beginPath(); insetContext.moveTo(...start); insetContext.lineTo(...end); insetContext.stroke();
+  }
+  insetContext.globalAlpha = 1;
+  const axisIndex = { x: 0, y: 1, z: 2 }[cut.axis];
+  const others = [0, 1, 2].filter((index) => index !== axisIndex);
+  const plane = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([first, second]) => {
+    const point = [0, 0, 0];
+    point[axisIndex] = cut.depth; point[others[0]] = first; point[others[1]] = second;
+    return insetPoint(point, size);
+  });
+  insetContext.beginPath();
+  plane.forEach((point, index) => (index ? insetContext.lineTo(...point) : insetContext.moveTo(...point)));
+  insetContext.closePath();
+  insetContext.fillStyle = "rgba(91, 140, 255, 0.35)";
+  insetContext.fill();
+  insetContext.strokeStyle = "rgb(91, 140, 255)";
+  insetContext.stroke();
+  insetContext.fillStyle = theme.text;
+  insetContext.font = "11px system-ui, sans-serif";
+  insetContext.textAlign = "center";
+  for (const [index, letter] of [[0, "x"], [1, "y"], [2, "z"]]) {
+    const tip = [0, 0, 0]; tip[index] = 1.18;
+    insetContext.globalAlpha = index === axisIndex ? 1 : 0.55;
+    insetContext.fillText(letter, ...insetPoint(tip, size));
+  }
+  insetContext.globalAlpha = 1;
+}
+
+/* ---------- drawing loop ---------- */
+let drawPending = false;
+
+/** Ask for one redraw on the next animation frame. */
+function requestDraw() {
+  if (drawPending) return;
+  drawPending = true;
+  requestAnimationFrame(() => { drawPending = false; drawView(); drawInset(); });
+}
+
+/** Match both canvases' pixel sizes to the window. */
+function resize() {
+  pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(window.innerWidth * pixelRatio);
+  canvas.height = Math.round(window.innerHeight * pixelRatio);
+  inset.width = Math.round(inset.clientWidth * pixelRatio);
+  inset.height = Math.round(inset.clientHeight * pixelRatio);
+  if (view.follow) fit(true); else requestDraw();
+}
+
+window.addEventListener("resize", resize);
+window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", applyTheme);
+
+/* ---------- pan and zoom ---------- */
 const pointers = new Map();
-let pinchStart = 0, pinchDistance = 0;
+let pinchStart = 0, pinchScale = 0;
 
-/** Return the distance between the first two active pointers. */
-function pointerSpread() {
+/** Distance and midpoint of the first two active pointers. */
+function pinchState() {
   const [first, second] = [...pointers.values()];
-  return Math.hypot(first.x - second.x, first.y - second.y);
+  return { spread: Math.hypot(first.x - second.x, first.y - second.y),
+    middleX: (first.x + second.x) / 2, middleY: (first.y + second.y) / 2 };
+}
+
+/** Zoom by `factor` keeping the plane point under screen (`atX`, `atY`) in place. */
+function zoomAt(factor, atX, atY) {
+  const worldX = view.centreX + (atX - window.innerWidth / 2) / view.scale;
+  const worldY = view.centreY - (atY - window.innerHeight / 2) / view.scale;
+  view.scale = Math.min(1e7, Math.max(1e-4, view.scale * factor));
+  view.centreX = worldX - (atX - window.innerWidth / 2) / view.scale;
+  view.centreY = worldY + (atY - window.innerHeight / 2) / view.scale;
+  view.follow = false;
+  requestDraw();
 }
 
 canvas.addEventListener("pointerdown", (event) => {
   canvas.setPointerCapture(event.pointerId);
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   canvas.classList.add("dragging");
-  if (pointers.size === 2) { pinchStart = pointerSpread(); pinchDistance = orbit.distance; }
+  if (pointers.size === 2) { pinchStart = pinchState().spread; pinchScale = view.scale; }
 });
 canvas.addEventListener("pointermove", (event) => {
   const previous = pointers.get(event.pointerId);
@@ -406,12 +421,14 @@ canvas.addEventListener("pointermove", (event) => {
   const dx = event.clientX - previous.x, dy = event.clientY - previous.y;
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if (pointers.size === 1) {
-    orbit.azimuth -= dx * 0.008;
-    orbit.elevation = Math.max(-1.55, Math.min(1.55, orbit.elevation + dy * 0.008));
+    view.centreX -= dx / view.scale;
+    view.centreY += dy / view.scale;
+    view.follow = false;
+    requestDraw();
   } else if (pointers.size === 2 && pinchStart > 0) {
-    orbit.distance = pinchDistance * pinchStart / Math.max(1, pointerSpread());
+    const state = pinchState();
+    zoomAt(pinchScale * state.spread / Math.max(1, pinchStart) / view.scale, state.middleX, state.middleY);
   }
-  placeCamera();
 });
 for (const name of ["pointerup", "pointercancel"]) {
   canvas.addEventListener(name, (event) => {
@@ -422,56 +439,21 @@ for (const name of ["pointerup", "pointercancel"]) {
 }
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
-  orbit.distance *= Math.exp(event.deltaY * 0.0012);
-  placeCamera();
+  zoomAt(Math.exp(-event.deltaY * 0.0012), event.clientX, event.clientY);
 }, { passive: false });
-canvas.addEventListener("dblclick", () => recentre());
-document.getElementById("fit").addEventListener("click", fit);
-
-/* ---------- drawing ---------- */
-let drawPending = false;
-
-/** Ask for one redraw on the next animation frame. */
-function requestDraw() {
-  if (drawPending) return;
-  drawPending = true;
-  requestAnimationFrame(() => { drawPending = false; renderer.render(scene, camera); });
-}
-
-/** Match renderer size, camera aspect and point scale to the window. */
-function resize() {
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
-  camera.aspect = window.innerWidth / Math.max(1, window.innerHeight);
-  camera.updateProjectionMatrix();
-  const pixels = window.innerHeight * renderer.getPixelRatio();
-  shared.pointScale.value = pixels / (2 * Math.tan((camera.fov * Math.PI / 180) / 2));
-  requestDraw();
-}
-
-/** Read the page's theme colours into the scene. */
-function applyTheme() {
-  const style = getComputedStyle(document.documentElement);
-  scene.background = new THREE.Color(style.getPropertyValue("--bg").trim());
-  jointColors.relaxed.set(style.getPropertyValue("--joint").trim());
-  jointColors.hot.set(style.getPropertyValue("--joint-hot").trim());
-  requestDraw();
-}
-
-window.addEventListener("resize", resize);
-window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", applyTheme);
-document.getElementById("showJoints").addEventListener("change", (event) => {
-  jointLines.visible = event.target.checked;
-  requestDraw();
-});
+document.getElementById("fit").addEventListener("click", () => fit(true));
 
 /* ---------- panel ---------- */
 const panel = document.getElementById("panel");
 const runButton = document.getElementById("run");
 const stateLabel = document.getElementById("state");
-let running = false, lastStep = -1, fitOnNextFrame = true;
+let running = false, lastStep = -1;
 
 if (window.innerWidth <= 700) panel.classList.add("collapsed");
-document.getElementById("toggle").addEventListener("click", () => panel.classList.toggle("collapsed"));
+document.getElementById("toggle").addEventListener("click", () => {
+  panel.classList.toggle("collapsed");
+  if (view.follow) fit(true);
+});
 
 /** Show whether the simulation runs, on the button and the label. */
 function setRunning(value) {
@@ -490,7 +472,7 @@ document.getElementById("reset").addEventListener("click", () => {
   send({ type: "reset", seed, cells });
   setRunning(false);
   lastStep = -1;
-  fitOnNextFrame = true;
+  view.follow = true;
 });
 
 /** Format a number short and readable. */
@@ -504,9 +486,19 @@ function formatNumber(value) {
 }
 
 const statsBox = document.getElementById("stats");
+let latestStats = { step: undefined, stats: {} };
+
+/** Count the cut's walls that are joints and those that are not. */
+function wallCounts() {
+  if (!cut.has) return { joints: undefined, plain: undefined };
+  const plain = cut.walls.filter((wall) => wall.squeeze === null || wall.squeeze === undefined).length;
+  return { joints: cut.walls.length - plain, plain };
+}
 
 /** Write the live stats as plain lines. */
-function showStats(step, stats) {
+function showStats() {
+  const { step, stats } = latestStats;
+  const walls = wallCounts();
   const lines = [
     ["step", step],
     ["energy volumes", stats.cells],
@@ -514,6 +506,9 @@ function showStats(step, stats) {
     ["size vs start", stats.size_vs_start == null ? undefined : formatNumber(stats.size_vs_start) + "x"],
     ["energy spread (packing)", stats.energy_spread],
     ["lumps", stats.lumps],
+    ["cells in this cut", cut.has ? cut.cells.length : undefined],
+    ["walls that are joints", walls.joints],
+    ["walls not matching joints", stats.walls_not_matching_joints ?? walls.plain],
   ];
   statsBox.replaceChildren(...lines.map(([label, value]) => {
     const line = document.createElement("div");
@@ -541,7 +536,7 @@ function valueToSlider(entry, value) {
   return Math.round(part * 1000);
 }
 
-/** Build one labelled range slider into `container`; `onValue` gets each new value. */
+/** Build one labelled range slider into `container`; `onValue` gets each new position. */
 function labelledSlider(text, container, onValue) {
   const wrap = document.createElement("div");
   wrap.className = "setting";
@@ -596,25 +591,42 @@ function applySettings(values) {
   }
 }
 
-/** Build the page-only view sliders: cutaway depth and drawn volume size. */
-function buildViewSliders() {
-  const box = document.getElementById("viewSettings");
-  const cut = labelledSlider("cutaway (look inside)", box, (position) => {
-    cutaway = position / 1000 * 0.95;
-    cut.valueLabel.textContent = Math.round(cutaway * 100) + "%";
-    placeCut();
-    requestDraw();
-  });
-  cut.input.value = "0";
-  cut.valueLabel.textContent = "0%";
-  const size = labelledSlider("drawn size of energy volumes", box, (position) => {
-    shared.sizeFactor.value = 0.2 + 0.8 * position / 1000;
-    size.valueLabel.textContent = Math.round(shared.sizeFactor.value * 100) + "%";
-    requestDraw();
-  });
-  size.input.value = "1000";
-  size.valueLabel.textContent = "100%";
+/* ---------- cut controls: depth slider and axis buttons ---------- */
+let sliceTimer = 0;
+const depthSlider = labelledSlider("cut depth", document.getElementById("cutSettings"), (position) => {
+  cut.depth = position / 1000;
+  depthSlider.valueLabel.textContent = cut.depth.toFixed(2);
+  requestDraw();
+  clearTimeout(sliceTimer);
+  sliceTimer = setTimeout(sendSlice, 60);
+});
+depthSlider.held = false;
+depthSlider.input.addEventListener("pointerdown", () => { depthSlider.held = true; });
+depthSlider.input.addEventListener("change", () => { depthSlider.held = false; });
+
+/** Show depth `value` 0..1 on the slider and the inset. */
+function showDepth(value) {
+  cut.depth = Math.min(1, Math.max(0, value));
+  depthSlider.input.value = String(Math.round(cut.depth * 1000));
+  depthSlider.valueLabel.textContent = cut.depth.toFixed(2);
 }
+
+/** Tell the server where the cut lies. */
+function sendSlice() {
+  send({ type: "slice", depth: cut.depth, axis: cut.axis });
+}
+
+const axisButtons = [...document.querySelectorAll("button.axis")];
+for (const button of axisButtons) {
+  button.addEventListener("click", () => {
+    cut.axis = button.dataset.axis;
+    for (const other of axisButtons) other.setAttribute("aria-pressed", String(other === button));
+    view.follow = true;
+    sendSlice();
+    requestDraw();
+  });
+}
+showDepth(0.5);
 
 /* ---------- connection ---------- */
 const offline = document.getElementById("offline");
@@ -642,16 +654,15 @@ function showOffline() {
 
 /** Route one server message to its handler. */
 function handleMessage(message) {
-  if (message.type === "mesh") {
-    applyMesh(message);
-    requestDraw();
-  } else if (message.type === "frame") {
-    if (!applyFrame(message)) return;
+  if (message.type === "frame") {
     if (message.step > lastStep && lastStep >= 0 && !running) setRunning(true);
     lastStep = message.step;
-    showStats(message.step, message.stats || {});
-    if (fitOnNextFrame) { fitOnNextFrame = false; fit(); } else { recentre(); }
-    requestDraw();
+    latestStats = { step: message.step, stats: message.stats || {} };
+    showStats();
+  } else if (message.type === "slice") {
+    applySlice(message);
+    if (view.follow) fit(true); else requestDraw();
+    showStats();
   } else if (message.type === "settings") {
     applySettings(message.values || {});
   }
@@ -666,7 +677,8 @@ function connect() {
     offline.hidden = true;
     setRunning(false);
     lastStep = -1;
-    fitOnNextFrame = true;
+    view.follow = true;
+    sendSlice();
   });
   socket.addEventListener("message", (event) => {
     let message;
@@ -680,10 +692,8 @@ function connect() {
   });
 }
 
-buildViewSliders();
-resize();
 applyTheme();
-placeCamera();
+resize();
 connect();
 </script>
 </body>

@@ -47,8 +47,8 @@ def test_the_socket_greets_a_page_and_echoes_a_settings_change():
     with TestClient(create_app(CELLS, seed=1)) as client:
         assert client.get("/").status_code in (200, 503)
         with client.websocket_connect("/ws") as socket:
-            kinds = [socket.receive_json()["type"] for _ in range(3)]
-            assert kinds == ["settings", "mesh", "frame"]
+            kinds = [socket.receive_json()["type"] for _ in range(4)]
+            assert kinds == ["settings", "mesh", "frame", "slice"]
             socket.send_json({"type": "settings", "values": {"speed": 30}})
             echo = socket.receive_json()
             assert echo["type"] == "settings" and echo["values"]["speed"]["value"] == 30
@@ -59,5 +59,5 @@ def test_the_socket_greets_a_page_and_echoes_a_settings_change():
             socket.send_json({"type": "pause"})
             socket.send_json({"type": "reset", "seed": 2, "cells": CELLS})
             kinds = []
-            while kinds[-3:] != ["settings", "mesh", "frame"]:
+            while kinds[-4:] != ["settings", "mesh", "frame", "slice"]:
                 kinds.append(socket.receive_json()["type"])
