@@ -16,8 +16,8 @@
     --warn: #ff7a45;
     --volume-clear: #ff8a8a;
     --volume-solid: #a10a14;
-    --joint-clear: #5a7fe0;
-    --joint-solid: #3aa2ff;
+    --joint-clear: #b4c4dc;
+    --joint-solid: #8fb3e6;
     --sealed: #e6b422;
   }
   * { box-sizing: border-box; }
@@ -38,8 +38,8 @@
   .key.volume { background: linear-gradient(90deg, color-mix(in srgb, var(--volume-clear) 12%, transparent), var(--volume-solid));
     border: 1px solid color-mix(in srgb, var(--volume-clear) 45%, transparent); }
   .key.sealed { height: 0; border-top: 2px solid var(--sealed); border-radius: 0; }
-  .key.joint { height: 7px; background: linear-gradient(90deg, color-mix(in srgb, var(--joint-clear) 12%, transparent), var(--joint-solid));
-    border: 1px solid color-mix(in srgb, var(--joint-clear) 45%, transparent); }
+  .key.joint { height: 3px; background: linear-gradient(90deg, color-mix(in srgb, var(--joint-clear) 5%, transparent),
+    color-mix(in srgb, var(--joint-solid) 50%, transparent)); }
   #panel { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px;
     bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: 310px; max-width: calc(100vw - 24px);
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
@@ -90,7 +90,7 @@
   </div>
   <div id="legend">
     <span><i class="key volume"></i>red glass = energy volume (pulls)</span>
-    <span><i class="key joint"></i>blue glass = joint (pushes)</span>
+    <span><i class="key joint"></i>pale blue = joint (pushes; faint at rest)</span>
     <span><i class="key sealed"></i>gold edge = wall of a sealed lump</span>
     <small>more solid = stronger</small>
   </div>
@@ -119,9 +119,17 @@
     <button type="button" class="show" data-show="volumes" aria-pressed="true">energy volumes</button>
     <button type="button" class="show" data-show="joints" aria-pressed="true">joints</button>
   </div>
+  <div class="row" style="margin-top:8px">
+    <span class="label">joints as</span>
+    <button type="button" class="jointStyle" data-style="slabs" aria-pressed="true">thin slabs</button>
+    <button type="button" class="jointStyle" data-style="lines" aria-pressed="false">edge lines</button>
+  </div>
   <div id="viewSettings"></div>
   <div class="caption">Every shape is the engine's own: each red cell is an energy volume, more solid the harder it pulls.
-    Each blue slab is a joint, a volume of its own on the face two energy volumes share, more solid the closer it is squeezed to its push limit.
+    Each pale blue slab is a joint, a volume of its own on the face two energy volumes share, drawn at its real thickness:
+    nearly invisible at rest, clearer the closer it is squeezed to its push limit.
+    The drawn energy volumes are picked once (on reset or when the slider moves) and then followed step by step,
+    through joint collapse too; the camera stays put until you move it or press fit.
     A gold edge marks a joint on the outside of a sealed lump: every seam around the lump is closed, so no energy leaks in or out.</div>
 
   <h2>Run</h2>
@@ -191,12 +199,36 @@ const GLASS_FRAGMENT = `
     float alpha = mix(0.025, 0.93, strong) + 0.12 * edge;
     gl_FragColor = vec4(mix(clear, solid, smoothstep(0.0, 1.0, strong)), clamp(alpha, 0.0, 0.95));
   }`;
+/* Joints: near invisible at rest (alpha ~0.03), clear only as the squeeze nears the push limit (up to 0.5). */
+const JOINT_FRAGMENT = `
+  uniform vec3 clear;
+  uniform vec3 solid;
+  uniform float rest;
+  uniform float limit;
+  varying float vStrength;
+  varying float vFacing;
+  void main() {
+    float strong = clamp(vStrength, 0.0, 1.0);
+    gl_FragColor = vec4(mix(clear, solid, strong), mix(rest, limit, strong * strong));
+  }`;
+const LINE_VERTEX = `
+  attribute float strength;
+  varying float vStrength;
+  varying float vFacing;
+  void main() {
+    vStrength = strength;
+    vFacing = 1.0;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }`;
 
 const scene3d = { renderer: null, scene: null, camera: null, volumeMaterial: null, jointMaterial: null,
-  sealMaterial: null, volumes: null, joints: null, seals: null, show: { volumes: true, joints: true }, drawnCells: 0, drawnJoints: 0 };
+  jointLineMaterial: null, sealMaterial: null, volumes: null, joints: null, seals: null,
+  show: { volumes: true, joints: true }, jointStyle: "slabs", drawnCells: 0, drawnJoints: 0 };
 const orbit = { theta: 0.7, phi: 1.15, distance: 10, follow: true, centre: [0, 0, 0], reach: 1 };
-let latest = null;            // the latest shapes message, checked, with each cell's centre
+let latest = null;            // the latest shapes message, checked, with each cell's centre and the box side
 let drawLimit = DEFAULT_DRAWN;
+let tracked = new Map();      // id of each drawn energy volume -> its centre as drawn (unwrapped out of the periodic box)
+let reselect = true;          // pick the drawn energy volumes afresh on the next shapes message
 
 /** Make the renderer, scene, camera and the two glass materials (once, when three.js loaded). */
 function createScene() {
@@ -209,7 +241,12 @@ function createScene() {
     fragmentShader: GLASS_FRAGMENT, transparent: true, depthWrite: false, side: THREE.DoubleSide,
     uniforms: { clear: { value: cssColour(clear) }, solid: { value: cssColour(solid) } } });
   scene3d.volumeMaterial = glass("--volume-clear", "--volume-solid");
-  scene3d.jointMaterial = glass("--joint-clear", "--joint-solid");
+  const faint = (vertexShader, rest, limit) => new THREE.ShaderMaterial({ vertexShader,
+    fragmentShader: JOINT_FRAGMENT, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    uniforms: { clear: { value: cssColour("--joint-clear") }, solid: { value: cssColour("--joint-solid") },
+      rest: { value: rest }, limit: { value: limit } } });
+  scene3d.jointMaterial = faint(GLASS_VERTEX, 0.03, 0.5);
+  scene3d.jointLineMaterial = faint(LINE_VERTEX, 0.05, 0.6);
   scene3d.sealMaterial = new THREE.LineBasicMaterial({ color: cssColour("--sealed"), transparent: true, opacity: 0.95 });
 }
 
@@ -252,23 +289,72 @@ function checkShapes(message) {
     && cell.faces.every(goodPolygon)).map((cell) => ({ ...cell, centre: cellCentre(cell.faces) }));
   const joints = (Array.isArray(message.joints) ? message.joints : []).filter((joint) =>
     joint && Number.isInteger(joint.a) && Number.isInteger(joint.b) && goodPolygon(joint.polygon));
-  return { step: message.step, stats: message.stats || {}, cells, joints };
+  return { step: message.step, stats: message.stats || {}, cells, joints, side: boxSide(cells),
+    byId: new Map(cells.map((cell) => [cell.id, cell])) };
 }
 
-/** Middle of the box around every cell centre: the view centre the drawn cells are nearest to. */
-function viewCentre(cells) {
-  const low = [Infinity, Infinity, Infinity], high = [-Infinity, -Infinity, -Infinity];
+/** Side of the periodic cube the cells fill: the cube root of their summed volume (signed, by their faces). */
+function boxSide(cells) {
+  let sixTimes = 0;
   for (const cell of cells) {
-    cell.centre.forEach((value, axis) => { low[axis] = Math.min(low[axis], value); high[axis] = Math.max(high[axis], value); });
+    for (const face of cell.faces) {
+      const [firstX, firstY, firstZ] = face;
+      for (let at = 3; at + 5 < face.length; at += 3) {
+        const [nextX, nextY, nextZ, lastX, lastY, lastZ] = face.slice(at, at + 6);
+        sixTimes += firstX * (nextY * lastZ - nextZ * lastY) + firstY * (nextZ * lastX - nextX * lastZ)
+          + firstZ * (nextX * lastY - nextY * lastX);
+      }
+    }
   }
-  return Number.isFinite(low[0]) ? low.map((value, axis) => (value + high[axis]) / 2) : [0, 0, 0];
+  return Math.cbrt(Math.abs(sixTimes) / 6) || 1;
 }
 
-/** The `limit` cells nearest the view centre. */
-function nearestCells(cells, centre, limit) {
-  const distance = (cell) => Math.hypot(cell.centre[0] - centre[0], cell.centre[1] - centre[1], cell.centre[2] - centre[2]);
-  return cells.map((cell) => ({ cell, away: distance(cell) })).sort((first, second) => first.away - second.away)
-    .slice(0, limit).map((entry) => entry.cell);
+/** The periodic image of `point` nearest `reference`, in a cube of `side`. */
+function wrapNear(point, reference, side) {
+  return point.map((value, axis) => value - side * Math.round((value - reference[axis]) / side));
+}
+
+/** Squared distance between two points, along the shortest way round the periodic cube. */
+function wrappedDistance(point, reference, side) {
+  return wrapNear(point, reference, side).reduce((sum, value, axis) => sum + (value - reference[axis]) ** 2, 0);
+}
+
+/** Middle of the periodic cube: the camera looks here. */
+function boxMiddle() {
+  return latest ? [latest.side / 2, latest.side / 2, latest.side / 2] : [0, 0, 0];
+}
+
+/** Pick the `drawLimit` energy volumes nearest the box middle, each placed at its image nearest the middle. */
+function selectTracked() {
+  const middle = boxMiddle();
+  tracked = new Map(latest.cells.map((cell) => ({ id: cell.id, at: wrapNear(cell.centre, middle, latest.side) }))
+    .map((entry) => ({ ...entry, away: Math.hypot(...entry.at.map((value, axis) => value - middle[axis])) }))
+    .sort((first, second) => first.away - second.away).slice(0, drawLimit).map((entry) => [entry.id, entry.at]));
+}
+
+/**
+ * Follow the drawn energy volumes to the new message. The box scaled by `ratio` about the origin, so each
+ * drawn centre is first scaled. Ids only change by joint collapse, which renumbers in order of the lowest
+ * old id with `removed` volumes gone: an old id k is now in k-removed..k. With no collapse the id is kept;
+ * after one, the nearest volume in that id window is taken, and volumes that fell into one are drawn once.
+ * Each centre goes to its periodic image nearest where it was, so a volume never jumps across the box.
+ */
+function followTracked(ratio, removed) {
+  const next = new Map(), side = latest.side;
+  for (const [id, at] of tracked) {
+    const predicted = at.map((value) => value * ratio);
+    let cell = removed === 0 ? latest.byId.get(id) : null;
+    if (removed !== 0) {
+      let best = Infinity;
+      for (let candidate = Math.max(0, id - removed); candidate <= id; candidate++) {
+        const here = latest.byId.get(candidate), away = here ? wrappedDistance(here.centre, predicted, side) : Infinity;
+        if (away < best) { best = away; cell = here; }
+      }
+    }
+    if (!cell || next.has(cell.id)) continue;
+    next.set(cell.id, wrapNear(cell.centre, predicted, side));
+  }
+  tracked = next;
 }
 
 /** Empty buffers for `vertexTotal` corners and `indexTotal` triangle indices, with write cursors. */
@@ -292,18 +378,23 @@ function writePolygon(points, normal, strength, buffers) {
   buffers.vertex += corners;
 }
 
-/** Write one cell's own faces, each shrunk toward the cell's centre. */
-function writeCell(cell, buffers) {
+/** A flat xyz list moved by `shift` (one periodic-image offset). */
+function shifted(points, shift) {
+  return points.map((value, index) => value + shift[index % 3]);
+}
+
+/** Write one cell's own faces, moved by `shift`, each shrunk toward the cell's centre. */
+function writeCell(cell, shift, buffers) {
   const strength = unit(cell.pull);
   for (const face of cell.faces) {
     const shrunk = face.map((value, index) => cell.centre[index % 3] + (value - cell.centre[index % 3]) * SHRINK);
-    writePolygon(shrunk, polygonNormal(face), strength, buffers);
+    writePolygon(shifted(shrunk, shift), polygonNormal(face), strength, buffers);
   }
 }
 
-/** Write one joint as a slab on its face: two caps half its thickness either side, joined by sides. */
-function writeJoint(joint, buffers) {
-  const points = joint.polygon, corners = points.length / 3, normal = polygonNormal(points);
+/** Write one joint, moved by `shift`, as a slab on its face: two caps half its real thickness either side, joined by sides. */
+function writeJoint(joint, shift, buffers) {
+  const points = shifted(joint.polygon, shift), corners = points.length / 3, normal = polygonNormal(points);
   const half = Number.isFinite(joint.thickness) && joint.thickness > 0 ? joint.thickness / 2 : 0;
   const offset = (sign) => points.map((value, index) => value + sign * normal[index % 3] * half);
   const top = offset(1), bottom = offset(-1), strength = unit(joint.push);
@@ -316,21 +407,26 @@ function writeJoint(joint, buffers) {
   }
 }
 
-/** Gold outlines of the given joints' faces (each polygon's corners joined in a ring), as one line set. */
-function sealLines(joints) {
-  const corners = [];
+/**
+ * Outlines of the given joints' faces (each polygon's corners joined in a ring, moved by its first volume's
+ * shift), as one line set in `material`, each segment carrying its joint's push as strength.
+ */
+function outlineLines(joints, shifts, material, order) {
+  const corners = [], strengths = [];
   for (const joint of joints) {
-    const points = joint.polygon, count = points.length / 3;
+    const points = shifted(joint.polygon, shifts.get(joint.a)), count = points.length / 3, strength = unit(joint.push);
     for (let corner = 0; corner < count; corner++) {
       const next = (corner + 1) % count;
       corners.push(...points.slice(corner * 3, corner * 3 + 3), ...points.slice(next * 3, next * 3 + 3));
+      strengths.push(strength, strength);
     }
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(corners), 3));
-  const lines = new THREE.LineSegments(geometry, scene3d.sealMaterial);
+  geometry.setAttribute("strength", new THREE.BufferAttribute(new Float32Array(strengths), 1));
+  const lines = new THREE.LineSegments(geometry, material);
   lines.frustumCulled = false;
-  lines.renderOrder = 3;
+  lines.renderOrder = order;
   return lines;
 }
 
@@ -357,42 +453,52 @@ function clearMeshes() {
   }
 }
 
-/** Rebuild the drawn cells and joints from the latest shapes: the nearest cells and the joints between them. */
+/** Joint slabs as one glass mesh, each moved by its first volume's shift. */
+function jointSlabs(joints, shifts) {
+  let corners = 0, indices = 0;
+  for (const joint of joints) {
+    const count = joint.polygon.length / 3;
+    corners += count * 6; indices += (count - 2) * 6 + count * 6;
+  }
+  const buffers = makeBuffers(corners, indices);
+  joints.forEach((joint) => writeJoint(joint, shifts.get(joint.a), buffers));
+  return glassMesh(buffers, scene3d.jointMaterial, 2);
+}
+
+/** Rebuild from the latest shapes: exactly the tracked energy volumes, and the joints between two of them. */
 function rebuild() {
   if (!scene3d.renderer || !latest) return;
-  orbit.centre = viewCentre(latest.cells);
-  const drawn = nearestCells(latest.cells, orbit.centre, drawLimit);
-  const drawnIds = new Set(drawn.map((cell) => cell.id));
-  const joints = latest.joints.filter((joint) => drawnIds.has(joint.a) && drawnIds.has(joint.b));
-  let cellCorners = 0, cellIndex = 0, jointCorners = 0, jointIndex = 0;
+  orbit.centre = boxMiddle();
+  const drawn = [...tracked.keys()].map((id) => latest.byId.get(id)).filter(Boolean);
+  const shifts = new Map(drawn.map((cell) => [cell.id, tracked.get(cell.id).map((value, axis) => value - cell.centre[axis])]));
+  const joints = latest.joints.filter((joint) => shifts.has(joint.a) && shifts.has(joint.b));
+  let cellCorners = 0, cellIndex = 0;
   for (const cell of drawn) {
     for (const face of cell.faces) { cellCorners += face.length / 3; cellIndex += (face.length / 3 - 2) * 3; }
   }
-  for (const joint of joints) {
-    const corners = joint.polygon.length / 3;
-    jointCorners += corners * 6; jointIndex += (corners - 2) * 6 + corners * 6;
-  }
-  const cellBuffers = makeBuffers(cellCorners, cellIndex), jointBuffers = makeBuffers(jointCorners, jointIndex);
-  drawn.forEach((cell) => writeCell(cell, cellBuffers));
-  joints.forEach((joint) => writeJoint(joint, jointBuffers));
+  const cellBuffers = makeBuffers(cellCorners, cellIndex);
+  drawn.forEach((cell) => writeCell(cell, shifts.get(cell.id), cellBuffers));
   clearMeshes();
   scene3d.volumes = glassMesh(cellBuffers, scene3d.volumeMaterial, 1);
-  scene3d.joints = glassMesh(jointBuffers, scene3d.jointMaterial, 2);
-  scene3d.seals = sealLines(joints.filter((joint) => joint.sealed === true));
+  scene3d.joints = scene3d.jointStyle === "lines"
+    ? outlineLines(joints, shifts, scene3d.jointLineMaterial, 2) : jointSlabs(joints, shifts);
+  scene3d.seals = outlineLines(joints.filter((joint) => joint.sealed === true), shifts, scene3d.sealMaterial, 3);
   scene3d.scene.add(scene3d.volumes, scene3d.joints, scene3d.seals);
   scene3d.drawnCells = drawn.length;
   scene3d.drawnJoints = joints.length;
-  orbit.reach = drawnReach(drawn, orbit.centre);
+  orbit.reach = drawnReach(drawn, shifts, orbit.centre);
   showParts();
 }
 
-/** Distance from the view centre to the farthest drawn corner. */
-function drawnReach(cells, centre) {
+/** Distance from the view centre to the farthest drawn corner (each cell moved by its shift). */
+function drawnReach(cells, shifts, centre) {
   let reach = 1e-6;
   for (const cell of cells) {
+    const shift = shifts.get(cell.id);
     for (const face of cell.faces) {
       for (let index = 0; index < face.length; index += 3) {
-        reach = Math.max(reach, Math.hypot(face[index] - centre[0], face[index + 1] - centre[1], face[index + 2] - centre[2]));
+        reach = Math.max(reach, Math.hypot(face[index] + shift[0] - centre[0], face[index + 1] + shift[1] - centre[1],
+          face[index + 2] + shift[2] - centre[2]));
       }
     }
   }
@@ -425,7 +531,10 @@ function fitDistance() {
 /** Point the camera at the view centre from the orbit's angles and distance. */
 function placeCamera() {
   const camera = scene3d.camera, width = window.innerWidth, height = window.innerHeight;
-  if (orbit.follow) orbit.distance = fitDistance();
+  if (orbit.follow && scene3d.drawnCells > 0) {   // fit once (reset, new selection or the fit button), then hold still
+    orbit.distance = fitDistance();
+    orbit.follow = false;
+  }
   const [centreX, centreY, centreZ] = orbit.centre, { theta, phi, distance } = orbit;
   camera.position.set(centreX + distance * Math.sin(phi) * Math.cos(theta), centreY + distance * Math.cos(phi),
     centreZ + distance * Math.sin(phi) * Math.sin(theta));
@@ -544,8 +653,18 @@ document.getElementById("reset").addEventListener("click", () => {
   send({ type: "reset", seed, cells });
   setRunning(false);
   lastStep = -1;
-  orbit.follow = true;
+  reselect = true;
 });
+
+for (const button of document.querySelectorAll("button.jointStyle")) {
+  button.addEventListener("click", () => {
+    scene3d.jointStyle = button.dataset.style;
+    for (const other of document.querySelectorAll("button.jointStyle")) {
+      other.setAttribute("aria-pressed", String(other === button));
+    }
+    rebuild();
+  });
+}
 
 for (const button of document.querySelectorAll("button.show")) {
   button.addEventListener("click", () => {
@@ -673,7 +792,13 @@ const drawSlider = labelledSlider("cells to draw (nearest the view centre)", doc
   drawLimit = Math.round(DRAW_RANGE[0] * Math.pow(DRAW_RANGE[1] / DRAW_RANGE[0], position / 1000));
   showDrawLimit();
   clearTimeout(rebuildTimer);
-  rebuildTimer = setTimeout(() => { rebuild(); showStats(); }, 60);
+  rebuildTimer = setTimeout(() => {
+    if (!latest) return;
+    selectTracked();
+    orbit.follow = true;
+    rebuild();
+    showStats();
+  }, 60);
 });
 
 /** Show the draw limit on its slider, "all" once it reaches every energy volume. */
@@ -712,9 +837,18 @@ function showOffline() {
 /** Take in a shapes message: draw exactly its cells and joints, show its stats. */
 function applyShapes(message) {
   if (message.step > lastStep && lastStep >= 0 && !running) setRunning(true);
+  if (message.step < lastStep) reselect = true;          // the simulation was reset (here or by another page)
   lastStep = message.step;
+  const previous = latest;
   latest = checkShapes(message);
   if (latest.stats.joints === 0) setRunning(false);
+  if (reselect || !previous || tracked.size === 0) {
+    selectTracked();
+    reselect = false;
+    orbit.follow = true;
+  } else {
+    followTracked(latest.side / previous.side, Math.max(0, previous.cells.length - latest.cells.length));
+  }
   rebuild();
   showDrawLimit();
   showStats();
@@ -735,7 +869,7 @@ function connect() {
     if (THREE_READY) offline.hidden = true; else showNoThree();
     setRunning(false);
     lastStep = -1;
-    orbit.follow = true;
+    reselect = true;
   });
   socket.addEventListener("message", (event) => {
     let message;
