@@ -41,12 +41,12 @@ The core depth/seam vocabulary used by `improve-codebase-architecture`, `tdd`, `
 
 ## Quantum-relativity theory (physics/)
 
-- **quantum-relativity theory**: the owner's hobby theory that space, matter and forces all come from one network of joints and connections carrying energy. Rules in `docs/bible.md#physicsquantum-relativity`. _Avoid_: connection theory (its earlier name, which covered only the network), string theory, theory of everything, the model.
-- **joint**: a point of the network where connections meet; it carries a type (charge) and pushes on the energy in its connections. _Avoid_: node, vertex, particle, point.
-- **connection**: a link between two joints that holds energy; its length follows from its energy (more energy, shorter). _Avoid_: edge, link, string, bond.
-- **drift**: the small built-in lengthening of every connection in the base state; the proposed cause of expansion. _Avoid_: dark energy (that is what drift may explain, not the rule), inflation, stretch.
-- **energy volume**: the volume a region of the network takes up, set by the energy in it; it decides how hard that region pulls. _Avoid_: mass, energy density, gravity source.
-- **joint collapse**: a joint giving way when the pull squeezing it passes its limit, so its connections fall into each other; the network's version of gravitational collapse. _Avoid_: black hole (what collapse may produce, not the rule), merge, implosion.
+- **quantum-relativity theory**: the owner's hobby theory that space, matter and forces all come from one woven grid of energy volumes and joints. Rules in `docs/bible.md#physicsquantum-relativity`. _Avoid_: connection theory (its earlier name, which covered only the network), string theory, theory of everything, the model.
+- **joint**: a pushing volume on one side of an energy volume, between it and its neighbour; it keeps the two from falling into each other, up to its limit. _Avoid_: node, vertex, particle, point (it was a point until 2026-11-14; now it is a volume).
+- **connection**: the pull between two neighbouring energy volumes, through the joint between them; it has no volume of its own. _Avoid_: edge, link, string, bond.
+- **drift**: the small built-in growth of every energy volume in the base state; the proposed cause of expansion. _Avoid_: dark energy (that is what drift may explain, not the rule), inflation, stretch.
+- **energy volume**: a tetrahedral cell of space holding energy inside it; more energy makes it smaller and pulls harder. Energy volumes and joints together fill space with no gaps. _Avoid_: mass, energy density, gravity source, region.
+- **joint collapse**: a joint giving way when the squeeze on it passes its limit, so the two energy volumes it separated merge, keeping their energy; the network's version of gravitational collapse. _Avoid_: black hole (what collapse may produce, not the rule), merge, implosion.
 - **reference spacetime**: a network built from points scattered in a flat space or spacetime whose true dimension and proper times are known; used to validate a measurement before it is trusted. _Avoid_: test grid, ground truth, toy universe.
 
 ## Project vocabulary

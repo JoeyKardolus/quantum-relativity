@@ -920,14 +920,14 @@ particles in space. Code that breaks a rule below is simulating something else.
 
 ### The rules
 
-1. **Only relations are fundamental.** There is no background space: the network of joints and connections *is* space. The code stores no coordinates for joints; distance, dimension and curvature are measured from the network alone (paths, neighbour counts, random walks).
-2. **Space is filled with energy** held by connections, and energy can travel through the network.
-3. **The network is not uniform and not static**: its shape and size follow the energy in it. Connections have no shape of their own; "shape" is energy being more or less concentrated.
-4. **Energy sets length**: length = constant ÷ energy, so doubling a connection's energy halves its length (like E = hc/λ). Too much energy packs a region tighter.
-5. **Energy oscillates** along a connection between its two joints, slightly differently depending on those joints.
-6. **Drift**: in the base state every connection slowly lengthens. This is the proposed mechanism for the expansion of the universe and for redshift (a longer connection holds less energy). Drift is the same everywhere; dense regions differ only because attraction works against it, so gravitational redshift near a dense region must come out of attraction, not out of a separate drift setting.
-7. **Attraction**: pull is decided by a region's energy volume, and the energy volume is decided by the energy in that region (gravity-like). More energy shrinks the region, and a small, packed region pulls harder than a large, thin one. Pull does not come from neighbouring connections tugging. Pull reaches other regions by spreading out through the connections, weaker the more connections lie in between, the way gravity fades with distance.
-8. **Joint repulsion**: joints push (electromagnetism-like), not across empty space but by pushing on the energy in their connections. A push stretches a connection, which lowers its energy, so force, energy and length are one thing seen from three sides. A joint pushes back harder the more the pull squeezes it, up to a limit; past that limit comes joint collapse: the joint gives way and its connections fall into each other, keeping all their energy. The region gets smaller and more packed, so it pulls harder and the collapse runs away (the network's version of a star collapsing into a black hole).
+1. **Only relations are fundamental.** There is no background space: a woven grid of cells *is* space and fills it with no gaps. The code stores no coordinates; distance, dimension and curvature are measured from the grid alone (paths, neighbour counts, random walks).
+2. **Two kinds of cell.** **Energy volumes** are tetrahedra that hold energy inside them. On each of a tetrahedron's 4 sides sits a **joint**: a pushing volume between it and its neighbour. A **connection** is the pull between two neighbouring energy volumes, through the joint between them; it has no volume of its own.
+3. **The grid is not uniform and not static**: its shape and size follow the energy in it. "Shape" is energy being more or less concentrated.
+4. **Energy sets volume**: more energy makes an energy volume smaller and more packed, as length = constant ÷ energy (like E = hc/λ).
+5. **Energy oscillates** between neighbouring energy volumes through their joints, slightly differently depending on the joints.
+6. **Drift**: in the base state every energy volume slowly grows. This is the proposed mechanism for expansion and redshift (a bigger volume holds its energy less packed). Drift is the same everywhere; dense regions differ only because attraction works against it.
+7. **Attraction**: energy volumes pull on each other, mass attracting mass; a small, packed volume pulls harder than a large, thin one. Pull spreads from volume to volume through the connections, weaker the more lie in between, the way gravity fades with distance.
+8. **Joint push**: joints push back (electromagnetism-like), keeping energy volumes from falling into each other. A joint pushes harder the more it is squeezed, up to a limit; past it comes joint collapse: the joint gives way and the two energy volumes merge, keeping all their energy. The merged volume is more packed, pulls harder, and the collapse runs away (a star collapsing into a black hole).
 9. **Entanglement**: two connections can carry the same signal strength, inverted, so their behaviour is linked through the network.
 
 ### Open problems
