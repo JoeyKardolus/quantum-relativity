@@ -9,7 +9,7 @@ Contract: `pull_potential(grid)` returns one potential per energy volume, >= 0:
                about sqrt(4 / GROUND) ~ 6 volumes on a 4-joint grid) and the system
                is symmetric positive definite. The full energy is the source, not
                its unevenness: even space feels a background pull of
-               energy / GROUND everywhere, which drift balances.
+               energy / GROUND everywhere.
 """
 from __future__ import annotations
 

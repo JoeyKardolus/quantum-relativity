@@ -8,13 +8,12 @@ Module map:
   build_grid.py       build_grid: periodic tetrahedra as scaffolding, then dropped
   settings.py         CellSettings: rule strengths, all_on() defaults
   pull_potential.py   pull_potential: grounded graph-Poisson spread of energy
-  energy_flow.py      energy_flow: conserved flow between neighbours through joints
+  leak.py             leak: each volume leaks energy to its neighbours by their pull
   share_space.py      share_space: an energy volume hands space to its joints by their size
-  move_space.py       move_space: pull, push, drift, energy-volume rule, flow; no collapse
+  move_space.py       move_space: pull, push, energy-volume rule, leak; no collapse
   joint_collapse.py   joint_collapse: joints that gave way, volumes fall into each other
   joint_squeeze.py    joint_squeeze: 0..1 how close each joint is to its limit, for drawing
   step.py             step: move_space, then collapse of joints below their limit
-  balancing_drift.py  balancing_drift: drift that keeps even space's total space steady
   grid_stats.py       grid_stats: cells, collapsed, size, joint share, packing spread, lumps
 """
 from physics.cells.grid import Grid
@@ -23,15 +22,14 @@ from physics.cells.joint_rest import joint_rest
 from physics.cells.settings import CellSettings
 from physics.cells.build_grid import build_grid
 from physics.cells.pull_potential import pull_potential
-from physics.cells.energy_flow import energy_flow
+from physics.cells.leak import leak
 from physics.cells.share_space import share_space
 from physics.cells.move_space import move_space
 from physics.cells.joint_collapse import joint_collapse
 from physics.cells.joint_squeeze import joint_squeeze
 from physics.cells.step import step
-from physics.cells.balancing_drift import balancing_drift
 from physics.cells.grid_stats import grid_stats
 
 __all__ = ["Grid", "VOLUME_SCALE", "rest_volume", "joint_rest", "CellSettings", "build_grid",
-           "pull_potential", "energy_flow", "share_space", "move_space", "joint_collapse",
-           "joint_squeeze", "step", "balancing_drift", "grid_stats"]
+           "pull_potential", "leak", "share_space", "move_space", "joint_collapse",
+           "joint_squeeze", "step", "grid_stats"]

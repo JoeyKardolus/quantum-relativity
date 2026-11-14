@@ -20,7 +20,7 @@ def test_the_simulation_steps_and_a_reset_is_reproducible_by_seed():
         first.advance()
         second.advance()
     assert first.steps == 3
-    assert float(first.grid.volume.sum()) != start_volume      # drift is always on
+    assert float(first.grid.volume.sum()) != start_volume      # pull and the leak are always on
     assert np.array_equal(first.grid.energy, second.grid.energy)
     assert np.array_equal(first.grid.volume, second.grid.volume)
     assert np.allclose(first.layout(), second.layout())
@@ -53,8 +53,8 @@ def test_the_layout_puts_neighbours_at_their_radius_sum_and_skips_wrap_around_jo
 
 def test_settings_are_clamped_to_their_range_and_unknown_names_refused():
     simulation = Simulation(CELLS, seed=1)
-    simulation.apply({"energy_flow": 7.0, "speed": 0.0})
-    assert simulation.settings.energy_flow == simulation.ranges["energy_flow"][1] <= 1.0
+    simulation.apply({"leak": 7.0, "speed": 0.0})
+    assert simulation.settings.leak == simulation.ranges["leak"][1] <= 1.0
     assert simulation.speed == simulation.ranges["speed"][0]
     with pytest.raises(ValueError):
         simulation.apply({"gravity": 1.0})

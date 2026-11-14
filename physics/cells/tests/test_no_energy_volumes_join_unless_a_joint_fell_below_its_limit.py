@@ -1,13 +1,14 @@
 """No two energy volumes ever join unless a joint between them fell below its limit.
 
-For 200 steps, at the default settings and with strong pull (attraction four
-times the default, so joints settle below their limit and collapses happen),
+For 200 steps, with weak pull (attraction 0.002, where no joint reaches its
+limit in 200 steps) and at the default settings (attraction 0.005: with no drift
+balancing pull, space shrinks until joints give way and collapses happen),
 each step's moved grid (move_space) is checked here independently: the joints
 whose volume is below push_limit * joint_rest * (V_a + V_b) / 2 are found, and
 step's merged_into must group old energy volumes exactly as the connected
 components of those joints do. Two volumes with no chain of below-limit joints
-between them must stay apart. The strong-pull run must see collapses and the
-default run must see none, so both directions are exercised.
+between them must stay apart. The default run must see collapses and the
+weak-pull run must see none, so both directions are exercised.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ import pytest
 import scipy.sparse as sp
 from scipy.sparse.csgraph import connected_components
 
-from physics.cells import CellSettings, balancing_drift, build_grid, move_space, step
+from physics.cells import CellSettings, build_grid, move_space, step
 
 STEPS = 200
 
@@ -30,12 +31,10 @@ def _below_limit_groups(moved, settings):
     return connected_components(links, directed=False)[1]
 
 
-@pytest.mark.parametrize("attraction, collapses", [(0.005, False), (0.02, True)])
+@pytest.mark.parametrize("attraction, collapses", [(0.002, False), (0.005, True)])
 def test_joining_only_through_joints_below_their_limit(attraction, collapses):
     grid, _ = build_grid(600, seed=11, unevenness=0.1)
-    even, _ = build_grid(600, seed=11, unevenness=0.0)
-    settings = CellSettings.all_on(attraction=attraction,
-                                   drift=balancing_drift(even, CellSettings.all_on()))
+    settings = CellSettings.all_on(attraction=attraction)
     collapsed = 0
     for _ in range(STEPS):
         groups = _below_limit_groups(move_space(grid, settings), settings)

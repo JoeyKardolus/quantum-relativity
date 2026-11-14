@@ -10,7 +10,7 @@ Contract: a frozen record of
                 1 for a joint at its collapse limit (step.py gives the formula)
   charge        (n,) per energy volume, zeros for now (what charge is, is still open)
   merged_into   None at the start; after a step, merged_into[old_cell] = that cell's index now
-total_energy() is the sum of energy, the quantity joint collapse and energy flow keep.
+total_energy() is the sum of energy, the quantity joint collapse and the leak keep.
 total_space() is the sum of energy volumes plus the sum of joint volumes: all of space,
 since energy volumes and joints fill it with no gaps.
 """

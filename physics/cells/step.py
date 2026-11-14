@@ -3,14 +3,15 @@
 Contract: `step(grid, settings)` returns a new Grid, possibly with fewer energy
 volumes (joint collapse), merged_into mapping every old volume to its new index:
   1. move     moved = move_space(grid, settings): pull squeezes joints, joints push
-              back taking space from their energy volumes, drift, the energy-volume
-              rule and energy flow (move_space.py has the formulas).
+              back taking space from their energy volumes, the energy-volume rule
+              and the leak (move_space.py has the formulas).
   2. collapse a joint gives way only when its volume fell below its limit,
               J < push_limit * R, R = joint_rest(moved volume, joints, joint_rest);
               its two energy volumes fall into each other (joint_collapse.py),
               keeping all energy and all space. No other path joins two volumes.
   3. squeeze  set to joint_squeeze(result, settings), for drawing only.
-Total space changes only by pull and drift. Deterministic: the same grid and
+Total space changes only by pull (shrinks it) and the leak (drift: volumes
+it drains grow). Deterministic: the same grid and
 settings give the same result.
 """
 from __future__ import annotations

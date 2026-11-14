@@ -3,8 +3,8 @@
 Contract: `Simulation(cells, seed, unevenness, speed)` resets at once.
 `reset(seed, cells)` builds the start (`build_grid`: energy slightly uneven
 everywhere by `unevenness`, no lump placed), sets `settings` to all rules on
-with the drift balanced on the even grid of the same seed (`balancing_drift`,
-the one calibration), and lays the energy volumes out for display: build_grid's
+at their defaults (`CellSettings.all_on()`, leak included), and lays the
+energy volumes out for display: build_grid's
 display positions scaled so neighbours sit about one radius sum apart, then
 `cell_layout` START_ITERATIONS times. Any rule setting changed before is
 dropped; unevenness and speed are kept. Unevenness is a start condition, so a
@@ -30,7 +30,7 @@ import numpy as np
 
 from physics.app.cell_layout import cell_layout
 from physics.app.setting_ranges import setting_ranges
-from physics.cells import CellSettings, Grid, balancing_drift, build_grid, step
+from physics.cells import CellSettings, Grid, build_grid, step
 from physics.viewer.carry_positions import carry_positions
 
 START_ITERATIONS = 40
@@ -48,10 +48,9 @@ class Simulation:
         self.reset(seed, cells)
 
     def reset(self, seed: int, cells: int) -> None:
-        """Fresh uneven grid, recalibrated settings and a new display layout."""
+        """Fresh uneven grid, default settings and a new display layout."""
         self.grid, start_positions = build_grid(cells, seed, self.unevenness)
-        even, _ = build_grid(cells, seed, 0.0)
-        self.settings = CellSettings.all_on(drift=balancing_drift(even, CellSettings.all_on()))
+        self.settings = CellSettings.all_on()
         self.ranges = setting_ranges(self.settings)
         self.seed = seed
         self.steps = 0
