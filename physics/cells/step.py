@@ -17,7 +17,8 @@ old one as it was. Deterministic: the same engine and settings give the same res
                it, so the box follows; positions scale by the side ratio, weights by
                its square, which changes no shape.
   5. shapes    the new positions and weights are tessellated (tessellate.py), and
-               the grid's joints become exactly its shared faces (reconcile_joints.py):
+               the grid's joints become exactly its shared faces and its seams
+               exactly its edges (reconcile_joints.py):
                joint volumes carried by pair, new faces at rest volume, vanished
                faces' volume handed back; total space kept.
 collapses grows by the energy volumes that fell in; grid.merged_into maps each old
@@ -50,7 +51,7 @@ def step(engine: Engine, settings: EngineSettings) -> Engine:
                           target_size(ruled) / ratio ** 3) * ratio ** 2
     positions = np.mod(moved * ratio, side)
     tessellation = tessellate(positions, weights, side)
-    grid = reconcile_joints(ruled, tessellation.pairs, settings)
+    grid = reconcile_joints(ruled, tessellation.pairs, tessellation.seams, settings)
     return Engine(grid=grid, positions=positions, weights=weights, side=side,
                   tessellation=tessellation,
                   collapses=engine.collapses + before.cell_count - ruled.cell_count,

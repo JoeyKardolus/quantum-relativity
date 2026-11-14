@@ -10,7 +10,10 @@ two thirds of the time re-validating input this module already checks: finite
 values, weights turned into radii sqrt(w - min w), positions wrapped into the
 half-open box, no two positions closer than MIN_GAP times the mean spacing).
 Volumes come from voro++; centroids and face areas are summed here from each
-face's fan of triangles around the cell's mean corner. A cell can come out empty
+face's fan of triangles around the cell's mean corner. Seams are the edges:
+within a cell, an edge (two consecutive corners of a face) lies on exactly two
+of its faces, and the cell with those two faces' other cells are the three around
+it. A cell can come out empty
 (no faces, volume 0) when its weight is far below its neighbours'; it then has
 no joints. Raises ValueError for non-finite input or two positions too close.
 """
@@ -81,7 +84,8 @@ def tessellate(positions: np.ndarray, weights: np.ndarray, side: float) -> Tesse
                         face_start=face_start, face_size=face_size, pairs=pairs,
                         face_joint=face_joint,
                         pair_area=np.bincount(face_joint[lower], face_area[lower], len(pairs)),
-                        pair_gap=_gaps(wrapped, pairs, side))
+                        pair_gap=_gaps(wrapped, pairs, side),
+                        seams=_seams(shifted, face_start, face_size, face_cell, face_other))
 
 
 def _checked(positions: np.ndarray, weights: np.ndarray, side: float) -> np.ndarray:
@@ -134,6 +138,30 @@ def _pairs(face_cell: np.ndarray, face_other: np.ndarray) -> tuple[np.ndarray, n
     face_joint = np.full(len(face_cell), -1, dtype=np.int64)
     face_joint[shared] = slot.ravel()
     return pairs.astype(np.int64).reshape(-1, 2), face_joint
+
+
+def _seams(vertex: np.ndarray, face_start: np.ndarray, face_size: np.ndarray,
+           face_cell: np.ndarray, face_other: np.ndarray) -> np.ndarray:
+    """Sorted unique triples (a < b < c) of the three distinct cells around each edge.
+
+    `vertex` is each corner's vertex id, unique per cell, so an edge key (two ids)
+    is found only within its own cell, on the two faces of that cell it borders.
+    """
+    face_of = np.repeat(np.arange(len(face_size)), face_size)
+    position = np.arange(len(vertex))
+    ring_end = face_start[face_of] + face_size[face_of]
+    following = np.where(position + 1 == ring_end, face_start[face_of], position + 1)
+    ends = np.sort(np.column_stack([vertex, vertex[following]]), axis=1)
+    _, inverse, counts = np.unique(ends, axis=0, return_inverse=True, return_counts=True)
+    inverse = inverse.ravel()
+    on_two = counts[inverse] == 2
+    order = np.argsort(inverse[on_two], kind="stable")
+    bordering = face_of[on_two][order].reshape(-1, 2)
+    triples = np.column_stack([face_cell[bordering[:, 0]], face_other[bordering[:, 0]],
+                               face_other[bordering[:, 1]]])
+    distinct = ((triples[:, 0] != triples[:, 1]) & (triples[:, 0] != triples[:, 2])
+                & (triples[:, 1] != triples[:, 2]))
+    return np.unique(np.sort(triples[distinct], axis=1), axis=0).astype(np.int64).reshape(-1, 3)
 
 
 def _gaps(positions: np.ndarray, pairs: np.ndarray, side: float) -> np.ndarray:

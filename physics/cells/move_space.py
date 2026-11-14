@@ -19,10 +19,12 @@ the grid at the start:
   4. settle   V = rest_volume(E); each energy volume hands the space it gave up
               (or takes the space it gained) to its own joints in proportion to
               their volumes (share_space.py): S is kept.
-  5. leak     E = leak(joints, E, attraction * p / 2, settings.leak) (leak.py):
-              each volume leaks that share of its energy to its neighbours, by how
-              hard each pulls (share_b = p_b / sum of p over the leaker's
-              neighbours); total energy kept exactly. Then V = rest_volume(E):
+  5. leak     E = leak(joints, seams, E, attraction * p / 2, openness, settings.leak)
+              (leak.py), openness = seam_openness(grid) at the start: each volume
+              leaks that share of its energy, times its seams' mean openness, along
+              its open seams to its neighbours by how hard each pulls (share_b =
+              p_b g_ab / sum_k p_k g_ak, g a joint's seams' mean openness); a
+              sealed seam passes nothing; total energy kept exactly. Then V = rest_volume(E):
               volume follows energy, and the change is new space (drift), not taken
               from joints. A drained volume grows, a fed one shrinks; rest_volume
               is convex in E, so concentrating energy grows S and evening it shrinks S.
@@ -41,6 +43,7 @@ from physics.cells.joint_rest import joint_rest
 from physics.cells.leak import leak
 from physics.cells.pull_potential import pull_potential
 from physics.cells.rest_volume import VOLUME_SCALE, rest_volume
+from physics.cells.seam_openness import seam_openness
 from physics.cells.engine_settings import EngineSettings
 from physics.cells.share_space import share_space
 
@@ -48,6 +51,7 @@ from physics.cells.share_space import share_space
 def move_space(grid: Grid, settings: EngineSettings) -> Grid:
     """One round of pull, push, energy-volume rule and leak; joints never give way here."""
     exerted = settings.attraction * pull_potential(grid) / 2
+    openness = seam_openness(grid, settings)
     heads, tails = grid.joints[:, 0], grid.joints[:, 1]
     pulled = grid.joint_volume * np.exp(-(exerted[heads] + exerted[tails]))
     swell = _swell(grid, settings, pulled)
@@ -57,7 +61,7 @@ def move_space(grid: Grid, settings: EngineSettings) -> Grid:
     mismatch = np.log(grid.energy * np.cbrt(volume) / VOLUME_SCALE)
     energy = grid.energy * np.exp(-mismatch / 2)
     joint_volume = share_space(grid.joints, pulled + swell, volume - rest_volume(energy))
-    leaked = leak(grid.joints, energy, exerted, settings.leak)
+    leaked = leak(grid.joints, grid.seams, energy, exerted, openness, settings.leak)
     return replace(grid, energy=leaked, volume=rest_volume(leaked), merged_into=None,
                    joint_volume=joint_volume)
 

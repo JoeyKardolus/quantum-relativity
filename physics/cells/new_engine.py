@@ -6,7 +6,8 @@ exactly `cells` energy volumes:
   volume     rest_volume(energy): the energy-volume rule
   positions  uniform at random in the box (seeded); weights 0 (plain Voronoi)
   joints     the shared faces of their tessellation, each at its rest volume
-             (joint_rest.py, the EngineSettings.all_on() share), squeeze 0
+             (joint_rest.py, the EngineSettings.all_on() share), squeeze 0;
+             seams its edges, all open
   side       total_space() ** (1/3) (a plain Voronoi tessellation does not
              depend on the box's scale, so the faces are found in a unit box first)
   settle     SETTLE_ROUNDS (12) rounds of the shapes part of step() with no rule:
@@ -46,10 +47,12 @@ def new_engine(cells: int, seed: int, unevenness: float) -> Engine:
     volume = rest_volume(energy)
     unit = rng.random((cells, 3))
     weights = np.zeros(cells)
-    pairs = tessellate(unit, weights, 1.0).pairs
+    first = tessellate(unit, weights, 1.0)
+    pairs = first.pairs
     grid = Grid(cell_count=cells, joints=pairs, energy=energy, volume=volume,
                 joint_volume=joint_rest(volume, pairs, settings.joint_rest),
-                squeeze=np.zeros(len(pairs)), charge=np.zeros(cells))
+                squeeze=np.zeros(len(pairs)), charge=np.zeros(cells), seams=first.seams,
+                seam_open=np.ones(len(first.seams)))
     side = float(np.cbrt(grid.total_space()))
     positions = unit * side
     tessellation = tessellate(positions, weights, side)
@@ -58,7 +61,7 @@ def new_engine(cells: int, seed: int, unevenness: float) -> Engine:
         positions = move_seeds(positions, tessellation, grid.joints, grid.squeeze, side)
         weights = fit_weights(weights, tessellation, everyone, target_size(grid))
         tessellation = tessellate(positions, weights, side)
-        grid = reconcile_joints(grid, tessellation.pairs, settings)
+        grid = reconcile_joints(grid, tessellation.pairs, tessellation.seams, settings)
     return Engine(grid=grid, positions=positions, weights=weights, side=side,
                   tessellation=tessellation, collapses=0, start_space=grid.total_space())
 

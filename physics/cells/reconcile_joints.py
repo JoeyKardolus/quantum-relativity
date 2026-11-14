@@ -1,7 +1,9 @@
 """Reconcile joints: make the grid's joints exactly the shared faces of a new tessellation.
 
-Contract: `reconcile_joints(grid, pairs, settings)` returns a new Grid whose
-joints are `pairs` ((k, 2), a < b, sorted: Tessellation.pairs), keeping total_space():
+Contract: `reconcile_joints(grid, pairs, seams, settings)` returns a new Grid whose
+joints are `pairs` ((k, 2), a < b, sorted: Tessellation.pairs) and whose seams are
+the rows of `seams` ((m, 3), a < b < c: Tessellation.seams) whose three pairs are
+all in `pairs`, keeping total_space():
   carried   a pair that already was a joint keeps its joint volume.
   vanished  a joint whose face is gone hands its volume back, half to each of its
             two energy volumes' surroundings: their carried joints, by size
@@ -15,8 +17,8 @@ joints are `pairs` ((k, 2), a < b, sorted: Tessellation.pairs), keeping total_sp
             space to its new joints, by their rest volume.
   lost      only an energy volume left with no joint at all (an empty cell) loses
             the space its vanished joints returned.
-Energy, volume, charge and merged_into are carried unchanged; squeeze is recomputed
-(joint_squeeze.py). Pairs must index the grid's energy volumes.
+Energy, volume, charge and merged_into are carried unchanged; squeeze and seam_open
+are recomputed (joint_squeeze.py, seam_openness.py). Pairs must index the grid's energy volumes.
 """
 from __future__ import annotations
 
@@ -28,12 +30,14 @@ from physics.cells.engine_settings import EngineSettings
 from physics.cells.grid import Grid
 from physics.cells.joint_rest import joint_rest
 from physics.cells.joint_squeeze import joint_squeeze
+from physics.cells.seam_openness import seam_openness
 from physics.cells.share_space import share_space
 
 RESERVE = 0.4
 
 
-def reconcile_joints(grid: Grid, pairs: np.ndarray, settings: EngineSettings) -> Grid:
+def reconcile_joints(grid: Grid, pairs: np.ndarray, seams: np.ndarray,
+                     settings: EngineSettings) -> Grid:
     """The grid with joints set to `pairs`, joint volumes carried, returned and taken."""
     count = grid.cell_count
     old_keys = _keys(np.sort(grid.joints, axis=1), count)
@@ -59,12 +63,21 @@ def reconcile_joints(grid: Grid, pairs: np.ndarray, settings: EngineSettings) ->
     joint_volume[carried] = share_space(kept_pairs, kept_volume,
                                         np.where(around > 0, returned - taken, 0.0))
     joint_volume[~carried] = fresh_volume
-    reconciled = replace(grid, joints=pairs, joint_volume=joint_volume)
-    return replace(reconciled, squeeze=joint_squeeze(reconciled, settings))
+    reconciled = replace(grid, joints=pairs, joint_volume=joint_volume,
+                         seams=_seams_on(seams, new_keys, count))
+    return replace(reconciled, squeeze=joint_squeeze(reconciled, settings),
+                   seam_open=seam_openness(reconciled, settings))
 
 
 def _keys(pairs: np.ndarray, count: int) -> np.ndarray:
     return pairs[:, 0].astype(np.int64) * count + pairs[:, 1]
+
+
+def _seams_on(seams: np.ndarray, pair_keys: np.ndarray, count: int) -> np.ndarray:
+    """The seams whose three pairs are all among the pairs with these keys."""
+    wanted = np.column_stack([seams[:, 0] * count + seams[:, 1], seams[:, 0] * count + seams[:, 2],
+                              seams[:, 1] * count + seams[:, 2]]).astype(np.int64)
+    return seams[np.isin(wanted, pair_keys).all(axis=1)].astype(np.int64).reshape(-1, 3)
 
 
 def _to_both(pairs: np.ndarray, amount: np.ndarray, count: int,

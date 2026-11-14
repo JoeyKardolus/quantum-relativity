@@ -12,19 +12,22 @@ Module map:
   new_engine.py       new_engine: seeded uneven energy, random seeds, settled shapes
   step.py             step: pure Engine -> Engine; rules, then seeds, box and shapes follow
   shapes.py           shapes: cells' faces with pull, joints' faces with push, for drawing
-  engine_stats.py     engine_stats: cells, joints, collapses, size, spread, lumps
+  engine_stats.py     engine_stats: cells, joints, collapses, size, spread, lumps, sealed
   grid.py             Grid: per energy volume its energy, volume and charge, the joints
-                      between neighbours with each joint's volume; no shapes, no coordinates
+                      between neighbours with each joint's volume, the seams where three
+                      joints meet; no shapes, no coordinates
   apply_rules.py      apply_rules: move_space, then collapse of joints below their limit
   rest_volume.py      rest_volume: the energy-volume rule, volume = (VOLUME_SCALE / E) ** 3
   joint_rest.py       joint_rest: a joint's rest volume, a share of its neighbours' mean volume
   pull_potential.py   pull_potential: grounded graph-Poisson spread of energy
-  leak.py             leak: each volume leaks energy to its neighbours by their pull
+  seam_joints.py      seam_joints: the three joints that meet at each seam
+  seam_openness.py    seam_openness: 1 relaxed .. 0 at the seal point, per seam
+  leak.py             leak: each volume leaks energy along open seams, by pull
   share_space.py      share_space: an energy volume hands space to its joints by their size
   move_space.py       move_space: pull, push, energy-volume rule, leak; no collapse
   joint_collapse.py   joint_collapse: joints that gave way, volumes fall into each other
   joint_squeeze.py    joint_squeeze: 0..1 how close each joint is to its limit (its push)
-  tessellation.py     Tessellation: volumes, centroids, faces, neighbour pairs, as arrays
+  tessellation.py     Tessellation: volumes, centroids, faces, neighbour pairs, seams
   tessellate.py       tessellate: periodic power tessellation of positions (pyvoro2)
   target_size.py      target_size: energy volume plus half its joints, per cell
   fit_weights.py      fit_weights: Newton step of the weights toward the target sizes
@@ -36,6 +39,8 @@ from physics.cells.rest_volume import VOLUME_SCALE, rest_volume
 from physics.cells.joint_rest import joint_rest
 from physics.cells.engine_settings import EngineSettings
 from physics.cells.pull_potential import pull_potential
+from physics.cells.seam_joints import seam_joints
+from physics.cells.seam_openness import seam_openness
 from physics.cells.leak import leak
 from physics.cells.share_space import share_space
 from physics.cells.move_space import move_space
@@ -55,7 +60,7 @@ from physics.cells.shapes import shapes
 from physics.cells.engine_stats import engine_stats
 
 __all__ = ["Grid", "VOLUME_SCALE", "rest_volume", "joint_rest", "EngineSettings",
-           "pull_potential", "leak", "share_space", "move_space", "joint_collapse",
+           "pull_potential", "seam_joints", "seam_openness", "leak", "share_space", "move_space", "joint_collapse",
            "joint_squeeze", "apply_rules", "Tessellation", "tessellate", "target_size",
            "fit_weights", "move_seeds", "reconcile_joints", "Engine", "new_engine", "step",
            "shapes", "engine_stats"]

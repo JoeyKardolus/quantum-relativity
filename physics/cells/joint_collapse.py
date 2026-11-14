@@ -19,6 +19,9 @@ apply_rules() marks exactly those whose volume fell below push_limit times their
             (share_space.py), so they swell: total_space() is kept. Only when no
             joint is left around a merged volume (everything fell into one) is
             its freed space lost.
+  seams    relabelled to the new volumes; a seam with two of its volumes merged is
+           dropped, seams around the same three volumes combine into one with the
+           smallest openness (apply_rules recomputes it).
   merged_into[old_volume] = its new index (identity when nothing gave way).
 """
 from __future__ import annotations
@@ -52,9 +55,22 @@ def joint_collapse(grid: Grid, giving_way: np.ndarray) -> Grid:
     squeeze = np.zeros(len(joints))
     np.maximum.at(squeeze, slot, grid.squeeze[~inside])
     joint_volume = np.bincount(slot, grid.joint_volume[~inside], len(joints))
+    seams, seam_open = _relabelled_seams(grid, merged_into)
     return Grid(cell_count=count, joints=joints, energy=energy, volume=volume,
                 joint_volume=share_space(joints, joint_volume, freed), squeeze=squeeze,
-                charge=np.bincount(merged_into, grid.charge, count), merged_into=merged_into)
+                charge=np.bincount(merged_into, grid.charge, count), seams=seams,
+                seam_open=seam_open, merged_into=merged_into)
+
+
+def _relabelled_seams(grid: Grid, merged_into: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Seams on the new volumes (three distinct, unique) and each one's smallest openness."""
+    triples = np.sort(merged_into[grid.seams], axis=1)
+    distinct = (triples[:, 0] != triples[:, 1]) & (triples[:, 1] != triples[:, 2])
+    seams, slot = np.unique(triples[distinct], axis=0, return_inverse=True)
+    slot = slot.ravel()
+    seam_open = np.ones(len(seams))
+    np.minimum.at(seam_open, slot, grid.seam_open[distinct])
+    return seams.astype(np.int64).reshape(-1, 3), seam_open
 
 
 def _merge_map(grid: Grid, giving_way: np.ndarray) -> np.ndarray:

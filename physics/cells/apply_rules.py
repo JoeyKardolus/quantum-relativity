@@ -9,7 +9,8 @@ volumes (joint collapse), merged_into mapping every old volume to its new index:
               J < push_limit * R, R = joint_rest(moved volume, joints, joint_rest);
               its two energy volumes fall into each other (joint_collapse.py),
               keeping all energy and all space. No other path joins two volumes.
-  3. squeeze  set to joint_squeeze(result, settings): how hard each joint pushes.
+  3. squeeze  set to joint_squeeze(result, settings): how hard each joint pushes;
+              seam_open to seam_openness(result, settings).
 Total space changes only by pull (shrinks it) and the leak (drift: volumes
 it drains grow). Deterministic: the same grid and
 settings give the same result.
@@ -23,6 +24,7 @@ from physics.cells.joint_collapse import joint_collapse
 from physics.cells.joint_rest import joint_rest
 from physics.cells.joint_squeeze import joint_squeeze
 from physics.cells.move_space import move_space
+from physics.cells.seam_openness import seam_openness
 from physics.cells.engine_settings import EngineSettings
 
 
@@ -31,4 +33,5 @@ def apply_rules(grid: Grid, settings: EngineSettings) -> Grid:
     moved = move_space(grid, settings)
     limit = settings.push_limit * joint_rest(moved.volume, moved.joints, settings.joint_rest)
     collapsed = joint_collapse(moved, moved.joint_volume < limit)
-    return replace(collapsed, squeeze=joint_squeeze(collapsed, settings))
+    return replace(collapsed, squeeze=joint_squeeze(collapsed, settings),
+                   seam_open=seam_openness(collapsed, settings))

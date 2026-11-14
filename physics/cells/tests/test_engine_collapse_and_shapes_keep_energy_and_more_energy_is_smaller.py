@@ -5,7 +5,7 @@ an energy volume with more energy ends up smaller.
             seeds: fewer cells, engine_stats counts them, every remaining cell has a
             shape, the joints are still exactly the shared faces, and the total
             energy is what the rules left before collapse (move_space), to rounding.
-  energy    the leak, joint collapse and the engine's shape part (seeds, weights,
+  energy    the leak (any seam openness), joint collapse and the engine's shape part (seeds, weights,
             box, re-tessellation, reconciling joints) keep the total energy and total
             space: a full step ends with exactly what apply_rules gave, and the box
             holds exactly that space. (The energy-volume
@@ -42,13 +42,14 @@ def test_leak_collapse_and_shapes_keep_energy():
     engine = new_engine(500, seed=3, unevenness=0.2)
     grid = engine.grid
     pull = np.random.default_rng(3).uniform(0.1, 2.0, grid.cell_count)
-    assert np.isclose(leak(grid.joints, grid.energy, pull, 0.2).sum(), grid.total_energy(),
-                      rtol=1e-13)
+    openness = np.random.default_rng(4).uniform(0.0, 1.0, len(grid.seams))
+    assert np.isclose(leak(grid.joints, grid.seams, grid.energy, pull, openness, 0.2).sum(),
+                      grid.total_energy(), rtol=1e-13)
     giving_way = np.zeros(len(grid.joints), dtype=bool)
     giving_way[::50] = True
     assert np.isclose(joint_collapse(grid, giving_way).total_energy(), grid.total_energy(),
                       rtol=1e-13)
-    shuffled = reconcile_joints(grid, grid.joints[::2], EngineSettings.all_on())
+    shuffled = reconcile_joints(grid, grid.joints[::2], grid.seams, EngineSettings.all_on())
     assert np.array_equal(shuffled.energy, grid.energy)
     assert np.isclose(shuffled.total_space(), grid.total_space(), rtol=1e-12)
     settings = EngineSettings.all_on()

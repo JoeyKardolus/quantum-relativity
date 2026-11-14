@@ -20,6 +20,11 @@ periodic cube of side `side`:
                 with itself (only in a box a few cells wide)
   pair_area     (k,) summed area of the faces of each pair, counted from the lower cell
   pair_gap      (k,) distance between the pair's two working positions (nearest image)
+  seams         (m, 3) int, a < b < c, sorted unique: the three cells around each
+                edge of the tessellation (an edge two faces of a cell share; one
+                face to each of the other two cells). Edges whose three cells are
+                not distinct (a cell meeting itself or one neighbour twice, only in
+                a box a few cells wide) are left out.
 Positions are labels for computing these shapes; no rule reads any of them.
 """
 from __future__ import annotations
@@ -31,7 +36,7 @@ import numpy as np
 
 @dataclass(frozen=True)
 class Tessellation:
-    """Volumes, centroids, faces and the neighbour pairs of one periodic power tessellation."""
+    """Volumes, centroids, faces, neighbour pairs and seams of one periodic power tessellation."""
 
     volume: np.ndarray
     centroid: np.ndarray
@@ -45,3 +50,4 @@ class Tessellation:
     face_joint: np.ndarray
     pair_area: np.ndarray
     pair_gap: np.ndarray
+    seams: np.ndarray

@@ -9,6 +9,11 @@ Contract: a frozen record of
   squeeze       (k,) derived, for drawing: 0 for a joint at or above its rest volume,
                 1 for a joint at its collapse limit (step.py gives the formula)
   charge        (n,) per energy volume, zeros for now (what charge is, is still open)
+  seams         (m, 3) int, a < b < c: the three energy volumes around each seam, the
+                edge where their three joint walls meet; the leak flows only along
+                seams (leak.py). The three pairs of every seam are joints.
+  seam_open     (m,) derived, for drawing and engine_stats: each seam's openness,
+                1 relaxed, 0 sealed (seam_openness.py)
   merged_into   None at the start; after a step, merged_into[old_cell] = that cell's index now
 total_energy() is the sum of energy, the quantity joint collapse and the leak keep.
 total_space() is the sum of energy volumes plus the sum of joint volumes: all of space,
@@ -23,7 +28,7 @@ import numpy as np
 
 @dataclass(frozen=True)
 class Grid:
-    """Energy volumes (energy, volume, charge) and the joints between neighbours (pairs, volume)."""
+    """Energy volumes (energy, volume, charge), the joints between neighbours, and their seams."""
 
     cell_count: int
     joints: np.ndarray
@@ -32,6 +37,8 @@ class Grid:
     joint_volume: np.ndarray
     squeeze: np.ndarray
     charge: np.ndarray
+    seams: np.ndarray
+    seam_open: np.ndarray
     merged_into: np.ndarray | None = None
 
     def total_energy(self) -> float:

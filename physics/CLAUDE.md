@@ -13,7 +13,7 @@ joint-network milestones.
 ## Must not get wrong
 
 - **The engine owns the shapes; positions are labels.** `cells.Engine` = `Grid` (energy, volume,
-  charge per energy volume, joints with their volume) plus a seed position and power weight per
+  charge per energy volume, joints with their volume, seams) plus a seed position and power weight per
   cell, used only to tessellate. Rules and measurements read only the Grid, never a position.
   `step(engine, settings) -> Engine` is pure. Joints are exactly the shared faces, volumes
   carried by cell pair; a new face starts at rest, a vanished one returns its volume.
@@ -26,11 +26,12 @@ joint-network milestones.
 - **Energy sets volume**: `cells/rest_volume.py` (`(1/E)^3`), restored each step; in `network/`
   `energy * length = LENGTH_SCALE`. Push and pull change size; energy moves to match.
 - **All rules are always on, nothing placed by hand.** Energy starts slightly uneven everywhere;
-  lumps must form by themselves. Drift is the leak (`cells/leak.py`): a volume's `leak` share of
-  energy goes to its neighbours by pull (`p_b / sum p_k`), never all to the hardest.
+  lumps must form by themselves. Drift is the leak (`cells/leak.py`): it flows only along seams
+  (tessellation edges), as open as `cells/seam_openness.py` says (closed past `seal_point`),
+  by pull (`p_b / sum p_k`).
 - **Honesty.** Never tune a setting, seed or fit window until a result passes. Report every number
   with seed and settings; report a miss. Today (seed 1, 1000 cells, defaults) the grid falls to 2
-  volumes by step 110, space to 0.01 of its start; about 15 joints per cell. No lasting lumps.
+  volumes by step 78, space to 0.02 of its start; about 15 joints per cell. No lasting lumps.
 - **Speed.** Vectorised numpy and scipy.sparse; a step is about 21 ms at 500 cells, 126 ms at 2500,
   nearly all tessellation; `shapes()` is a 6 MB message at 1000 cells.
 - **Layout.** One public function (or type) per file, helpers `_prefixed`, each subpackage
