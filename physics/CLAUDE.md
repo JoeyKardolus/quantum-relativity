@@ -1,6 +1,6 @@
 # physics/
 
-Connection theory simulation. Rules: `docs/bible.md#physicsconnection-theory`; words: `CONTEXT.md`
+Quantum-relativity theory simulation. Rules: `docs/bible.md#physicsquantum-relativity`; words: `CONTEXT.md`
 (joint, connection, drift, reference spacetime; never node, edge or vertex).
 
 ## Must not get wrong

@@ -64,6 +64,7 @@
     background: linear-gradient(90deg, rgb(51,102,242), rgb(170,150,200), rgb(255,90,40)); }
   .legend-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
   #state { color: var(--muted); font-size: 12px; margin-left: auto; }
+  #offline[hidden] { display: none; }
   #offline { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     pointer-events: none; padding: 0 16px; }
   #offline div { background: var(--panel); border: 1px solid var(--warn); border-radius: 10px;
@@ -92,7 +93,7 @@
   <h2>Reset</h2>
   <div class="row">
     <label for="seed">seed</label><input id="seed" type="number" value="1" step="1">
-    <label for="jointCount">joints</label><input id="jointCount" type="number" value="300" min="2" step="1">
+    <label for="jointCount">joints</label><input id="jointCount" type="number" value="2500" min="2" step="1">
   </div>
   <div class="row" style="margin-top:8px"><button id="reset" type="button">Reset</button></div>
 
@@ -527,7 +528,7 @@ function handleMessage(message) {
     if (message.step > lastStep && lastStep >= 0 && !running) setRunning(true);
     lastStep = message.step;
     showStats(message.step, message.stats || {});
-    if (fitOnNextFrame) { fitOnNextFrame = false; fit(); }
+    if (fitOnNextFrame) { fitOnNextFrame = false; fit(); } else { recentre(); }
     requestDraw();
   } else if (message.type === "settings") {
     applySettings(message.values || {});
