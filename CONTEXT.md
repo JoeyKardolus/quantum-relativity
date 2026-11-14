@@ -49,6 +49,7 @@ The core depth/seam vocabulary used by `improve-codebase-architecture`, `tdd`, `
 - **joint collapse**: a joint giving way when the squeeze on it passes its limit, so the two energy volumes it separated fall into each other, keeping their energy; the network's version of gravitational collapse. _Avoid_: black hole (what collapse may produce, not the rule), merge, implosion.
 - **energy event**: a particle (electron, proton) seen as a pattern of energy travelling through the grid, not a structure of its own; far bigger than one energy volume. _Avoid_: particle as a thing, ball, structure.
 - **map position**: the point the engine gives each energy volume only so it can compute and draw exact cell shapes; like any map (coordinates, counting) it describes the grid but decides nothing in it. _Avoid_: location, coordinate as something real, where a volume is.
+- **seam**: an edge where joint walls meet; the leak flows along seams into the energy volumes around them, never through the middle of a joint, and a seam narrows as its joints are squeezed. _Avoid_: channel, pore, edge, Plateau border.
 - **reference spacetime**: a network built from points scattered in a flat space or spacetime whose true dimension and proper times are known; used to validate a measurement before it is trusted. _Avoid_: test grid, ground truth, toy universe.
 
 ## Project vocabulary
