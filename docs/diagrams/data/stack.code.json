@@ -1,0 +1,42 @@
+{
+ "assistant": [
+  "apps/assistant"
+ ],
+ "caddy": [
+  "infra/caddy"
+ ],
+ "deploy": [
+  "infra/auto-deploy",
+  "infra/deploy_loop"
+ ],
+ "gpu": [
+  "infra/gpu",
+  "infra/gpu-jobs"
+ ],
+ "laptop": [
+  ".claude/skills",
+  ".claude/hooks"
+ ],
+ "media": [
+  "infra/media"
+ ],
+ "notulen": [
+  "apps/notulen"
+ ],
+ "observability": [
+  "infra/observability"
+ ],
+ "sso": [
+  "infra/nextcloud"
+ ],
+ "talk": [
+  "infra/media/connect-talk.sh"
+ ],
+ "vault": [
+  "infra/secrets"
+ ],
+ "website": [
+  "apps/website",
+  "design"
+ ]
+}

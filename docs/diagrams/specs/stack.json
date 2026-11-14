@@ -1,0 +1,231 @@
+{
+ "title": "The stack",
+ "subtitle": "One server behind one front door, a media node beside it for video calls, a few rented pieces, and your system, where every change starts. Push to main is the deploy.",
+ "legend": {
+  "external": "Your system, outside services",
+  "frontend": "Public, video calls",
+  "backend": "Apps, deploy loop",
+  "security": "Door and login",
+  "messagebus": "The watch",
+  "database": "Kept on Scaleway",
+  "cloud": "Separate or on demand",
+  "edge-default": "A request",
+  "edge-emphasis": "Into the repository",
+  "edge-dashed": "Periodic or optional"
+ },
+ "nodes": {
+  "laptop": {
+   "type": "external",
+   "label": "Your system",
+   "sublabel": "Claude Code + harness",
+   "note": "Claude Code running in this repository, with the harness: skills, guards, overlays and the code index. Every change starts here as one conversation; open this box for the loop it follows. From here the browser reaches the private pages through Caddy, and Signal carries the assistant's questions, pages and briefs both ways. Nothing deploys from your system.",
+   "module": "stack/loop.html",
+   "code": [
+    ".claude/skills",
+    ".claude/hooks"
+   ],
+   "bible": "Nothing deploys from your system.",
+   "code_seen": "b84fe6268cef"
+  },
+  "github": {
+   "type": "external",
+   "label": "GitHub",
+   "sublabel": "main, issues, board",
+   "note": "Holds `main`, the issues and the Projects board, and receives the minutes notulen commits. A push to `main` fires the webhook at `deploy.$DOMAIN/hooks/deploy`. The server posts each commit's `vm/gate`, `vm/build`, `vm/boot` and `vm/deploy` status back to its commit page.",
+   "bible": "| A session | git and `gh` | the repository, issues, the board"
+  },
+  "caddy": {
+   "type": "security",
+   "label": "Caddy",
+   "sublabel": "the only public door",
+   "note": "`caddy`, ports 80 and 443, the only container with public ports. It gets its own Let's Encrypt certificates and asks oauth2-proxy about every request to a private subdomain. **Watch out:** it deletes any `Remote-User` header the browser sent, which is why an app can trust that header.",
+   "code": [
+    "infra/caddy"
+   ],
+   "bible": "Caddy is the only container with public ports.",
+   "code_seen": "67169e875d52"
+  },
+  "sso": {
+   "type": "security",
+   "label": "Nextcloud",
+   "sublabel": "files, calendar, login",
+   "note": "`nextcloud` on `cloud.$DOMAIN` with its Postgres, and `oauth2-proxy` on `auth.$DOMAIN`. Accounts live here: Nextcloud is the identity provider, oauth2-proxy the client, and one login with a second factor opens every private name. Files and the calendars the assistant reads and writes over CalDAV live here too.",
+   "code": [
+    "infra/nextcloud"
+   ],
+   "bible": "Nextcloud is where accounts live.",
+   "code_seen": "7f646e166af9"
+  },
+  "website": {
+   "type": "frontend",
+   "label": "website",
+   "sublabel": "the bare domain",
+   "note": "`website`, nginx serving the static files in `apps/website/` at the bare domain, public. It links `/design/index.css`, so an edit to `design/tokens.css` restyles it together with the documents and the dashboards.",
+   "code": [
+    "apps/website",
+    "design"
+   ],
+   "bible": "served by a stock `nginx:alpine` image.",
+   "code_seen": "532cd5d3f087"
+  },
+  "notulen": {
+   "type": "backend",
+   "label": "notulen",
+   "sublabel": "meetings in, minutes out",
+   "note": "`notulen` on `notulen.$DOMAIN`, behind the login. Two ways in: a phone recording in five-second chunks, or a recorded Talk call, fetched when the call ends. Either way the audio goes to object storage, is transcribed, and Claude writes the minutes, committed to `NOTULEN_TARGET_REPO`.",
+   "code": [
+    "apps/notulen"
+   ],
+   "bible": "behind the Nextcloud single sign-on.",
+   "code_seen": "b6d8de84e95e"
+  },
+  "assistant": {
+   "type": "backend",
+   "label": "The assistant",
+   "sublabel": "OpenClaw on Signal",
+   "note": "The upstream OpenClaw gateway holds the Signal conversation, and this repository's door (`apps/assistant`) triages alerts and serves the gateway its tools. On the agenda it reads and writes the team's calendars over CalDAV, makes a Talk call link with `create_video_call` and puts the meeting on each calendar, and sends a Signal reminder with the link before it starts.",
+   "code": [
+    "apps/assistant"
+   ],
+   "bible": "The door is this repository's code, and it decides what reaches a phone.",
+   "code_seen": "03d154ba8717"
+  },
+  "observability": {
+   "type": "messagebus",
+   "label": "Prometheus",
+   "sublabel": "alerts and deadmen",
+   "note": "Prometheus evaluates its rules every 30 seconds and probes each subdomain over HTTPS; Alertmanager hands a firing group to the alert-relay, and the relay to the assistant. Deadmen run as systemd timers and page straight to Signal when the assistant itself is down. Loopback only: Prometheus on 9090.",
+   "code": [
+    "infra/observability"
+   ],
+   "bible": "which hands it unchanged to the assistant.",
+   "code_seen": "20a52f7e13de"
+  },
+  "deploy": {
+   "type": "backend",
+   "label": "auto-deploy",
+   "sublabel": "tests, then ships",
+   "note": "CronJob `deploy-cycle` in the cluster, every two minutes and on every push, runs `infra/auto-deploy/auto-deploy.sh`. It picks one commit, a gate Job tests it in the gate image its own tree pins, and only the changed images are built and must roll out. Red or amber ships nothing. The eject ships off.",
+   "code": [
+    "infra/auto-deploy",
+    "infra/deploy_loop"
+   ],
+   "bible": "Pushing to `main` is the deploy.",
+   "code_seen": "cc4cffb45cbb"
+  },
+  "vault": {
+   "type": "database",
+   "label": "The vault",
+   "sublabel": "Secret Manager",
+   "note": "One Scaleway Secret Manager secret holding the whole environment, secrets included. `infra/secrets/push-env.sh` writes a new version from the laptop; the server pulls it every deploy cycle into `$HARNESS_ROOT/harness.env`, mode 600. A failed pull keeps the old file.",
+   "code": [
+    "infra/secrets"
+   ],
+   "bible": "plus every password and token listed in `config/vault.env.example`.",
+   "code_seen": "004aa3f34d20"
+  },
+  "storage": {
+   "type": "database",
+   "label": "Object storage",
+   "sublabel": "meeting audio",
+   "note": "A Scaleway Object Storage bucket (`S3_BUCKET`) for meeting audio. Notulen uploads the stitched recording before any check that could end the session, so every failed job can be retried. **Watch out:** it keeps billing after the server is deleted.",
+   "bible": "The audio goes to S3 before any check that could end the session, so every failed job can be retried."
+  },
+  "gpu": {
+   "type": "cloud",
+   "label": "GPU tier",
+   "sublabel": "optional, Kubernetes",
+   "note": "Optional. A Scaleway Kapsule cluster whose GPU pools scale to zero, so a node bills only while it transcribes. Notulen submits a Kubernetes Job; the worker reads the audio from object storage and writes its result to the stack's Postgres, which then listens beyond the server with only its password as guard.",
+   "code": [
+    "infra/gpu",
+    "infra/gpu-jobs"
+   ],
+   "bible": "so a node bills only while it transcribes.",
+   "code_seen": "8cda8187a25b"
+  },
+  "talk": {
+   "type": "frontend",
+   "label": "Nextcloud Talk",
+   "sublabel": "video calls",
+   "note": "Talk is the Nextcloud app for chat and video calls, at `cloud.$DOMAIN`. Its calls run through the media node. The recording bot that `infra/media/connect-talk.sh` installs posts every call event of an assistant-made room to notulen, signed with `TALK_BOT_SECRET`.",
+   "code": [
+    "infra/media/connect-talk.sh"
+   ],
+   "bible": "Nextcloud Talk runs inside Nextcloud; the media node only carries its calls and records them.",
+   "code_seen": "24a04aa20e3f"
+  },
+  "media": {
+   "type": "cloud",
+   "label": "Media node",
+   "sublabel": "signaling + recording",
+   "note": "Optional: the one node of the media pool role, on its host network, with the flexible IP `MEDIA_PUBLIC_IP` that DNS and Janus name. One pod: the signaling server, the Janus media server on UDP 20000 to 40000, and the Talk recording server, a headless browser that sits in the call. Images built from pinned upstream commits; a CronJob on the system role moves the IP onto a replaced node within a minute. **Watch out:** no TURN relay, so a network that blocks UDP cannot join.",
+   "code": [
+    "infra/media"
+   ],
+   "bible": "The calls run on the one node of the `media` pool role, so no other node opens the UDP range 20000 to 40000 that media needs.",
+   "code_seen": "658eae543656"
+  }
+ },
+ "slides": [
+  {
+   "label": "Your system reaches it two ways: a browser through Caddy, and Signal both ways with the assistant",
+   "add": [
+    "laptop",
+    "caddy",
+    "assistant",
+    "laptop-caddy",
+    "assistant-laptop"
+   ]
+  },
+  {
+   "label": "Caddy is the only public door, and one Nextcloud login opens every private name",
+   "add": [
+    "website",
+    "sso",
+    "notulen",
+    "caddy-website",
+    "caddy-sso",
+    "caddy-notulen"
+   ]
+  },
+  {
+   "label": "The assistant keeps the agenda: it books meetings on the calendars and makes their Talk call links",
+   "add": [
+    "talk",
+    "assistant-sso",
+    "assistant-talk"
+   ]
+  },
+  {
+   "label": "Calls run through the media node, and a recorded call becomes minutes in the repository",
+   "add": [
+    "media",
+    "storage",
+    "gpu",
+    "github",
+    "talk-media",
+    "talk-notulen",
+    "notulen-storage",
+    "storage-gpu",
+    "notulen-github"
+   ]
+  },
+  {
+   "label": "Prometheus watches the server and hands every alert to the assistant",
+   "add": [
+    "observability",
+    "observability-assistant"
+   ]
+  },
+  {
+   "label": "Every change starts on your system as a push; the server tests it, pulls the vault and ships",
+   "add": [
+    "deploy",
+    "vault",
+    "laptop-github",
+    "github-deploy",
+    "deploy-vault"
+   ]
+  }
+ ]
+}

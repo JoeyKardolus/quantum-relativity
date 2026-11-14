@@ -1,0 +1,58 @@
+{
+ "assistant": {
+  "chapter": "apps/assistant",
+  "section": "What runs"
+ },
+ "caddy": {
+  "chapter": "infra/platform",
+  "section": "One login across subdomains"
+ },
+ "deploy": {
+  "chapter": "infra/deploy",
+  "section": "The loop"
+ },
+ "github": {
+  "chapter": "architecture/system-context",
+  "section": "Who talks to it"
+ },
+ "gpu": {
+  "chapter": "infra/gpu",
+  "section": "What the tier is"
+ },
+ "laptop": {
+  "chapter": "architecture/system-context",
+  "section": "The pieces"
+ },
+ "media": {
+  "chapter": "infra/media",
+  "section": "What runs on the media node"
+ },
+ "notulen": {
+  "chapter": "apps/notulen",
+  "section": "The recording path"
+ },
+ "observability": {
+  "chapter": "infra/observability",
+  "section": "Alert path"
+ },
+ "sso": {
+  "chapter": "infra/platform",
+  "section": "One login across subdomains"
+ },
+ "storage": {
+  "chapter": "apps/notulen",
+  "section": "The recording path"
+ },
+ "talk": {
+  "chapter": "infra/media",
+  "section": "How a call becomes minutes"
+ },
+ "vault": {
+  "chapter": "infra/platform",
+  "section": "The vault"
+ },
+ "website": {
+  "chapter": "apps/website",
+  "section": "What it serves"
+ }
+}

@@ -1,0 +1,504 @@
+{
+ "schema_version": 1,
+ "diagram_type": "architecture",
+ "meta": {
+  "title": "The stack",
+  "subtitle": "One server behind one front door, a media node beside it for video calls, a few rented pieces, and your system, where every change starts. Push to main is the deploy.",
+  "visual_preset": "editorial",
+  "quality_profile": "standard",
+  "viewBox": [
+   1600,
+   960
+  ],
+  "legend": {
+   "mode": "auto",
+   "entries": {
+    "external": {
+     "label": "Your system, outside services"
+    },
+    "frontend": {
+     "label": "Public, video calls"
+    },
+    "backend": {
+     "label": "Apps, deploy loop"
+    },
+    "security": {
+     "label": "Door and login"
+    },
+    "messagebus": {
+     "label": "The watch"
+    },
+    "database": {
+     "label": "Kept on Scaleway"
+    },
+    "cloud": {
+     "label": "Separate or on demand"
+    },
+    "edge-default": {
+     "label": "A request"
+    },
+    "edge-emphasis": {
+     "label": "Into the repository"
+    },
+    "edge-dashed": {
+     "label": "Periodic or optional"
+    }
+   }
+  }
+ },
+ "components": [
+  {
+   "id": "github",
+   "type": "external",
+   "label": "GitHub",
+   "sublabel": "main, issues, board",
+   "pos": [
+    60,
+    540
+   ],
+   "size": [
+    150,
+    62
+   ]
+  },
+  {
+   "id": "laptop",
+   "type": "external",
+   "label": "Your system",
+   "sublabel": "Claude Code + harness",
+   "pos": [
+    60,
+    260
+   ],
+   "size": [
+    150,
+    62
+   ]
+  },
+  {
+   "id": "website",
+   "type": "frontend",
+   "label": "website",
+   "sublabel": "the bare domain",
+   "pos": [
+    320,
+    120
+   ],
+   "size": [
+    150,
+    62
+   ]
+  },
+  {
+   "id": "caddy",
+   "type": "security",
+   "label": "Caddy",
+   "sublabel": "the only public door",
+   "pos": [
+    320,
+    260
+   ],
+   "size": [
+    150,
+    62
+   ]
+  },
+  {
+   "id": "sso",
+   "type": "security",
+   "label": "Nextcloud",
+   "sublabel": "files, calendar, login",
+   "pos": [
+    580,
+    260
+   ],
+   "size": [
+    150,
+    62
+   ]
+  },
+  {
+   "id": "assistant",
+   "type": "backend",
+   "label": "The assistant",
+   "sublabel": "OpenClaw on Signal",
+   "pos": [
+    840,
+    120
+   ],
+   "size": [
+    150,
+    62
+   ]
+  },
+  {
+   "id": "talk",
+   "type": "frontend",
+   "label": "Nextcloud Talk",
+   "sublabel": "video calls",
+   "pos": [
+    840,
+    260
+   ],
+   "size": [
+    150,
+    62
+   ]
+  },
+  {
+   "id": "observability",
+   "type": "messagebus",
+   "label": "Prometheus",
+   "sublabel": "alerts and deadmen",
+   "pos": [
+    1100,
+    120
+   ],
+   "size": [
+    150,
+    62
+   ]
+  },
+  {
+   "id": "notulen",
+   "type": "backend",
+   "label": "notulen",
+   "sublabel": "meetings in, minutes out",
+   "pos": [
+    840,
+    400
+   ],
+   "size": [
+    150,
+    62
+   ]
+  },
+  {
+   "id": "deploy",
+   "type": "backend",
+   "label": "auto-deploy",
+   "sublabel": "tests, then ships",
+   "pos": [
+    580,
+    680
+   ],
+   "size": [
+    150,
+    62
+   ]
+  },
+  {
+   "id": "media",
+   "type": "cloud",
+   "label": "Media node",
+   "sublabel": "signaling + recording",
+   "pos": [
+    1380,
+    260
+   ],
+   "size": [
+    150,
+    62
+   ]
+  },
+  {
+   "id": "storage",
+   "type": "database",
+   "label": "Object storage",
+   "sublabel": "meeting audio",
+   "pos": [
+    1380,
+    400
+   ],
+   "size": [
+    150,
+    62
+   ]
+  },
+  {
+   "id": "gpu",
+   "type": "cloud",
+   "label": "GPU tier",
+   "sublabel": "optional, Kubernetes",
+   "pos": [
+    1380,
+    540
+   ],
+   "size": [
+    150,
+    62
+   ]
+  },
+  {
+   "id": "vault",
+   "type": "database",
+   "label": "The vault",
+   "sublabel": "Secret Manager",
+   "pos": [
+    1380,
+    680
+   ],
+   "size": [
+    150,
+    62
+   ]
+  }
+ ],
+ "connections": [
+  {
+   "id": "laptop-caddy",
+   "from": "laptop",
+   "to": "caddy",
+   "label": "HTTPS, browser",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "assistant-laptop",
+   "from": "assistant",
+   "to": "laptop",
+   "label": "Signal both ways: questions, pages, briefs",
+   "fromSide": "top",
+   "toSide": "left",
+   "via": [
+    [
+     915,
+     70
+    ],
+    [
+     12,
+     70
+    ],
+    [
+     12,
+     291
+    ]
+   ],
+   "labelAt": [
+    520,
+    58
+   ]
+  },
+  {
+   "id": "caddy-website",
+   "from": "caddy",
+   "to": "website",
+   "label": "public",
+   "fromSide": "top",
+   "toSide": "bottom"
+  },
+  {
+   "id": "caddy-sso",
+   "from": "caddy",
+   "to": "sso",
+   "label": "logged in?",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "caddy-notulen",
+   "from": "caddy",
+   "to": "notulen",
+   "label": "after login",
+   "fromSide": "bottom",
+   "toSide": "left",
+   "via": [
+    [
+     395,
+     431
+    ]
+   ],
+   "labelAt": [
+    560,
+    419
+   ]
+  },
+  {
+   "id": "assistant-sso",
+   "from": "assistant",
+   "to": "sso",
+   "label": "agenda, CalDAV",
+   "fromSide": "left",
+   "toSide": "top",
+   "via": [
+    [
+     655,
+     151
+    ]
+   ],
+   "labelAt": [
+    745,
+    139
+   ]
+  },
+  {
+   "id": "assistant-talk",
+   "from": "assistant",
+   "to": "talk",
+   "label": "call link",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "labelAt": [
+    915,
+    196
+   ]
+  },
+  {
+   "id": "observability-assistant",
+   "from": "observability",
+   "to": "assistant",
+   "label": "alerts",
+   "fromSide": "left",
+   "toSide": "right"
+  },
+  {
+   "id": "talk-media",
+   "from": "talk",
+   "to": "media",
+   "label": "calls",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "talk-notulen",
+   "from": "talk",
+   "to": "notulen",
+   "label": "call over: recording",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "labelAt": [
+    915,
+    336
+   ]
+  },
+  {
+   "id": "notulen-storage",
+   "from": "notulen",
+   "to": "storage",
+   "label": "audio",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "storage-gpu",
+   "from": "storage",
+   "to": "gpu",
+   "label": "the audio",
+   "variant": "dashed",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "labelAt": [
+    1455,
+    476
+   ]
+  },
+  {
+   "id": "notulen-github",
+   "from": "notulen",
+   "to": "github",
+   "label": "minutes",
+   "variant": "emphasis",
+   "fromSide": "bottom",
+   "toSide": "right",
+   "via": [
+    [
+     915,
+     571
+    ]
+   ],
+   "labelAt": [
+    560,
+    559
+   ]
+  },
+  {
+   "id": "laptop-github",
+   "from": "laptop",
+   "to": "github",
+   "label": "push to main",
+   "variant": "emphasis",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "labelAt": [
+    135,
+    336
+   ]
+  },
+  {
+   "id": "github-deploy",
+   "from": "github",
+   "to": "deploy",
+   "label": "webhook",
+   "variant": "emphasis",
+   "fromSide": "left",
+   "toSide": "bottom",
+   "via": [
+    [
+     12,
+     571
+    ],
+    [
+     12,
+     800
+    ],
+    [
+     655,
+     800
+    ]
+   ],
+   "labelAt": [
+    330,
+    788
+   ]
+  },
+  {
+   "id": "deploy-vault",
+   "from": "deploy",
+   "to": "vault",
+   "label": "every cycle",
+   "variant": "dashed",
+   "fromSide": "right",
+   "toSide": "left"
+  }
+ ],
+ "boundaries": [
+  {
+   "kind": "region",
+   "label": "Outside the server",
+   "wraps": [
+    "laptop",
+    "github"
+   ]
+  },
+  {
+   "kind": "region",
+   "label": "One server, behind Caddy",
+   "wraps": [
+    "website",
+    "caddy",
+    "sso",
+    "assistant",
+    "talk",
+    "observability",
+    "notulen",
+    "deploy"
+   ]
+  },
+  {
+   "kind": "region",
+   "label": "Media node",
+   "wraps": [
+    "media"
+   ]
+  },
+  {
+   "kind": "region",
+   "label": "Rented beside it",
+   "wraps": [
+    "storage",
+    "gpu",
+    "vault"
+   ]
+  }
+ ]
+}

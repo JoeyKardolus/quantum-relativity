@@ -1,0 +1,88 @@
+{
+ "steps": [
+  {
+   "label": "Your system reaches it two ways: a browser through Caddy, and Signal both ways with the assistant",
+   "add": [
+    "laptop",
+    "caddy",
+    "assistant",
+    "laptop-caddy",
+    "assistant-laptop"
+   ]
+  },
+  {
+   "label": "Caddy is the only public door, and one Nextcloud login opens every private name",
+   "add": [
+    "website",
+    "sso",
+    "notulen",
+    "caddy-website",
+    "caddy-sso",
+    "caddy-notulen"
+   ]
+  },
+  {
+   "label": "The assistant keeps the agenda: it books meetings on the calendars and makes their Talk call links",
+   "add": [
+    "talk",
+    "assistant-sso",
+    "assistant-talk"
+   ]
+  },
+  {
+   "label": "Calls run through the media node, and a recorded call becomes minutes in the repository",
+   "add": [
+    "media",
+    "storage",
+    "gpu",
+    "github",
+    "talk-media",
+    "talk-notulen",
+    "notulen-storage",
+    "storage-gpu",
+    "notulen-github"
+   ]
+  },
+  {
+   "label": "Prometheus watches the server and hands every alert to the assistant",
+   "add": [
+    "observability",
+    "observability-assistant"
+   ]
+  },
+  {
+   "label": "Every change starts on your system as a push; the server tests it, pulls the vault and ships",
+   "add": [
+    "deploy",
+    "vault",
+    "laptop-github",
+    "github-deploy",
+    "deploy-vault"
+   ]
+  }
+ ],
+ "regions": [
+  [
+   "laptop",
+   "github"
+  ],
+  [
+   "website",
+   "caddy",
+   "sso",
+   "assistant",
+   "talk",
+   "observability",
+   "notulen",
+   "deploy"
+  ],
+  [
+   "media"
+  ],
+  [
+   "storage",
+   "gpu",
+   "vault"
+  ]
+ ]
+}
