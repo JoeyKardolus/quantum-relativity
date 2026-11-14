@@ -25,6 +25,8 @@ Connection theory simulation. Rules: `docs/bible.md#physicsconnection-theory`; w
 
 ```
 PYTHONPATH=. .venv/bin/pytest -q physics          # all tests, seconds
+PYTHONPATH=. .venv/bin/python -m physics          # every milestone, results page, minutes
+PYTHONPATH=. .venv/bin/python -m physics.viewer   # gravity scenes as a 3D page (layout drawn, never stored)
 ```
 
 `physics/` is exempt from the test register (owner, 2026-11-14; `UNREGISTERED` in

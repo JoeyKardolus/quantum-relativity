@@ -3,8 +3,8 @@
 WHAT IT PINS. physics/rules through step and RuleSettings: default settings
 leave a consistent network alone; drift lengthens every connection by exactly
 (1 + drift) per step and lowers its energy by the same factor; energy flow
-conserves total energy and evens it out; attraction shortens the connections
-in the energy-dense part more; repulsion stretches only the charged joint's
+conserves total energy and evens it out; attraction (pull from energy volume)
+shortens the connections in the energy-dense part more; repulsion stretches only the charged joint's
 connections and lowers their energy; rewiring keeps the connection count and
 total energy, makes no self or double connections and lowers the action.
 
@@ -40,6 +40,7 @@ def _default_leaves_alone():
     after = step(network)
     np.testing.assert_allclose(after.length, network.length, rtol=1e-12)
     np.testing.assert_allclose(after.energy, network.energy, rtol=1e-12)
+    np.testing.assert_array_equal(after.merged_into, np.arange(network.joint_count))
 
 
 def _drift_lengthens():

@@ -6,8 +6,10 @@ nothing but a charge. Connection i joins joints pairs[i, 0] and pairs[i, 1]
 energy-length rule keeps energy * length = LENGTH_SCALE unless a rule run with
 that rule switched off has let them part. `causal` is set only for a spacetime
 network: a sparse boolean matrix with causal[i, j] true when joint i precedes
-joint j (the full transitive relation, not only the links). Rules return a new
-Network via `dataclasses.replace`; nothing mutates one in place.
+joint j (the full transitive relation, not only the links). `merged_into` is
+set by a rules step: merged_into[old_joint] is that joint's index in this
+network (identity when no joint collapsed); None on a freshly built network.
+Rules return a new Network via `dataclasses.replace`; nothing mutates one in place.
 """
 from __future__ import annotations
 
@@ -21,7 +23,7 @@ from physics.network.energy_length import energy_length
 
 @dataclass(frozen=True)
 class Network:
-    """Joints, connections with energy and length, joint charges, optional causal order."""
+    """Joints, connections with energy and length, charges, optional causal order, merge map."""
 
     joint_count: int
     pairs: np.ndarray
@@ -29,6 +31,7 @@ class Network:
     length: np.ndarray
     charge: np.ndarray = field(default=None)
     causal: sp.csr_matrix | None = None
+    merged_into: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         if self.charge is None:
@@ -41,6 +44,9 @@ class Network:
             raise ValueError("charge needs one value per joint")
         if np.any(self.pairs[:, 0] == self.pairs[:, 1]):
             raise ValueError("a connection cannot join a joint to itself")
+        if self.merged_into is not None and len(self.merged_into) and (
+                self.merged_into.min() < 0 or self.merged_into.max() >= self.joint_count):
+            raise ValueError("merged_into must point at joints of this network")
 
     @classmethod
     def from_lengths(cls, joint_count: int, pairs: np.ndarray, length: np.ndarray,

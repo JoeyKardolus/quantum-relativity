@@ -7,6 +7,7 @@ unchanged.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 
@@ -20,8 +21,13 @@ class RuleSettings:
     energy_flow: float = 0.0
     #: drift: fractional lengthening of every connection per step (energy drops by the same factor).
     drift: float = 0.0
-    #: attraction: shortening per step per unit of local energy density (a coupling like G).
+    #: attraction: shortening per step per unit of pull, the pull spread from each
+    #: region's energy volume through the connections (a coupling like G; see pull.py).
     attraction: float = 0.0
+    #: joint push: stretching a joint gives its connections per unit of squeeze on it.
+    joint_push: float = 0.0
+    #: push limit: the most push a joint can give; a joint asked for more collapses.
+    push_limit: float = math.inf
     #: joint repulsion: stretching per step per unit of charge at a connection's joints.
     repulsion: float = 0.0
     #: rewiring: local move attempts per step (0 = off).

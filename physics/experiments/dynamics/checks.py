@@ -4,9 +4,13 @@ Contract: `rule_checks(seed)` switches on one rule at a time on a small seeded
 network and returns (numbers, passed): flat {"name", "measured", "known",
 "note"} entries and one bool per check. Known values come from the rule
 definitions, not from the code: drift lengthens by (1 + h)^n, energy flow
-conserves total energy, repulsion leaves uncharged connections alone,
-rewiring keeps the connection count, the energy-length rule restores
-energy * length = LENGTH_SCALE. Pass bands are fixed here, before any run.
+conserves total energy, the pull shortens an energy-dense part more than a
+sparse one and fades the more connections lie between (rule 7), joint push
+never exceeds push_limit and equals joint_push x squeeze below it (rule 8),
+joint collapse keeps all energy (rule 8), repulsion leaves uncharged
+connections alone, rewiring keeps the connection count, the energy-length
+rule restores energy * length = LENGTH_SCALE. Pass bands are fixed here,
+before any run. `pull_profile` is the pull-fade profile the checks used.
 """
 from __future__ import annotations
 
@@ -15,17 +19,18 @@ from dataclasses import replace
 import numpy as np
 
 from physics.network import LENGTH_SCALE, Network, random_network, spatial_reference
-from physics.rules import RuleSettings, step
+from physics.rules import RuleSettings, collapse, push, step
 
 _JOINTS = 2000
 _DRIFT = 0.01
 _DRIFT_STEPS = 10
 
 
-def rule_checks(seed: int) -> tuple[list[dict], list[bool]]:
+def rule_checks(seed: int, pull_profile: dict) -> tuple[list[dict], list[bool]]:
     """Run every rule check; return the number entries and whether each passed."""
     base = spatial_reference(_JOINTS, 3, seed=seed)[0]
     results = [_energy_length(base, seed), _drift(base), _flow(base), _attraction(seed),
+               _pull_fades(pull_profile), _push_cap(seed), _collapse_keeps_energy(base, seed),
                _repulsion(base), _rewiring(seed)]
     numbers = [entry for entries, _ in results for entry in entries]
     return numbers, [passed for _, passed in results]
@@ -80,6 +85,41 @@ def _attraction(seed: int):
                       None, "should shrink less than the dense part")]
     return numbers, bool((shrink < 1).all() and shrink[hot].mean() < shrink[cold].mean())
 
+
+def _pull_fades(profile: dict):
+    excess = np.array(profile["excess"])
+    numbers = [_entry("pull: extra pull at a packed lump's centre / background pull",
+                      round(float(excess[0] / profile["background"]), 4), None,
+                      "how far a lump stands out from the pull everywhere"),
+               _entry(f"pull: extra pull {profile['hops'][4]} connections away / at the centre",
+                      round(float(excess[4] / excess[0]), 4), None, "below 1 means the pull fades"),
+               _entry(f"pull: extra pull {profile['hops'][-1]} connections away / at the centre",
+                      round(float(excess[-1] / excess[0]), 4), None, "keeps falling with every connection")]
+    return numbers, bool(excess[0] > 0 and np.all(np.diff(excess) < 0))
+
+
+def _push_cap(seed: int):
+    squeeze = np.random.default_rng(seed).uniform(0.0, 2.0, 1000)
+    settings = RuleSettings(joint_push=0.8, push_limit=1.0)
+    pushed = push(squeeze, settings)
+    below = settings.joint_push * squeeze < settings.push_limit
+    numbers = [_entry("joint push: largest push / push_limit", float(pushed.max() / settings.push_limit), 1.0,
+                      f"{int((~below).sum())} of 1000 joints asked for more than the limit"),
+               _entry("joint push: largest |push - joint_push x squeeze| below the limit",
+                      float(np.abs(pushed[below] - settings.joint_push * squeeze[below]).max()), 0.0,
+                      "under the limit a joint pushes back in proportion to its squeeze")]
+    return numbers, bool(pushed.max() == settings.push_limit and numbers[1]["measured"] < 1e-12)
+
+
+def _collapse_keeps_energy(base: Network, seed: int):
+    giving_way = np.random.default_rng(seed).random(base.joint_count) < 0.05
+    after = collapse(base, giving_way)
+    total = float(after.energy.sum() / base.energy.sum())
+    numbers = [_entry("joint collapse: total energy after / before", round(total, 12), 1.0,
+                      f"{int(giving_way.sum())} of {base.joint_count} joints gave way"),
+               _entry("joint collapse: joints after / before", after.joint_count / base.joint_count, None,
+                      "below 1: joints merged into a neighbour")]
+    return numbers, abs(total - 1) < 1e-12 and after.joint_count < base.joint_count
 
 def _repulsion(base: Network):
     charge = np.zeros(base.joint_count)

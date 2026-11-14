@@ -1,11 +1,21 @@
-"""Run milestone 4: drift + attraction on a clustered 3D network, with an attraction sweep.
+"""Run milestone 4: drift, pull and joint push on a clustered 3D network, with a small sweep.
 
-Contract: `run(seed, out_dir)` builds a clustered 3D reference network, evolves
-it under drift and attraction for each strength in a sweep, writes PNGs to
-out_dir and returns the JSON-serialisable result dict. Pass criteria, fixed
-before any run: some attraction g gives (a) accelerating expansion of sparse
-space (median q < 0 over the second half), (b) scale factor grown >= 1.5x, and
-(c) clusters bound at a steady size (mean size ratio 0.8..1.25, no collapse).
+Contract: `run(seed, out_dir)` builds a clustered 3D reference network and
+evolves it under drift alone, then under drift + pull + joint push for each
+(attraction, push limit) pair in a small sweep, plus one run with full joint
+push. Writes PNGs to out_dir (picture: the network around one cluster before
+and after the picture run) and returns the JSON-serialisable result dict.
+
+Strengths are set from the network before any run: attraction g makes the pull
+at the median cluster joint shorten its connections by `attraction_multiples`
+x drift per step; the push limit is `limit_multiples` x the push the median
+cluster joint asks for (below 1: clusters start past the limit; above 1: under it).
+
+Pass criteria, fixed before any run: some run gives (a) accelerating expansion
+of sparse space (median q < 0 over the second half), (b) scale factor grown
+>= 1.5x, and (c) clusters bound at a steady size (mean size ratio 0.8..1.25)
+with the network still readable at the end. A cluster "collapsed" when the run
+lost more than a tenth of a cluster's joints to joint collapse.
 """
 from __future__ import annotations
 
@@ -17,17 +27,22 @@ import numpy as np
 from physics.experiments.expansion.clustered_reference import clustered_reference
 from physics.experiments.expansion.evolve import evolve
 from physics.experiments.expansion.plots import draw_plots
+from physics.experiments.expansion.result import expansion_result
+from physics.experiments.picture import network_picture
 from physics.measure import distances, expansion_rate
-from physics.rules import RuleSettings
+from physics.rules import RuleSettings, pull
 
-SETTINGS = {"sparse_joints": 20000, "clusters": 4, "cluster_joints": 2000, "cluster_spread": 0.025,
-            "neighbours": 10, "drift": 0.01, "energy_length": 1.0, "steps": 150, "measure_every": 5,
+SETTINGS = {"sparse_joints": 4000, "clusters": 4, "cluster_joints": 400, "cluster_spread": 0.025,
+            "neighbours": 10, "drift": 0.01, "energy_length": 1.0, "steps": 100, "measure_every": 5,
             "sparse_sources": 48, "targets_per_source": 64, "cluster_sources": 8,
-            "threshold_multiples": [0.0, 0.1, 0.25, 0.35, 0.5, 1.0, 2.0, 4.0]}
+            "joint_push": 0.5, "attraction_multiples": [1.0, 3.0], "limit_multiples": [0.5, 2.0],
+            "full_push_run": {"joint_push": 1.0, "attraction_multiple": 3.0, "limit_multiple": 2.0},
+            "picture_run": {"joint_push": 0.5, "attraction_multiple": 3.0, "limit_multiple": 2.0},
+            "picture_region_cluster_sizes": 5.0}
 
 
 def run(seed: int, out_dir: str) -> dict:
-    """Build, sweep attraction, plot, judge; return the result dict."""
+    """Build, sweep, plot, judge; return the result dict."""
     started = time.time()
     os.makedirs(out_dir, exist_ok=True)
     network, labels = clustered_reference(SETTINGS["sparse_joints"], SETTINGS["clusters"],
@@ -35,21 +50,38 @@ def run(seed: int, out_dir: str) -> dict:
                                           SETTINGS["neighbours"], seed)
     rng = np.random.default_rng(seed + 1000)
     probes = _probes(network, labels, rng)
-    cluster_length = _cluster_length(network, labels)
-    drift = SETTINGS["drift"]
+    cluster_pull = float(np.median(pull(network, network.energy, network.length)[labels >= 0]))
     runs = []
-    for multiple in SETTINGS["threshold_multiples"]:
-        attraction = 2 * drift * multiple * cluster_length
-        settings = RuleSettings(energy_length=SETTINGS["energy_length"], drift=drift, attraction=attraction)
-        record = evolve(network, labels, settings, SETTINGS["steps"], SETTINGS["measure_every"], probes)
-        runs.append(_summarise(attraction, multiple, record))
-    plots = draw_plots(runs, drift, out_dir)
-    return _result(runs, plots, cluster_length, network, labels, seed, time.time() - started)
+    for choice in _choices():
+        settings = _settings(choice, cluster_pull)
+        record, final, carried = evolve(network, labels, settings, SETTINGS["steps"],
+                                        SETTINGS["measure_every"], probes)
+        runs.append({**_summarise(choice, settings, record), "final": final, "carried": carried})
+    plots = draw_plots(runs, SETTINGS["drift"], out_dir)
+    picture = _picture(out_dir, network, labels, probes, runs)
+    for entry in runs:
+        del entry["final"], entry["carried"]
+    return expansion_result(runs, plots, picture, SETTINGS, network, cluster_pull, seed,
+                            time.time() - started)
 
 
-def _cluster_length(network, labels) -> float:
-    inside = (labels[network.pairs] >= 0).all(axis=1)
-    return float(network.length[inside].mean())
+def _choices() -> list[dict]:
+    """Drift alone, the sweep at the house joint push, then the full-push run."""
+    sweep = [{"joint_push": SETTINGS["joint_push"], "attraction_multiple": attraction,
+              "limit_multiple": limit}
+             for attraction in SETTINGS["attraction_multiples"] for limit in SETTINGS["limit_multiples"]]
+    return [{"joint_push": 0.0, "attraction_multiple": 0.0, "limit_multiple": None},
+            *sweep, SETTINGS["full_push_run"]]
+
+
+def _settings(choice: dict, cluster_pull: float) -> RuleSettings:
+    drift = SETTINGS["drift"]
+    if not choice["attraction_multiple"]:
+        return RuleSettings(energy_length=SETTINGS["energy_length"], drift=drift)
+    attraction = choice["attraction_multiple"] * drift / cluster_pull
+    asked = choice["joint_push"] * choice["attraction_multiple"] * drift
+    return RuleSettings(energy_length=SETTINGS["energy_length"], drift=drift, attraction=attraction,
+                        joint_push=choice["joint_push"], push_limit=choice["limit_multiple"] * asked)
 
 
 def _probes(network, labels, rng) -> dict:
@@ -69,84 +101,38 @@ def _probes(network, labels, rng) -> dict:
             "pair_targets": np.array(pair_targets), "cluster_sources": cluster_sources}
 
 
-def _summarise(attraction: float, multiple: float, record: dict) -> dict:
+def _summarise(choice: dict, settings: RuleSettings, record: dict) -> dict:
     scale = np.array(record["scale"])
     spacing = np.diff(record["step"]).mean() if len(scale) > 1 else 1.0
     measured = expansion_rate(scale, spacing) if len(scale) > 2 else {"rate": np.full(len(scale), np.nan),
                                                                      "deceleration": np.full(len(scale), np.nan)}
     sizes = np.array(record["cluster_size"])
     half = len(scale) // 2
-    return {"attraction": attraction, "threshold_multiple": multiple, "record": record,
-            "rate": measured["rate"].tolist(),
+    return {**choice, "attraction": settings.attraction, "push_limit": settings.push_limit,
+            "record": record, "rate": measured["rate"].tolist(),
             "median_q": float(np.nanmedian(measured["deceleration"][half:])) if len(scale) > 3 else None,
             "early_rate": float(measured["rate"][1]) if len(scale) > 2 else None,
             "late_rate": float(measured["rate"][-2]) if len(scale) > 2 else None,
             "scale_ratio": float(scale[-1] / scale[0]),
             "cluster_ratio": float((sizes[-1] / sizes[0]).mean()),
+            "joints_lost": int(record["joints"][0] - record["joints"][-1]),
             "steps_run": int(record["step"][-1])}
 
 
-def _judge(run: dict) -> dict:
-    accelerating = run["median_q"] is not None and run["median_q"] < 0
-    grew = run["scale_ratio"] >= 1.5
-    bound = 0.8 <= run["cluster_ratio"] <= 1.25 and run["record"]["collapse_step"] is None
-    return {"accelerating": accelerating, "grew": grew, "bound": bound}
-
-
-def _result(runs, plots, cluster_length, network, labels, seed, seconds) -> dict:
-    drift = SETTINGS["drift"]
-    judged = [_judge(run) for run in runs]
-    passing = [run for run, verdict in zip(runs, judged) if all(verdict.values())]
-    numbers = [{"name": "drift only (g = 0): late growth rate per step",
-                "measured": runs[0]["late_rate"], "known": float(np.log(1 + drift)),
-                "note": "pure exponential expansion, the cosmological-constant case"},
-               {"name": "drift only (g = 0): median deceleration q, second half",
-                "measured": runs[0]["median_q"], "known": -1.0, "note": "exponential growth has q = -1"},
-               {"name": "drift only (g = 0): cluster size ratio vs scale factor ratio",
-                "measured": runs[0]["cluster_ratio"], "known": runs[0]["scale_ratio"],
-                "note": "with no attraction clusters should simply grow with space"}]
-    for run, verdict in zip(runs[1:], judged[1:]):
-        collapse = run["record"]["collapse_step"]
-        tag = f"g = {run['attraction']:.3g} ({run['threshold_multiple']}x cluster threshold)"
-        status = "pass" if all(verdict.values()) else "miss: " + ", ".join(
-            key for key, value in verdict.items() if not value)
-        numbers.append({"name": f"{tag}: cluster size ratio, end / start", "measured": run["cluster_ratio"],
-                        "known": 1.0,
-                        "note": f"1 = bound; sparse scale factor grew {run['scale_ratio']:.3g}x over "
-                                f"{run['steps_run']} steps; " + (f"first connection collapsed at step {collapse}, "
-                                "run stopped; " if collapse else "no collapse; ") + status})
-        numbers.append({"name": f"{tag}: median deceleration q, second half", "measured": run["median_q"],
-                        "known": -1.0, "note": f"q < 0 accelerating, q < -1 faster than exponential; growth rate "
-                                               f"{run['early_rate']} early -> {run['late_rate']} late"})
-    return {"milestone": 4, "title": "Expansion test",
-            "question": "Does drift give accelerating expansion while dense clusters stay bound?",
-            "verdict": "pass" if passing else "fail",
-            "summary": _summary(runs, judged),
-            "numbers": numbers, "plots": plots,
-            "settings": {**SETTINGS, "joints": network.joint_count, "connections": network.connection_count,
-                         "cluster_mean_length": cluster_length,
-                         "attraction_values": [run["attraction"] for run in runs],
-                         "attraction_rule": "g = 2 * drift * multiple * cluster mean length "
-                                            "(multiple 1 = first-order threshold l* = g / 2h at the cluster scale)"},
-            "seed": seed, "seconds": round(seconds, 1)}
-
-
-def _summary(runs, judged) -> str:
-    calm = [run for run in runs[1:] if run["record"]["collapse_step"] is None]
-    broke = [run for run in runs[1:] if run["record"]["collapse_step"] is not None]
-    text = (f"With drift alone, space grows exactly exponentially (rate {runs[0]['late_rate']:.4f} per step, "
-            f"the known ln(1+h) = {np.log(1 + SETTINGS['drift']):.4f}), like a universe ruled by a "
-            f"cosmological constant, and the dense clusters simply grow with it. ")
-    if calm:
-        strongest = calm[-1]
-        text += (f"With weak attraction (up to g = {strongest['attraction']:.2g}) space still accelerates, "
-                 f"but the clusters keep growing too ({strongest['cluster_ratio']:.2f}x while space grew "
-                 f"{strongest['scale_ratio']:.2f}x), so they are not bound. ")
-    if broke:
-        weakest = broke[0]
-        text += (f"From g = {weakest['attraction']:.2g} up, the shortest connections inside a cluster shrink to "
-                 f"zero length within {weakest['record']['collapse_step']} steps and the collapse then spreads "
-                 f"through the whole network, one joint per step. ")
-    text += ("No attraction strength gave clusters that hold a steady size while space expands." if not any(
-        all(verdict.values()) for verdict in judged) else "At least one strength gave bound clusters in accelerating space.")
-    return text
+def _picture(out_dir: str, network, labels, probes: dict, runs: list[dict]) -> str:
+    """Cluster 0 and the sparse space around it, at the start and at the picture run's end."""
+    wanted = SETTINGS["picture_run"]
+    chosen = next(entry for entry in runs if all(entry[key] == value for key, value in wanted.items()))
+    centre = probes["cluster_sources"][0][0]
+    from_centre = distances(network, [centre])[0]
+    size = from_centre[labels == 0].mean()
+    region = np.flatnonzero(from_centre <= SETTINGS["picture_region_cluster_sizes"] * size)
+    final, carried = chosen["final"], chosen["carried"]
+    name = "network_before_after.png"
+    network_picture(os.path.join(out_dir, name),
+                    f"One dense cluster in expanding space: drift + pull (g x{wanted['attraction_multiple']:g}) "
+                    f"+ joint push {wanted['joint_push']:g} (2D layout for drawing only)",
+                    [(f"step 0: {len(region)} joints shown", network, region),
+                     (f"step {chosen['steps_run']}", final, np.unique(carried[region]))],
+                    [carried[region]])
+    return name

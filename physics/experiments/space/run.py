@@ -12,7 +12,8 @@ ball-growth and spectral dimension at CHECKPOINTS, log-spaced so the fast
 early change is resolved (`track`), writes
 the plots into out_dir and returns the result dict. Verdict, fixed in advance:
 pass if some start ends with both dimensions within 10% of 3, unclear if one of
-them does, fail otherwise.
+them does, fail otherwise. Picture: the steps-across plot; meaning: two plain
+sentences.
 """
 from __future__ import annotations
 
@@ -58,8 +59,10 @@ def run(seed: int, out_dir: str) -> dict:
                     "like 3D space?",
         "verdict": verdict,
         "summary": _summary(verdict, tracks),
+        "meaning": _meaning(verdict, tracks),
         "numbers": numbers,
         "plots": plots,
+        "picture": "space_steps_across.png",
         "settings": {"joints": JOINTS, "steps": STEPS, "checkpoints": CHECKPOINTS,
                      "rewiring_attempts_per_step": REWIRING_ATTEMPTS,
                      "energy_flow": ENERGY_FLOW, "energy_length": 1.0, "drift": 0.0,
@@ -150,3 +153,17 @@ def _summary(verdict: str, tracks: dict) -> str:
                  "even at the start, so those runs show only the steps-across shrinking.")
     return text.strip() + (" Some readings were close to 3 but not both, so this is unclear."
                            if verdict == "unclear" else "")
+
+
+def _meaning(verdict: str, tracks: dict) -> str:
+    lost = [name for name, history in tracks.items()
+            if history["ball"][-1] is None and history["spectral"][-1] is None]
+    if verdict == "pass":
+        return ("Rewiring alone settled at least one start into a network that reads as 3D space by both "
+                "measures. So 3D space can come out of the rules here without being put in.")
+    control = " (even the one that began as real 3D space)" if "3D reference (control)" in lost else ""
+    first = (f"Rewiring did not settle any start into 3D space: {len(lost)} of {len(tracks)} starts{control} "
+             "crumpled into a 'small world' where every joint is a few connections from every other."
+             if lost else
+             "Rewiring did not settle any start into 3D space, though the dimension could still be read.")
+    return first + " So the rewiring rule as written builds shortcuts, not space."

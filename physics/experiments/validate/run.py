@@ -2,8 +2,9 @@
 
 Contract: `run(seed, out_dir)` runs the four parts (spatial dimension, proper
 time, twin paradox, Myrheim-Meyer), writes their PNGs into out_dir and returns
-the JSON-serialisable result dict. Verdict is "pass" only when every part
-passes its pre-set 10% band; otherwise "fail", naming the misses.
+the JSON-serialisable result dict (picture: the dimension plot; meaning: two
+plain sentences). Verdict is "pass" only when every part passes its pre-set
+10% band; otherwise "fail", naming the misses.
 """
 from __future__ import annotations
 
@@ -36,8 +37,10 @@ def run(seed: int, out_dir: str) -> dict:
                     "and do they match the known answers of flat space and spacetime?",
         "verdict": "fail" if misses else "pass",
         "summary": _summary(misses),
+        "meaning": _meaning(misses, len(numbers)),
         "numbers": numbers,
         "plots": dimension_plots + time_plots + twin_plots + order_plots,
+        "picture": dimension_plots[0],
         "settings": {"tolerance": "10% relative", "dimension": dimension_settings,
                      "proper_time": time_settings, "twin_paradox": twin_settings,
                      "myrheim_meyer": order_settings, "misses": misses},
@@ -54,3 +57,17 @@ def _summary(misses: list[str]) -> str:
                        "twin's longest causal chain came out shorter, as relativity predicts.")
     return base + (f"{len(misses)} measurement(s) missed the 10% band: {'; '.join(misses)}. "
                    "The rest matched; the misses are reported as misses, not tuned away.")
+
+
+def _meaning(misses: list[str], checks: int) -> str:
+    twin = ("the travelling twin's clock did not reliably come out behind" if "twin paradox" in misses
+            else "the travelling twin's clock came out behind, as relativity says")
+    matched = ("matched flat space and spacetime" if not misses
+               else f"matched flat space and spacetime in all but {len(misses)} of {checks} readings")
+    three_d = not any("3D" in miss or "3+1" in miss for miss in misses)
+    reading = ("So the network carries real geometry without any coordinates, and the 3D rulers the "
+               "later tests use can be trusted" if three_d else
+               "So the rulers the later tests use are not yet trustworthy")
+    return (f"Dimension and elapsed time read off the connections alone, with every position thrown "
+            f"away, {matched}, and {twin}. {reading}"
+            + (f"; the misses ({'; '.join(misses)}) are reported, not tuned away." if misses else "."))

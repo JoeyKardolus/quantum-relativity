@@ -2,7 +2,8 @@
 
 Module map:
   clustered_reference.py  clustered_reference: 3D sparse space with dense clusters (coordinates dropped)
-  evolve.py               evolve: step the rules, record scale factor and cluster sizes
+  evolve.py               evolve: step the rules through joint collapse, record scale factor and cluster sizes
+  result.py               expansion_result: pass criteria, numbers, summary and meaning
   plots.py                draw_plots: the PNG curves
   run.py                  run(seed, out_dir) -> result dict
 """

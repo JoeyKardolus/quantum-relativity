@@ -30,7 +30,7 @@ import pytest
 
 from physics.network import LENGTH_SCALE, causal_reference, random_network, spatial_reference
 
-_FIELDS = {"joint_count", "pairs", "energy", "length", "charge", "causal"}
+_FIELDS = {"joint_count", "pairs", "energy", "length", "charge", "causal", "merged_into"}
 
 
 def _spatial():

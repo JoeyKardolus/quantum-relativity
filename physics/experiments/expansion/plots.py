@@ -1,8 +1,8 @@
 """PNG curves for the expansion test.
 
-Contract: `draw_plots(runs, drift, out_dir)` takes the per-attraction records
-from `evolve` and writes four PNGs into out_dir (scale factor, growth rate,
-cluster size, sweep summary), each with the known drift-only value dashed.
+Contract: `draw_plots(runs, drift, out_dir)` takes the per-run summaries (each
+with its `evolve` record) and writes three PNGs into out_dir (scale factor,
+growth rate, cluster size), each with the known drift-only value dashed.
 Returns the file names.
 """
 from __future__ import annotations
@@ -19,14 +19,16 @@ import numpy as np  # noqa: E402
 def draw_plots(runs: list[dict], drift: float, out_dir: str) -> list[str]:
     """Write the four figures; return their file names."""
     colours = plt.cm.viridis(np.linspace(0, 0.9, len(runs)))
-    names = [_scale_plot(runs, drift, colours, out_dir), _rate_plot(runs, drift, colours, out_dir),
-             _cluster_plot(runs, colours, out_dir), _sweep_plot(runs, out_dir)]
-    return names
+    return [_scale_plot(runs, drift, colours, out_dir), _rate_plot(runs, drift, colours, out_dir),
+            _cluster_plot(runs, colours, out_dir)]
 
 
 def _label(run: dict) -> str:
-    tail = f", collapse at step {run['record']['collapse_step']}" if run["record"]["collapse_step"] else ""
-    return f"g = {run['attraction']:.2g}{tail}"
+    if not run["attraction_multiple"]:
+        return "drift only"
+    tail = f", broke down at step {run['record']['breakdown_step']}" if run["record"]["breakdown_step"] else ""
+    return (f"pull x{run['attraction_multiple']:g}, limit x{run['limit_multiple']:g}, "
+            f"push {run['joint_push']:g}{tail}")
 
 
 def _save(figure, out_dir: str, name: str) -> str:
@@ -79,19 +81,3 @@ def _cluster_plot(runs, colours, out_dir) -> str:
     axis.set_title("Dense clusters: do they grow with space or stay bound?")
     axis.legend(fontsize=7)
     return _save(figure, out_dir, "cluster_size.png")
-
-
-def _sweep_plot(runs, out_dir) -> str:
-    figure, axis = plt.subplots(figsize=(7, 4.5))
-    strengths = np.array([run["attraction"] for run in runs])
-    shown = np.where(strengths > 0, strengths, strengths[strengths > 0].min() / 3)
-    axis.plot(shown, [run["scale_ratio"] for run in runs], "o-", label="sparse scale factor, end / start")
-    axis.plot(shown, [run["cluster_ratio"] for run in runs], "s-", label="cluster size, end / start")
-    axis.axhline(1.0, color="k", ls="--", label="no change (bound)")
-    axis.set_xscale("log")
-    axis.set_yscale("log")
-    axis.set_xlabel("attraction strength g  (leftmost point is g = 0)")
-    axis.set_ylabel("ratio at end of run (or at collapse)")
-    axis.set_title("Attraction sweep: where do clusters stop following expansion?")
-    axis.legend(fontsize=7)
-    return _save(figure, out_dir, "attraction_sweep.png")
