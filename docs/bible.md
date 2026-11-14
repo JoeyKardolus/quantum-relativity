@@ -947,7 +947,7 @@ Validation comes first: a measurement is trusted on new rules only after it give
 answer on a known reference spacetime (a network built from points scattered in flat space or
 flat spacetime, whose true dimension and proper times are known). Every result is reported as a
 number beside the known value it should match, with the run's seed and settings, so anyone can
-rerun it. Results that miss are reported as misses. Every scene runs with all rules on, because the rules depend on each other; a rule is switched off only in a side-by-side comparison run (owner, 2026-11-14). Nothing is placed by hand: scenes start from energy that is slightly uneven everywhere, and lumps must form by themselves. The viewer draws the network as a solid mesh of connections, because the connections are space and nothing lies between them.
+rerun it. Results that miss are reported as misses. Every scene runs with all rules on, because the rules depend on each other; a rule is switched off only in a side-by-side comparison run (owner, 2026-11-14). Nothing is placed by hand: scenes start from energy that is slightly uneven everywhere, and lumps must form by themselves. Until the Space test makes 3D space emerge, scenes start from a network scattered in 3D as a stand-in for space that already exists. The viewer draws the network as a solid mesh of connections, because the connections are space and nothing lies between them.
 
 ### Milestones
 
