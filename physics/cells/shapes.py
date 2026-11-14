@@ -14,7 +14,8 @@ Contract: `shapes(engine)` returns
            grid and every joint of the grid has at least one entry.
   push     how hard that joint pushes: its squeeze toward its collapse limit, 0..1
            (joint_squeeze.py).
-  thickness  the joint's volume / the area of its faces: how thick a slab it is.
+  thickness  the joint's volume / the area of its faces: how thick a slab it is, capped
+           at a quarter of a typical cell's width so tiny faces do not draw as streaks.
 Plain Python floats and ints, ready for JSON. Reads the engine only.
 """
 from __future__ import annotations
@@ -22,6 +23,10 @@ from __future__ import annotations
 import numpy as np
 
 from physics.cells.engine import Engine
+
+#: Drawn slab thickness is capped at this share of a typical cell's width: on a tiny face,
+#: volume / area explodes and the slab would shoot across the view as a streak.
+_THICKEST = 0.25
 
 
 def shapes(engine: Engine) -> dict:
@@ -38,7 +43,8 @@ def shapes(engine: Engine) -> dict:
         faces[cell].append(polygon)
     cells = [{"id": cell, "faces": faces[cell], "pull": float(pull[cell])}
              for cell in range(grid.cell_count)]
-    thickness = grid.joint_volume / np.maximum(tessellation.pair_area, 1e-300)
+    thickness = np.minimum(grid.joint_volume / np.maximum(tessellation.pair_area, 1e-300),
+                           _THICKEST * np.cbrt(grid.volume.mean()))
     joints = []
     lower = (tessellation.face_joint >= 0) & (tessellation.face_cell < tessellation.face_other)
     for face in np.flatnonzero(lower).tolist():
