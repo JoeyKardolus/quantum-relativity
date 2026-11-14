@@ -11,7 +11,8 @@
   sealed    a lump (one volume and its neighbours, energy tripled) with every joint
             touching it at depth 0.45 (seal 0.4, limit 0.5) keeps exactly its
             energy over 50 leaks while the rest of the grid moves; engine_stats
-            counts it as a sealed lump; the rules collapse nothing there, until one
+            counts it as a sealed lump and shapes() flags exactly its outer joints
+            (one volume in the lump) as sealed; the rules collapse nothing there, until one
             of its joints is pushed to 0.3 of rest, past the limit: then it collapses.
 """
 from __future__ import annotations
@@ -21,7 +22,7 @@ from dataclasses import replace
 import numpy as np
 
 from physics.cells import (EngineSettings, apply_rules, engine_stats, joint_rest, leak,
-                           new_engine, rest_volume, seam_joints, seam_openness, step)
+                           new_engine, rest_volume, seam_joints, seam_openness, shapes, step)
 
 SETTINGS = EngineSettings.all_on()
 
@@ -92,6 +93,10 @@ def test_a_sealed_lump_keeps_its_energy_until_pushed_past_the_limit():
     assert np.isclose(leaked.sum(), grid.energy.sum(), rtol=1e-13)
     stats = engine_stats(replace(engine, grid=grid))
     assert stats["lumps"] == 1 and stats["sealed_lumps"] == 1
+    walls = {(joint["a"], joint["b"]) for joint in shapes(replace(engine, grid=grid))["joints"]
+             if joint["sealed"]}
+    inside = np.isin(grid.joints, lump)
+    assert walls == {tuple(pair) for pair in grid.joints[inside[:, 0] != inside[:, 1]].tolist()}
     assert apply_rules(grid, SETTINGS).cell_count == grid.cell_count
     pushed = squeezed.copy()
     pushed[np.flatnonzero(touching)[0]] = 0.3 * rest[np.flatnonzero(touching)[0]]

@@ -18,6 +18,7 @@
     --volume-solid: #a10a14;
     --joint-clear: #5a7fe0;
     --joint-solid: #3aa2ff;
+    --sealed: #e6b422;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
@@ -36,6 +37,7 @@
   .key { display: inline-block; flex: none; width: 28px; height: 12px; border-radius: 2px; }
   .key.volume { background: linear-gradient(90deg, color-mix(in srgb, var(--volume-clear) 12%, transparent), var(--volume-solid));
     border: 1px solid color-mix(in srgb, var(--volume-clear) 45%, transparent); }
+  .key.sealed { height: 0; border-top: 2px solid var(--sealed); border-radius: 0; }
   .key.joint { height: 7px; background: linear-gradient(90deg, color-mix(in srgb, var(--joint-clear) 12%, transparent), var(--joint-solid));
     border: 1px solid color-mix(in srgb, var(--joint-clear) 45%, transparent); }
   #panel { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px;
@@ -89,6 +91,7 @@
   <div id="legend">
     <span><i class="key volume"></i>red glass = energy volume (pulls)</span>
     <span><i class="key joint"></i>blue glass = joint (pushes)</span>
+    <span><i class="key sealed"></i>gold edge = wall of a sealed lump</span>
     <small>more solid = stronger</small>
   </div>
 </div>
@@ -118,7 +121,8 @@
   </div>
   <div id="viewSettings"></div>
   <div class="caption">Every shape is the engine's own: each red cell is an energy volume, more solid the harder it pulls.
-    Each blue slab is a joint, a volume of its own on the face two energy volumes share, more solid the closer it is squeezed to its push limit.</div>
+    Each blue slab is a joint, a volume of its own on the face two energy volumes share, more solid the closer it is squeezed to its push limit.
+    A gold edge marks a joint on the outside of a sealed lump: every seam around the lump is closed, so no energy leaks in or out.</div>
 
   <h2>Run</h2>
   <div id="runSettings"></div>
@@ -143,6 +147,7 @@ const LABELS = {
   push_limit: "push limit (below it, joint collapse)",
   joint_rest: "joint rest volume",
   leak: "leak (energy flowing to harder-pulling neighbours)",
+  seal_point: "seal point (seams close, lump holds)",
 };
 const RUN_SETTINGS = new Set(["speed", "unevenness"]);
 const SHRINK = 0.95;            // each cell's faces drawn this far toward its centre, so they clear the joints
@@ -188,7 +193,7 @@ const GLASS_FRAGMENT = `
   }`;
 
 const scene3d = { renderer: null, scene: null, camera: null, volumeMaterial: null, jointMaterial: null,
-  volumes: null, joints: null, show: { volumes: true, joints: true }, drawnCells: 0, drawnJoints: 0 };
+  sealMaterial: null, volumes: null, joints: null, seals: null, show: { volumes: true, joints: true }, drawnCells: 0, drawnJoints: 0 };
 const orbit = { theta: 0.7, phi: 1.15, distance: 10, follow: true, centre: [0, 0, 0], reach: 1 };
 let latest = null;            // the latest shapes message, checked, with each cell's centre
 let drawLimit = DEFAULT_DRAWN;
@@ -205,6 +210,7 @@ function createScene() {
     uniforms: { clear: { value: cssColour(clear) }, solid: { value: cssColour(solid) } } });
   scene3d.volumeMaterial = glass("--volume-clear", "--volume-solid");
   scene3d.jointMaterial = glass("--joint-clear", "--joint-solid");
+  scene3d.sealMaterial = new THREE.LineBasicMaterial({ color: cssColour("--sealed"), transparent: true, opacity: 0.95 });
 }
 
 /** A flat list of at least three finite xyz corners. */
@@ -310,6 +316,24 @@ function writeJoint(joint, buffers) {
   }
 }
 
+/** Gold outlines of the given joints' faces (each polygon's corners joined in a ring), as one line set. */
+function sealLines(joints) {
+  const corners = [];
+  for (const joint of joints) {
+    const points = joint.polygon, count = points.length / 3;
+    for (let corner = 0; corner < count; corner++) {
+      const next = (corner + 1) % count;
+      corners.push(...points.slice(corner * 3, corner * 3 + 3), ...points.slice(next * 3, next * 3 + 3));
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(corners), 3));
+  const lines = new THREE.LineSegments(geometry, scene3d.sealMaterial);
+  lines.frustumCulled = false;
+  lines.renderOrder = 3;
+  return lines;
+}
+
 /** One mesh from written buffers, with the glass material. */
 function glassMesh(buffers, material, order) {
   const geometry = new THREE.BufferGeometry();
@@ -323,9 +347,9 @@ function glassMesh(buffers, material, order) {
   return mesh;
 }
 
-/** Drop the two meshes and free their GPU buffers. */
+/** Drop the meshes and the seal lines and free their GPU buffers. */
 function clearMeshes() {
-  for (const name of ["volumes", "joints"]) {
+  for (const name of ["volumes", "joints", "seals"]) {
     if (!scene3d[name]) continue;
     scene3d.scene.remove(scene3d[name]);
     scene3d[name].geometry.dispose();
@@ -354,7 +378,8 @@ function rebuild() {
   clearMeshes();
   scene3d.volumes = glassMesh(cellBuffers, scene3d.volumeMaterial, 1);
   scene3d.joints = glassMesh(jointBuffers, scene3d.jointMaterial, 2);
-  scene3d.scene.add(scene3d.volumes, scene3d.joints);
+  scene3d.seals = sealLines(joints.filter((joint) => joint.sealed === true));
+  scene3d.scene.add(scene3d.volumes, scene3d.joints, scene3d.seals);
   scene3d.drawnCells = drawn.length;
   scene3d.drawnJoints = joints.length;
   orbit.reach = drawnReach(drawn, orbit.centre);
@@ -378,6 +403,7 @@ function drawnReach(cells, centre) {
 function showParts() {
   if (scene3d.volumes) scene3d.volumes.visible = scene3d.show.volumes;
   if (scene3d.joints) scene3d.joints.visible = scene3d.show.joints;
+  if (scene3d.seals) scene3d.seals.visible = scene3d.show.joints;
   requestDraw();
 }
 
@@ -541,7 +567,7 @@ function formatNumber(value) {
 }
 
 const statsBox = document.getElementById("stats");
-const SHOWN_STATS = new Set(["cells", "joints", "collapses", "size_vs_start", "energy_spread", "lumps"]);
+const SHOWN_STATS = new Set(["cells", "joints", "collapses", "size_vs_start", "energy_spread", "lumps", "sealed_lumps"]);
 
 /** Write the live stats as plain lines. */
 function showStats() {
@@ -554,6 +580,7 @@ function showStats() {
     ["size vs start", stats.size_vs_start == null ? undefined : formatNumber(stats.size_vs_start) + "x"],
     ["energy spread (packing)", stats.energy_spread],
     ["lumps", stats.lumps],
+    ["sealed lumps", stats.sealed_lumps],
     ...Object.keys(stats).filter((name) => !SHOWN_STATS.has(name)).map((name) => [name.replace(/_/g, " "), stats[name]]),
     ["energy volumes drawn", scene3d.renderer ? scene3d.drawnCells : undefined],
     ["joints drawn", scene3d.renderer ? scene3d.drawnJoints : undefined],

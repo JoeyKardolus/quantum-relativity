@@ -13,6 +13,7 @@ Module map:
   step.py             step: pure Engine -> Engine; rules, then seeds, box and shapes follow
   shapes.py           shapes: cells' faces with pull, joints' faces with push, for drawing
   engine_stats.py     engine_stats: cells, joints, collapses, size, spread, lumps, sealed
+  lumps.py            lumps: lump number per energy volume, and which lumps have sealed
   grid.py             Grid: per energy volume its energy, volume and charge, the joints
                       between neighbours with each joint's volume, the seams where three
                       joints meet; no shapes, no coordinates
@@ -56,6 +57,7 @@ from physics.cells.reconcile_joints import reconcile_joints
 from physics.cells.engine import Engine
 from physics.cells.new_engine import new_engine
 from physics.cells.step import step
+from physics.cells.lumps import lumps
 from physics.cells.shapes import shapes
 from physics.cells.engine_stats import engine_stats
 
@@ -63,4 +65,4 @@ __all__ = ["Grid", "VOLUME_SCALE", "rest_volume", "joint_rest", "EngineSettings"
            "pull_potential", "seam_joints", "seam_openness", "leak", "share_space", "move_space", "joint_collapse",
            "joint_squeeze", "apply_rules", "Tessellation", "tessellate", "target_size",
            "fit_weights", "move_seeds", "reconcile_joints", "Engine", "new_engine", "step",
-           "shapes", "engine_stats"]
+           "lumps", "shapes", "engine_stats"]

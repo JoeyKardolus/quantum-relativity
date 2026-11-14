@@ -3,8 +3,8 @@
 Contract: `shapes_message(simulation)` returns {"type": "shapes", "step",
 "cells", "joints", "stats"}. "cells" and "joints" are passed on unchanged from
 `physics.cells.shapes(engine)` (each cell {"id", "faces", "pull"}, each joint
-{"a", "b", "polygon", "push", "thickness"}; polygons are the tessellation's own
-faces). "stats" is `physics.cells.engine_stats(engine)` with every value plain
+{"a", "b", "polygon", "push", "thickness", "sealed"}; polygons are the
+tessellation's own faces; "sealed" marks an outer wall of a sealed lump). "stats" is `physics.cells.engine_stats(engine)` with every value plain
 JSON: a value that is not finite becomes null, a float is rounded to 5 decimals.
 Nothing here computes or alters a shape.
 """

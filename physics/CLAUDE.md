@@ -7,7 +7,7 @@ vertex, or merge for joint collapse).
 The core is `cells/`: the engine. Energy volumes in a periodic box, their exact cell shapes
 from a power (Laguerre) tessellation (pyvoro2, pinned), and a joint on every shared face. `app/`
 is the live simulator on it (`python -m physics.app`); it draws `cells.shapes(engine)` as sent
-and has no geometry code. `network/`, `rules/`, `measure/` and `experiments/` are the earlier
+(sealed lumps' walls gold) and has no geometry code. `network/`, `rules/`, `measure/` and `experiments/` are the earlier
 joint-network milestones.
 
 ## Must not get wrong
@@ -41,9 +41,9 @@ joint-network milestones.
 ## Run
 
 ```
-PYTHONPATH=. .venv/bin/pytest -q physics                 # all tests, seconds
-PYTHONPATH=. .venv/bin/python -m physics.app             # live cell grid page, localhost:8765
-PYTHONPATH=. .venv/bin/python -m physics                 # network milestones, results page, minutes
+PYTHONPATH=. .venv/bin/pytest -q physics                 # all tests
+PYTHONPATH=. .venv/bin/python -m physics.app             # live page, localhost:8765
+PYTHONPATH=. .venv/bin/python -m physics                 # network milestones, minutes
 PYTHONPATH=. .venv/bin/python -m physics.viewer          # network gravity scenes as a 3D page
 ```
 

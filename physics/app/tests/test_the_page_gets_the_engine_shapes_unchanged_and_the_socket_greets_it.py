@@ -19,7 +19,7 @@ from physics.app.shapes_message import shapes_message  # noqa: E402
 from physics.app.simulation import RULE_NAMES  # noqa: E402
 
 CELLS = 80
-STATS = {"cells", "joints", "collapses", "size_vs_start", "energy_spread", "lumps"}
+STATS = {"cells", "joints", "collapses", "size_vs_start", "energy_spread", "lumps", "sealed_lumps"}
 
 
 def _good_polygon(points) -> bool:
@@ -43,7 +43,8 @@ def test_the_shapes_message_is_the_engines_shapes_with_its_stats():
         assert cell["faces"] and all(_good_polygon(face) for face in cell["faces"])
     assert len(message["joints"]) == message["stats"]["joints"]
     for joint in message["joints"]:
-        assert set(joint) >= {"a", "b", "polygon", "push", "thickness"}
+        assert set(joint) >= {"a", "b", "polygon", "push", "thickness", "sealed"}
+        assert isinstance(joint["sealed"], bool)
         assert joint["a"] in ids and joint["b"] in ids and joint["a"] != joint["b"]
         assert _good_polygon(joint["polygon"]) and 0.0 <= joint["push"] <= 1.0
         assert math.isfinite(joint["thickness"]) and joint["thickness"] >= 0.0

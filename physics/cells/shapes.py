@@ -2,7 +2,8 @@
 
 Contract: `shapes(engine)` returns
   {"cells":  [{"id": i, "faces": [[x, y, z, x, y, z, ...], ...], "pull": p}, ...],
-   "joints": [{"a": i, "b": j, "polygon": [x, y, z, ...], "push": q, "thickness": t}, ...]}
+   "joints": [{"a": i, "b": j, "polygon": [x, y, z, ...], "push": q, "thickness": t,
+               "sealed": s}, ...]}
   cells    one entry per energy volume: every face of its tessellated cell, each a flat
            list of its corners in order, all in one unwrapped periodic image of that
            cell (corners may lie just outside [0, side)); an empty cell has no faces.
@@ -16,6 +17,8 @@ Contract: `shapes(engine)` returns
            (joint_squeeze.py).
   thickness  the joint's volume / the area of its faces: how thick a slab it is, capped
            at a quarter of a typical cell's width so tiny faces do not draw as streaks.
+  sealed   True when the joint is an outer wall of a sealed lump (lumps.py): exactly one
+           of its two energy volumes lies in a lump whose outer seams are all closed.
 Plain Python floats and ints, ready for JSON. Reads the engine only.
 """
 from __future__ import annotations
@@ -23,6 +26,7 @@ from __future__ import annotations
 import numpy as np
 
 from physics.cells.engine import Engine
+from physics.cells.lumps import lumps
 
 #: Drawn slab thickness is capped at this share of a typical cell's width: on a tiny face,
 #: volume / area explodes and the slab would shoot across the view as a streak.
@@ -45,11 +49,14 @@ def shapes(engine: Engine) -> dict:
              for cell in range(grid.cell_count)]
     thickness = np.minimum(grid.joint_volume / np.maximum(tessellation.pair_area, 1e-300),
                            _THICKEST * np.cbrt(grid.volume.mean()))
+    label, sealed = lumps(grid)
+    in_sealed = np.append(sealed, False)[label]   # label -1 (no lump) reads the appended False
+    wall = in_sealed[grid.joints[:, 0]] != in_sealed[grid.joints[:, 1]]
     joints = []
     lower = (tessellation.face_joint >= 0) & (tessellation.face_cell < tessellation.face_other)
     for face in np.flatnonzero(lower).tolist():
         joint = int(tessellation.face_joint[face])
         joints.append({"a": int(grid.joints[joint, 0]), "b": int(grid.joints[joint, 1]),
                        "polygon": flat[face], "push": float(grid.squeeze[joint]),
-                       "thickness": float(thickness[joint])})
+                       "thickness": float(thickness[joint]), "sealed": bool(wall[joint])})
     return {"cells": cells, "joints": joints}

@@ -5,7 +5,8 @@ every EngineSettings field plus "unevenness" and "speed". A rule's range runs
 from 0 to SCALED times its calibrated value (a negative value flips the range;
 a zero value gets 0 to ZERO_REACH), since its sensible size depends on the
 rules' own units. Leak and joint push are shares per step, so they never
-go past 1, and push_limit stays below 1 (at 1 a joint's squeeze divides by zero).
+go past 1, push_limit stays below 1 (at 1 a joint's squeeze divides by zero), and
+seal_point stays below 1 (a squeeze depth; the engine caps it at 1 - push_limit).
 Unevenness and speed are fixed.
 """
 from __future__ import annotations
@@ -16,7 +17,7 @@ from physics.cells import EngineSettings
 
 SCALED = 5.0
 ZERO_REACH = 0.01
-_CAPS = {"leak": 1.0, "joint_push": 1.0, "push_limit": 0.99}
+_CAPS = {"leak": 1.0, "joint_push": 1.0, "push_limit": 0.99, "seal_point": 0.99}
 _FIXED = {
     "unevenness": (0.0, 1.0),
     "speed": (0.5, 60.0),
