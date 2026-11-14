@@ -934,7 +934,7 @@ particles in space. Code that breaks a rule below is simulating something else.
 
 Bell's theorem says a classical network cannot reproduce entanglement, so something
 non-classical is needed later; linked connections must never give a usable faster-than-light
-signal; joints probably need two types (+ and −); a regular grid picks out directions, so the
+signal; charge is undecided (owner's lead: energy volumes one sign and joints the other, so an electron would be a lump where joints win); a regular grid picks out directions, so the
 network should be irregular; length must be an internal quantity, not a coordinate; drift and
 repulsion must balance attraction so everything does not clump; bound regions (atoms, galaxies)
 must resist the drift while empty space expands; the real expansion first slowed and then sped
