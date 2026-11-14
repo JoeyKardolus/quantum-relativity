@@ -47,6 +47,7 @@ The core depth/seam vocabulary used by `improve-codebase-architecture`, `tdd`, `
 - **drift**: the small built-in growth of every energy volume in the base state; the proposed cause of expansion. _Avoid_: dark energy (that is what drift may explain, not the rule), inflation, stretch.
 - **energy volume**: a cell of space holding energy inside it (drawn and started as a tetrahedron, but it has no shape in the theory); more energy makes it smaller and pulls harder. Energy volumes and joints together fill space with no gaps. _Avoid_: mass, energy density, gravity source, region.
 - **joint collapse**: a joint giving way when the squeeze on it passes its limit, so the two energy volumes it separated fall into each other, keeping their energy; the network's version of gravitational collapse. _Avoid_: black hole (what collapse may produce, not the rule), merge, implosion.
+- **energy event**: a particle (electron, proton) seen as a pattern of energy travelling through the grid, not a structure of its own; far bigger than one energy volume. _Avoid_: particle as a thing, ball, structure.
 - **reference spacetime**: a network built from points scattered in a flat space or spacetime whose true dimension and proper times are known; used to validate a measurement before it is trusted. _Avoid_: test grid, ground truth, toy universe.
 
 ## Project vocabulary
