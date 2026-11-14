@@ -23,7 +23,8 @@ def _run(steps):
 def test_step_is_reproducible():
     first, second = _run(10), _run(10)
     assert first.cell_count == second.cell_count
-    for name in ("joints", "energy", "volume", "squeeze", "merged_into"):
+    for name in ("joints", "energy", "volume", "joint_volume", "squeeze", "charge",
+                 "merged_into"):
         assert np.array_equal(getattr(first, name), getattr(second, name))
     grid, _ = build_grid(400, seed=5, unevenness=0.1)
     flowed = energy_flow(grid, grid.energy, 0.5)

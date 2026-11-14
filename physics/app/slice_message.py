@@ -9,16 +9,21 @@ radius^2 - distance^2 is positive; the crossing volumes' 2D power diagram
 extent on the two plane axes: x cut -> (y, z), y cut -> (x, z), z cut ->
 (x, y)) is the slice of the 3D power diagram, so the cells tile the box. Returns
 {"type": "slice", "step", "depth", "cells": [{"id", "polygon": [x0, y0, ...],
-"energy"}], "walls": [{"a", "b", "line": [x0, y0, x1, y1], "squeeze"}]};
-"energy" is the volume's entry in `energy`, a wall's "squeeze" is the entry
-in `squeeze` of the joint between a and b, or null when a and b are not
-neighbours in the grid (a wall the drawing needs that no joint matches).
+"energy"}], "walls": [{"a", "b", "line": [x0, y0, x1, y1], "squeeze",
+"band"}]}; "energy" is the volume's entry in `energy`, a wall's "squeeze" is
+the entry in `squeeze` of the joint between a and b, or null when a and b are
+not neighbours in the grid (a wall the drawing needs that no joint matches).
+"band" is the width of the joint layer on that wall: the joint's entry in
+`bands` (the thickness of its 3D joint layer, `walls_message`), null for a
+wall that is no joint, for a joint without a 3D face, or when `bands` is None.
+The page draws the band centred on the line, in its own colour.
 Coordinates have 3 decimals. Nothing here is stored on the Grid.
 """
 from __future__ import annotations
 
 import numpy as np
 
+from physics.app.joint_index import joint_index
 from physics.app.power_cells import power_cells
 
 PLANE_AXES = {"x": (1, 2), "y": (0, 2), "z": (0, 1)}
@@ -26,7 +31,7 @@ CUT_AXIS = {"x": 0, "y": 1, "z": 2}
 
 
 def slice_message(positions: np.ndarray, radius: np.ndarray, energy, joints: np.ndarray,
-                  squeeze, depth: float, axis: str, step: int) -> dict:
+                  squeeze, depth: float, axis: str, step: int, bands=None) -> dict:
     """The foam cut through the display layout at depth along axis."""
     if axis not in CUT_AXIS:
         raise ValueError(f"axis must be x, y or z, not {axis!r}")
@@ -47,11 +52,12 @@ def slice_message(positions: np.ndarray, radius: np.ndarray, energy, joints: np.
     message["cells"] = [{"id": int(crossing[index]), "polygon": _rounded(polygon),
                          "energy": energy[crossing[index]]}
                         for index, polygon in enumerate(polygons) if polygon is not None]
-    joint_of = _joint_of(joints, len(positions),
-                         [(crossing[first], crossing[second]) for first, second, _ in walls])
+    joint_of = joint_index(joints, len(positions),
+                           [(crossing[first], crossing[second]) for first, second, _ in walls])
     message["walls"] = [{"a": int(crossing[first]), "b": int(crossing[second]),
                          "line": _rounded(segment),
-                         "squeeze": None if joint < 0 else squeeze[joint]}
+                         "squeeze": None if joint < 0 else squeeze[joint],
+                         "band": None if joint < 0 or bands is None else bands[joint]}
                         for (first, second, segment), joint in zip(walls, joint_of)]
     return message
 
@@ -59,18 +65,3 @@ def slice_message(positions: np.ndarray, radius: np.ndarray, energy, joints: np.
 def _rounded(points):
     return np.round(points, 3).ravel().tolist()
 
-
-def _joint_of(joints, count, pairs):
-    """Index of the joint between each pair of energy volumes, -1 where there is none."""
-    if not pairs:
-        return []
-    joints = np.sort(np.asarray(joints, dtype=np.int64).reshape(-1, 2), axis=1)
-    keys = joints[:, 0] * count + joints[:, 1]
-    order = np.argsort(keys)
-    wanted = np.sort(np.asarray(pairs, dtype=np.int64), axis=1)
-    wanted = wanted[:, 0] * count + wanted[:, 1]
-    place = np.minimum(np.searchsorted(keys[order], wanted), max(len(keys) - 1, 0))
-    if not len(keys):
-        return [-1] * len(wanted)
-    found = keys[order][place] == wanted
-    return np.where(found, order[place], -1).tolist()

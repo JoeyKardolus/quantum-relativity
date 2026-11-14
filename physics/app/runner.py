@@ -2,20 +2,27 @@
 
 Contract: `Runner(simulation)` serves page connections (`serve(socket)`) and
 runs the stepping loop (`run()`, one asyncio task for the app's life). A new
-page gets settings, mesh and frame at once. Client messages: "start" (step
+page gets settings, mesh, frame, walls and slice at once. Client messages: "start" (step
 at `speed` steps per second, mesh sent), "pause", "reset" (seed, cells
 clamped to CELL_RANGE; settings, mesh and frame sent), "settings" (values
 applied, settings echoed), "slice" (depth clamped to 0..1, axis "x", "y" or "z";
-the cut moves and a fresh slice is sent). Every frame is followed by its slice
-(`slice_message` of the frame's own positions, radii and shades), and the frame's
-stats gain "walls_not_matching_joints": the slice's walls between energy volumes
-that are not neighbours in the grid. Every page gets every message (one shared
-simulation). Frames go out at most FRAMES_PER_SECOND; a mesh goes out after
-any step that changed the joint list. Steps, resets and frames run in a
-worker thread under one lock, so the server keeps answering. A bad message or
-a failed step is printed on the console; a failed step pauses the run, and so does a
-step that leaves no joint (every energy volume fell into one). A page
-that disconnects or cannot be sent to is dropped.
+the cut moves and a fresh slice is sent). Every frame is followed by the 3D
+joint layers (`walls_message`) when they are due, then by its slice
+(`slice_message` of the frame's own positions, radii and shades, each joint
+wall's band the thickness of that joint's 3D layer). Walls are due on every
+WALLS_EVERY-th frame, on any frame whose joint list differs from the last
+walls' (so bands never point at a joint list that is gone), and on a frame
+sent while not running (greeting, reset, the frame after a pause). The frame's stats gain
+"walls_not_matching_joints": the latest walls' mismatch, the share of 3D
+power-diagram faces that are no joint, and "cut_walls_not_matching_joints":
+the slice's walls between energy volumes that are not neighbours in the grid.
+Every page gets every message (one shared simulation). Frames go out at most
+FRAMES_PER_SECOND; a mesh goes out after any step that changed the joint
+list. Steps, resets and frames run in a worker thread under one lock, so the
+server keeps answering. A bad message or a failed step is printed on the
+console; a failed step pauses the run, and so does a step that leaves no
+joint (every energy volume fell into one). A page that disconnects or cannot
+be sent to is dropped.
 """
 from __future__ import annotations
 
@@ -29,12 +36,15 @@ import numpy as np
 from fastapi import WebSocket, WebSocketDisconnect
 
 from physics.app.frame_message import frame_message
+from physics.app.joint_index import joint_index
 from physics.app.mesh_message import mesh_message
 from physics.app.settings_message import settings_message
 from physics.app.slice_message import slice_message
 from physics.app.simulation import Simulation
+from physics.app.walls_message import walls_message
 
 FRAMES_PER_SECOND = 15
+WALLS_EVERY = 3
 CELL_RANGE = (50, 20000)
 
 
@@ -51,6 +61,8 @@ class Runner:
         self.slice_depth = 0.5
         self.slice_axis = "z"
         self._shown: tuple[dict, object] | None = None
+        self._frame_count = 0
+        self._walls: tuple[dict, object, list] | None = None
 
     async def serve(self, socket: WebSocket) -> None:
         """Hold one page's connection until it closes."""
@@ -149,18 +161,36 @@ class Runner:
         await self._broadcast(cut)
 
     def _frames(self) -> list[dict]:
-        """The frame and its slice, the slice's unmatched wall count added to the frame's stats."""
+        """The frame, its walls when due, and its slice, with both mismatch counts in its stats."""
         frame = frame_message(self.simulation)
-        self._shown = (frame, self.simulation.grid.joints.copy())
+        joints = self.simulation.grid.joints.copy()
+        self._shown = (frame, joints)
+        outgoing = [frame]
+        if self._walls_due(joints):
+            walls = walls_message(np.asarray(frame["positions"], dtype=float).reshape(-1, 3),
+                                  frame["radius"], joints, frame["joint_volume"],
+                                  frame["squeeze"], frame["step"])
+            self._walls = (walls, joints, _bands(walls, joints, len(frame["radius"])))
+            outgoing.append(walls)
+        self._frame_count += 1
         cut = self._slice(*self._shown)
-        frame["stats"]["walls_not_matching_joints"] = sum(wall["squeeze"] is None
-                                                          for wall in cut["walls"])
-        return [frame, cut]
+        frame["stats"]["walls_not_matching_joints"] = self._walls[0]["mismatch"]
+        frame["stats"]["cut_walls_not_matching_joints"] = sum(wall["squeeze"] is None
+                                                              for wall in cut["walls"])
+        return [*outgoing, cut]
+
+    def _walls_due(self, joints) -> bool:
+        return (not self.started or self._walls is None
+                or self._frame_count % WALLS_EVERY == 0
+                or not np.array_equal(self._walls[1], joints))
 
     def _slice(self, frame: dict, joints) -> dict:
+        bands = None
+        if self._walls is not None and np.array_equal(self._walls[1], joints):
+            bands = self._walls[2]
         return slice_message(np.asarray(frame["positions"], dtype=float).reshape(-1, 3),
                              frame["radius"], frame["energy"], joints, frame["squeeze"],
-                             self.slice_depth, self.slice_axis, frame["step"])
+                             self.slice_depth, self.slice_axis, frame["step"], bands)
 
     async def _broadcast(self, message: dict) -> None:
         text = json.dumps(message)
@@ -169,3 +199,12 @@ class Runner:
                 await socket.send_text(text)
             except Exception:
                 self._sockets.discard(socket)
+
+
+def _bands(walls: dict, joints, count: int) -> list:
+    """Per joint, the thickness of its 3D layer in the walls message, None where it has no face."""
+    bands = [None] * len(joints)
+    places = joint_index(joints, count, [(face["a"], face["b"]) for face in walls["faces"]])
+    for face, place in zip(walls["faces"], places):
+        bands[place] = face["thickness"]
+    return bands

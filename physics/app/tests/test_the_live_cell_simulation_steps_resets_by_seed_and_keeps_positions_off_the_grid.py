@@ -30,7 +30,7 @@ def test_the_simulation_steps_and_a_reset_is_reproducible_by_seed():
 
 def test_display_positions_follow_every_step_and_never_end_up_on_the_grid():
     simulation = Simulation(CELLS, seed=3)
-    simulation.apply({"push_limit": 0.0})      # every squeezed joint gives way: collapses happen
+    simulation.apply({"push_limit": 0.99})     # every squeezed joint gives way: collapses happen
     for _ in range(5):
         simulation.advance()
         positions = simulation.layout()

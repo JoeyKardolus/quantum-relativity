@@ -4,8 +4,11 @@ Contract: `frame_message(simulation)` relaxes the layout once (`layout`) and
 returns {"type": "frame", "step", "positions": [x, y, z, ...] per energy
 volume (3 decimals, display only), "radius": per energy volume (display
 scale, 3 decimals), "energy": per energy volume, energy per volume 0..1
-(`energy_shades`), "squeeze": per joint 0..1 of the push limit
-(`squeeze_shades`), "stats": every `grid_stats` key (collapsed counted from
+(`energy_shades`), "charge": per energy volume, the grid's charge (4
+decimals), "squeeze": per joint
+0..1, how close it is to joint collapse (`squeeze_shades`), "joint_volume":
+per joint, its own volume over its two energy volumes' mean volume
+(`joint_volume_shares`), "stats": every `grid_stats` key (collapsed counted from
 the reset) plus "collapses", the same count under the frame's own name}.
 Numbers are plain JSON: a value that is not finite becomes null, a float is
 rounded to 5 decimals.
@@ -17,6 +20,7 @@ import math
 import numpy as np
 
 from physics.app.energy_shades import energy_shades
+from physics.app.joint_volume_shares import joint_volume_shares
 from physics.app.simulation import Simulation
 from physics.app.squeeze_shades import squeeze_shades
 from physics.cells import grid_stats
@@ -35,7 +39,9 @@ def frame_message(simulation: Simulation) -> dict:
         "positions": np.round(simulation.layout(), 3).ravel().tolist(),
         "radius": np.round(simulation.radius(), 3).tolist(),
         "energy": energy_shades(grid),
-        "squeeze": squeeze_shades(grid, simulation.settings),
+        "charge": [_plain(value) for value in np.round(grid.charge, 4)],
+        "squeeze": squeeze_shades(grid),
+        "joint_volume": joint_volume_shares(grid),
         "stats": stats,
     }
 

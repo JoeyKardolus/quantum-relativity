@@ -55,8 +55,9 @@ def test_the_slice_message_is_plain_json_with_the_contract_keys_and_joint_walls(
     simulation.advance()
     frame = frame_message(simulation)
     positions = np.asarray(frame["positions"]).reshape(-1, 3)
+    bands = [0.01 * index for index in range(len(simulation.grid.joints))]
     cut = slice_message(positions, frame["radius"], frame["energy"], simulation.grid.joints,
-                        frame["squeeze"], 0.5, "y", frame["step"])
+                        frame["squeeze"], 0.5, "y", frame["step"], bands)
     cut = json.loads(json.dumps(cut, allow_nan=False))
     assert set(cut) == {"type", "step", "depth", "cells", "walls"}
     assert cut["type"] == "slice" and cut["step"] == 1 and cut["depth"] == 0.5
@@ -65,17 +66,21 @@ def test_the_slice_message_is_plain_json_with_the_contract_keys_and_joint_walls(
                for cell in cut["cells"])
     joints = {tuple(sorted(pair)): index for index, pair in enumerate(simulation.grid.joints.tolist())}
     for wall in cut["walls"]:
-        assert set(wall) == {"a", "b", "line", "squeeze"} and len(wall["line"]) == 4
+        assert set(wall) == {"a", "b", "line", "squeeze", "band"} and len(wall["line"]) == 4
         joint = joints.get(tuple(sorted((wall["a"], wall["b"]))))
         assert wall["squeeze"] == (None if joint is None else frame["squeeze"][joint])
+        assert wall["band"] == (None if joint is None else bands[joint])
     assert any(wall["squeeze"] is not None for wall in cut["walls"])
 
 
 def test_the_socket_sends_a_slice_after_each_frame_and_moves_the_cut_on_request():
     with TestClient(create_app(CELLS, seed=1)) as client:
         with client.websocket_connect("/ws") as socket:
-            greeting = [socket.receive_json() for _ in range(4)]
-            assert [message["type"] for message in greeting] == ["settings", "mesh", "frame", "slice"]
+            greeting = [socket.receive_json() for _ in range(5)]
+            kinds = [message["type"] for message in greeting]
+            assert kinds == ["settings", "mesh", "frame", "walls", "slice"]
+            assert any(wall["band"] is not None for wall in greeting[4]["walls"])
+            assert "cut_walls_not_matching_joints" in greeting[2]["stats"]
             assert "walls_not_matching_joints" in greeting[2]["stats"]
             socket.send_json({"type": "slice", "depth": 2.0, "axis": "x"})
             moved = socket.receive_json()

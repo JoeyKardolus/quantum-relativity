@@ -1,6 +1,7 @@
 """Build the starting grid from tetrahedra used as scaffolding, then drop the shapes.
 
-Contract: `build_grid(cells, seed, unevenness)` returns (Grid, display_positions):
+Contract: `build_grid(cells, seed, unevenness, joint_rest_share=0.2)` returns
+(Grid, display_positions):
   scaffold   round(cells / 6.77) points scattered uniformly in a periodic unit box
              (a 3D Delaunay tetrahedralisation of random points has about 6.77
              tetrahedra per point), tiled 27 times and tetrahedralised with
@@ -10,7 +11,9 @@ Contract: `build_grid(cells, seed, unevenness)` returns (Grid, display_positions
   joints     one per pair of tetrahedra sharing a side (matched across the wrap).
   energy     1 + unevenness * u, u uniform in [-1, 1] per energy volume (seeded).
   volume     rest_volume(energy): the energy-volume rule, not the tetrahedron's size.
-  squeeze    0 per joint; merged_into None.
+  joint_volume  each joint at its rest volume, joint_rest(volume, joints,
+             joint_rest_share) (the CellSettings.all_on() share by default).
+  squeeze    0 per joint; charge 0 per energy volume; merged_into None.
 display_positions are the tetrahedra centroids wrapped into the box, (n, 3),
 for drawing only; the Grid never holds them. Raises ValueError when
 unevenness is outside [0, 1) (energy must stay positive) or cells < 30.
@@ -23,13 +26,16 @@ import numpy as np
 from scipy.spatial import Delaunay
 
 from physics.cells.grid import Grid
+from physics.cells.joint_rest import joint_rest
 from physics.cells.rest_volume import rest_volume
+from physics.cells.settings import CellSettings
 
 _TETRAHEDRA_PER_POINT = 6.77
 _OFFSETS = np.array(list(itertools.product((-1, 0, 1), repeat=3)), dtype=float)
 
 
-def build_grid(cells: int, seed: int, unevenness: float) -> tuple[Grid, np.ndarray]:
+def build_grid(cells: int, seed: int, unevenness: float,
+               joint_rest_share: float = CellSettings.all_on().joint_rest) -> tuple[Grid, np.ndarray]:
     """A periodic grid of about `cells` energy volumes with slightly uneven energy."""
     if not 0 <= unevenness < 1:
         raise ValueError("unevenness must be in [0, 1) so every energy stays positive")
@@ -44,8 +50,10 @@ def build_grid(cells: int, seed: int, unevenness: float) -> tuple[Grid, np.ndarr
     kept = np.flatnonzero(np.all((centroids >= 0) & (centroids < 1), axis=1))
     joints = _joints(mesh, kept, point_count)
     energy = 1.0 + unevenness * rng.uniform(-1.0, 1.0, len(kept))
-    grid = Grid(cell_count=len(kept), joints=joints, energy=energy,
-                volume=rest_volume(energy), squeeze=np.zeros(len(joints)))
+    volume = rest_volume(energy)
+    grid = Grid(cell_count=len(kept), joints=joints, energy=energy, volume=volume,
+                joint_volume=joint_rest(volume, joints, joint_rest_share),
+                squeeze=np.zeros(len(joints)), charge=np.zeros(len(kept)))
     return grid, centroids[kept]
 
 

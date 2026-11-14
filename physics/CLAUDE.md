@@ -11,25 +11,28 @@ neighbours. `app/` is the live simulator on it (`python -m physics.app`). `netwo
 ## Must not get wrong
 
 - **The physics stores no shapes and no coordinates.** `cells.Grid` holds the energy volume count,
-  the joints (pairs of neighbouring energy volumes), energy and volume per energy volume, squeeze
-  per joint and the `merged_into` map, nothing else. `Network` likewise holds no positions.
-  The tetrahedra in `cells/build_grid.py` are scaffolding only: they decide the starting
-  neighbours and give display positions, which are returned beside the Grid, never stored on it.
+  the joints (pairs of neighbouring energy volumes), energy, volume and charge per energy volume,
+  a volume per joint (`joint_volume`; `squeeze` is derived from it, for drawing) and the
+  `merged_into` map, nothing else. `Network` likewise holds no positions.
+  The tetrahedra in `cells/build_grid.py` only pick starting neighbours and display positions,
+  returned beside the Grid.
 - **Positions are drawing only.** `app/cell_layout.py` relaxes them per frame so neighbours sit at
   the sum of their radii and carries them through joint collapse; no rule reads them. Joints across
-  the periodic box's wrap-around are left out of the layout and the drawing.
-- **Every measurement reads only the grid or network**: neighbour lists, joint counts, energy per
-  volume, length-weighted paths, random walks. If a measure needs a coordinate, it is measuring
-  the wrong thing.
+  the periodic box's wrap-around are left out of the layout and the drawing. The 3D glass foam
+  (`app/power_faces.py`) draws only faces between real joints and reports the rest (about 75%).
+- **Joints hold space.** Total space = energy volumes + joint volumes (`Grid.total_space()`). Every
+  rule keeps it except pull (destroys squeezed-out space) and drift. Energy volumes join only through a
+  joint whose volume fell below `push_limit` times its rest volume.
+- **Every measurement reads only the grid or network**; a measure that needs a coordinate is wrong.
 - **Energy sets volume**: `cells/rest_volume.py` (`(1/E)^3`), restored each step; in `network/`
-  `energy * length = LENGTH_SCALE`. Rules that push or pull change size; the rule moves energy to match.
+  `energy * length = LENGTH_SCALE`. Push and pull change size; energy moves to match.
 - **All rules are always on, nothing placed by hand.** Energy starts slightly uneven everywhere;
   lumps must form by themselves. Drift comes from `balancing_drift`, not a hand-picked number.
 - **Honesty.** Never tune a setting, seed or fit window until a result passes. Report every number
-  with seed and settings; a miss is reported as a miss. Today the grid shrinks as a whole and
-  every energy volume falls into one rather than forming lasting lumps; say so until it changes.
-- **Speed.** Vectorised numpy and scipy.sparse; a step at 2500 energy volumes runs in about 16 ms
-  and an experiment in under ~3 minutes. Only `rules/rewire.py` loops in Python.
+  with seed and settings; a miss is reported as a miss. Today, at default settings, no joint
+  collapses and lumps even out; at strong pull the whole grid falls into one. No lasting lumps
+  form yet; say so until it changes.
+- **Speed.** Vectorised numpy and scipy.sparse; a step at 2500 energy volumes takes about 17 ms.
 - **Layout.** One public function (or type) per file, helpers `_prefixed`, each subpackage
   `__init__.py` holds the module map and `__all__`.
 - **Port 8765** is the owner's own running app; test on another port (`--port 8766`).

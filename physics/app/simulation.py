@@ -56,7 +56,7 @@ class Simulation:
         self.seed = seed
         self.steps = 0
         self.start_cells = self.grid.cell_count
-        self.start_total_volume = float(self.grid.volume.sum())
+        self.start_total_volume = self.grid.total_space()
         radius = _radius(self.grid.volume)
         self.unit = 2.0 * float(radius.mean())
         self._positions = cell_layout(_scaled(start_positions, self.grid, radius), self.grid.joints,
