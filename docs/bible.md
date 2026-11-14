@@ -926,8 +926,8 @@ particles in space. Code that breaks a rule below is simulating something else.
 4. **Energy sets length**: length = constant ÷ energy, so doubling a connection's energy halves its length (like E = hc/λ). Too much energy packs a region tighter.
 5. **Energy oscillates** along a connection between its two joints, slightly differently depending on those joints.
 6. **Drift**: in the base state every connection slowly lengthens. This is the proposed mechanism for the expansion of the universe and for redshift (a longer connection holds less energy). Drift is the same everywhere; dense regions differ only because attraction works against it, so gravitational redshift near a dense region must come out of attraction, not out of a separate drift setting.
-7. **Attraction**: connection energy pulls (gravity-like).
-8. **Joint repulsion**: joints push (electromagnetism-like), not across empty space but by pushing on the energy in their connections. A push stretches a connection, which lowers its energy, so force, energy and length are one thing seen from three sides.
+7. **Attraction**: the energy volume of each region pulls on other regions, weaker with network distance (gravity-like). Pull comes from the amount of energy in a region, not from neighbouring connections tugging.
+8. **Joint repulsion**: joints push (electromagnetism-like), not across empty space but by pushing on the energy in their connections. A push stretches a connection, which lowers its energy, so force, energy and length are one thing seen from three sides. A joint pushes back harder the more the pull squeezes it, up to a limit; past that limit comes joint collapse: the joint gives way and its connections fall into each other (the network's version of a star collapsing into a black hole).
 9. **Entanglement**: two connections can carry the same signal strength, inverted, so their behaviour is linked through the network.
 
 ### Open problems

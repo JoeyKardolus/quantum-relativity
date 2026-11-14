@@ -1,4 +1,4 @@
-"""Rules layer: the connection-theory rules that step a network forward.
+"""Rules layer: the quantum-relativity theory rules that step a network forward.
 
 Module map:
   settings.py  RuleSettings: per-rule strengths, 0 = off

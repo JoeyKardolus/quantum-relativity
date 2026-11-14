@@ -1,4 +1,4 @@
-"""One step of the connection-theory rules, each switchable, none using coordinates.
+"""One step of the quantum-relativity theory rules, each switchable, none using coordinates.
 
 Contract: `step(network, settings, rng)` returns a new Network. Order, each
 skipped when its strength is 0:

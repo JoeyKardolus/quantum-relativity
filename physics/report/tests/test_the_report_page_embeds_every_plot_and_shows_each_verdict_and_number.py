@@ -49,7 +49,7 @@ def test_the_report_page_embeds_every_plot_and_shows_each_verdict_and_number(tmp
     page = (tmp_path / "index.html")
     build_page(results, str(page))
     text = page.read_text(encoding="utf-8")
-    assert text.startswith("<title>Connection theory: first results</title>")
+    assert text.startswith("<title>Quantum-relativity theory: first results</title>")
     assert text.index("<style>") < text.index("<main>")
     for tag in ("<html", "<head", "<body", "http://", "https://", "—"):
         assert tag not in text

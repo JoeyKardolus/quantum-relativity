@@ -15,7 +15,7 @@ import html
 import json
 import os
 
-_TITLE = "Connection theory: first results"
+_TITLE = "Quantum-relativity theory: first results"
 _INTRO = ("A hobby simulation of space as a network of joints and connections with no coordinates. "
           "Each card is one milestone: what was asked, what was measured, and the known value it "
           "should match.")

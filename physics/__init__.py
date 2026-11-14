@@ -1,4 +1,4 @@
-"""Connection theory simulation (bible: physics/connection-theory). Tier M.
+"""Quantum-relativity theory simulation (bible: physics/quantum-relativity). Tier M.
 
 Module map:
   network/      joints and connections with energy and length; no coordinates
