@@ -45,7 +45,7 @@ The core depth/seam vocabulary used by `improve-codebase-architecture`, `tdd`, `
 - **joint**: a point of the network where connections meet; it carries a type (charge) and pushes on the energy in its connections. _Avoid_: node, vertex, particle, point.
 - **connection**: a link between two joints that holds energy; its length follows from its energy (more energy, shorter). _Avoid_: edge, link, string, bond.
 - **drift**: the small built-in lengthening of every connection in the base state; the proposed cause of expansion. _Avoid_: dark energy (that is what drift may explain, not the rule), inflation, stretch.
-- **energy volume**: the amount of energy held in one region of the network; it decides how hard that region pulls on other regions. _Avoid_: mass, energy density, gravity source.
+- **energy volume**: the volume a region of the network takes up, set by the energy in it; it decides how hard that region pulls. _Avoid_: mass, energy density, gravity source.
 - **joint collapse**: a joint giving way when the pull squeezing it passes its limit, so its connections fall into each other; the network's version of gravitational collapse. _Avoid_: black hole (what collapse may produce, not the rule), merge, implosion.
 - **reference spacetime**: a network built from points scattered in a flat space or spacetime whose true dimension and proper times are known; used to validate a measurement before it is trusted. _Avoid_: test grid, ground truth, toy universe.
 
