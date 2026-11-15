@@ -22,7 +22,14 @@ earlier ABAB engine (`abab/`), the browser app (`app/`) and the milestone code w
   run whose energy reaches them (`stats()["edge_share"]`) is no longer open space. Report it.
 - **Honesty.** Never tune a setting, seed or threshold until a result passes; report every
   number, seed, settings and miss. Today the whole filled cube still falls into one core
-  within about 10 steps (free fall 7.7 time units at any size); see `fluid/CLAUDE.md`.
+  (free fall 7.7 time units at any size); see `fluid/CLAUDE.md`.
+- **Expansion check comes before any fit** (side 64, seed 1, 200 steps, 2026-11-15): with
+  any pull from 0.005 down to 0.0005 the cube collapses to one lump; only with pull 0 does
+  the occupied size grow, and that is B's push spreading gas into the empty margin until it
+  hits the walls, not space growing. Rule 6 (the leak) sends A toward the harder-pulling,
+  packed neighbour, so it clumps; the thinned boxes "grow" only in the measured length
+  (`local_length.py`), which never feeds back into where energy goes. On fixed boxes no
+  rule yet makes the filled region grow.
 - **GPU**: RTX 5080 under WSL2. CUDA-OpenGL sharing does not work on WSL: copy GPU to host
   once per frame. Tests that need CUDA skip cleanly without it.
 - **A machine keeps no datasets**: long runs and their results go to object storage or tmp,

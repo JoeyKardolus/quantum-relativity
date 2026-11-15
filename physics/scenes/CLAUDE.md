@@ -15,14 +15,22 @@ scene builds a start, runs the fluid engine and returns measured numbers. Module
   be reached into.
 - **All rules on.** Scenes take `settings` (default `Settings.all_on()`); a rule switched off
   is only for a side-by-side run.
-- **Box units.** The engine's boxes are fixed and no length follows energy yet (rule 4), so
-  every size here is a box count or a distance in boxes: it says where the energy is, not
-  that space grew.
+- **Box units.** The engine's boxes are fixed; its length from energy (rule 4,
+  `fluid/local_length.py`) is measured only, so every size here is a box count or a
+  distance in boxes: it says where the energy is, not that space grew.
 - **Placed blobs** (orbit, black hole) break "nothing placed by hand" on purpose: those two
   test one mechanism. The expansion, structure, bound lump and Hubble scenes start from
   `new_grid`'s uneven field only.
 - **Small and quick**: defaults are side 48 to 64 and under about 2 minutes each on the
   RTX 5080. Tests run every scene on side 16 and check only that the numbers are finite.
+
+## Measured (2026-11-15, defaults, all rules on incl. local clocks)
+
+Expansion: energy radius 27.3 to 3.2 boxes, drift 0. Hubble gap: late / early 0.18
+(known 1.09). Structure: contrast 0.79 to 18.8, lumps 359 to 1. Bound lump: 208 boxes,
+surroundings shrink to 0.23. Orbit: early period 49 at distance 10 and 62 at 14 (Newton
+62.5, 103.6), then the small blob smears (spread 28 boxes). Black hole: sealed radius 1.24
+at every energy (power 0; a horizon gives 1).
 
 ## Run
 

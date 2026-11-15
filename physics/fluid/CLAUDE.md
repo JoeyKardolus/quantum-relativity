@@ -28,9 +28,9 @@ on CUDA; A (pulls) and B (pushes) energy and a momentum per kind. Module map in 
   rms `unevenness`; B = 3% of A in every box.
 - **Walls are closed**; a run whose `edge_share` is not ~0 is no longer open space; report it.
 - **Honesty.** Never tune a setting until a result passes; report misses with seed and
-  settings. Today (seed 1, unevenness 0.3, defaults) the filled cube still falls together
-  into one lump by step 10; slow clocks stretch the core's collapse (max compression 1583 at
-  step 40, was 5e5 by step 10). Drift 0; runs repeat exactly.
+  settings. Today the filled cube falls into one lump at every pull down to 0.0005; only
+  pull 0 spreads, into the margin (expansion check, `physics/CLAUDE.md`). Slow clocks only
+  stretch the core's collapse. Drift 0; runs repeat exactly.
 
 ## Measured (2026-11-15, RTX 5080, side 128, seed 1, unevenness 0.3)
 
