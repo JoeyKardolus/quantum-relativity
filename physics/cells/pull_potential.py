@@ -12,8 +12,11 @@ Contract: `pull_potential(grid)` returns one potential per energy volume, >= 0:
                energy / GROUND everywhere.
   numerics     conjugate gradients with a Jacobi preconditioner to a relative
                residual of 1e-12 (the matrix is symmetric positive definite and
-               diagonally dominant), started from energy / GROUND. Raises
-               RuntimeError if it does not converge.
+               diagonally dominant), started from energy / GROUND.
+  guard        raises RuntimeError, never returns a potential, when a measured
+               volume is not finite and positive (an inverted or runaway cell: the
+               conductance would break the solve) or when the solve does not
+               converge; the message names the count, worst value or residual.
 """
 from __future__ import annotations
 
@@ -28,6 +31,7 @@ GROUND = 0.1
 
 def pull_potential(grid: Grid) -> np.ndarray:
     """Grounded graph-Poisson potential with each energy volume's energy as source."""
+    _check_volumes(grid.volume)
     side = np.cbrt(grid.volume)
     heads, tails = grid.joints[:, 0], grid.joints[:, 1]
     conductance = 2.0 / (side[heads] + side[tails])
@@ -40,5 +44,15 @@ def pull_potential(grid: Grid) -> np.ndarray:
     potential, failed = cg(system, grid.energy, x0=grid.energy / GROUND, rtol=1e-12,
                            M=sp.diags(1.0 / total), maxiter=10 * count)
     if failed:
-        raise RuntimeError("pull potential did not converge")
+        residual = np.linalg.norm(system @ potential - grid.energy) / np.linalg.norm(grid.energy)
+        raise RuntimeError(f"pull potential did not converge (relative residual {residual:.3g})")
     return potential
+
+
+def _check_volumes(volume: np.ndarray) -> None:
+    """Raise when any measured volume is not finite and positive."""
+    bad = ~(np.isfinite(volume) & (volume > 0))
+    if bad.any():
+        raise RuntimeError(f"pull potential: {int(bad.sum())} energy volumes have a measured volume "
+                           f"that is not finite and positive (lowest {np.nanmin(volume):.3g}, "
+                           f"highest {np.nanmax(volume):.3g})")

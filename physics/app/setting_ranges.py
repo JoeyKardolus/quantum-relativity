@@ -7,7 +7,7 @@ a zero value gets 0 to ZERO_REACH), since its sensible size depends on the
 rules' own units. Leak and joint push are shares per step, so they never
 go past 1, push_limit stays below 1 (at 1 a joint's squeeze divides by zero), and
 seal_point stays below 1 (a squeeze depth; the engine caps it at 1 - push_limit),
-and push_power stays at or below 4 (past it the joint step goes unstable).
+and push_power stays at or below 4 (a steeper wall needs more joint substeps).
 Unevenness and speed are fixed.
 """
 from __future__ import annotations

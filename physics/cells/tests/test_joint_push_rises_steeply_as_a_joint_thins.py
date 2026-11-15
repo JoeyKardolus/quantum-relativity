@@ -24,8 +24,8 @@ def test_power_minus_one_is_the_straight_spring_and_rest_pushes_nothing():
 
 
 @pytest.mark.xfail(strict=True, reason="miss (2026-11-15, seed 1, 1000 cells, unevenness 0.5, defaults): "
-                   "joints still reach the push limit at default pull, first collapse step 53 with "
-                   "splits off, and volume splits blow the size up and stop the run at step 151")
+                   "with the Verlet swing no joint collapses (splits off: 0 in 300 steps), but volume "
+                   "splits blow the size up and the pull guard stops the run at step 154")
 def test_no_joint_collapses_in_300_steps_from_the_default_start():
     engine = new_engine(1000, 1, 0.5)
     settings = EngineSettings.all_on()

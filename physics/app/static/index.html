@@ -78,7 +78,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-<canvas id="scene" aria-label="A see-through grid: each energy volume outlined in red, drawn a little inside itself, and each joint outlined in blue in the gap between two red outlines"></canvas>
+<canvas id="scene" aria-label="A see-through grid: each energy volume outlined in red, drawn a little inside itself, and each joint a faint blue layer filling the gap between two red outlines; the cube's outer faces have no joint"></canvas>
 
 <div id="below">
   <div id="hint">
@@ -87,7 +87,7 @@
   </div>
   <div id="legend">
     <span><i class="key volume"></i>red outline = energy volume (deeper red = pulls harder)</span>
-    <span><i class="key joint"></i>blue outline = joint (brighter = pushes harder)</span>
+    <span><i class="key joint"></i>blue layer = joint between two volumes (brighter = pushes harder)</span>
     <span><i class="key cube"></i>the starting cube</span>
   </div>
 </div>
@@ -122,9 +122,10 @@
   <div id="viewSettings"></div>
   <div class="caption">Each red outline is one energy volume, its corners shared with its neighbours and moved by the
     engine every step; deeper red pulls harder. Every outline is drawn a little inside its volume, so where two volumes
-    meet you see two red outlines side by side, and the blue outline in the gap between them is the joint; brighter blue
-    pushes harder. The gap is a drawing aid, the same share of every volume, not the joint's real thickness. The faint
-    box is the cube the grid started in. Move the cut slider to hide the volumes past a plane and look inside; "fill
+    meet you see two red outlines side by side, and the faint blue layer filling the gap between them is their one
+    shared joint; brighter blue pushes harder. So every inner volume sits wrapped in blue, while the cube's outer faces
+    border nothing and stay bare red (they have no joint). The gap is a drawing aid, the same share of every volume, not
+    the joint's real thickness. The faint box is the cube the grid started in. Move the cut slider to hide the volumes past a plane and look inside; "fill
     cells" adds faint faces.</div>
 
   <h2>Run</h2>
@@ -159,6 +160,7 @@ const FRAME_MAGIC = 0x31465251;  // "QRF1", the binary frame's first word (physi
 const HEADER_BYTES = 32;         // 8 uint32 words
 const VOLUME_LIGHT = [1.0, 0.62, 0.6], VOLUME_DARK = [0.85, 0.05, 0.08];   // deep red, still visible on the dark ground
 const FILL_OPACITY = 0.14;
+const LAYER_OPACITY = 0.15;      // the joint layers' blue fill, always drawn
 const JOINT_DIM = [0.1, 0.18, 0.45], JOINT_BRIGHT = [0.55, 0.85, 1.0];
 
 /* ---------- the 3D scene ---------- */
@@ -192,6 +194,12 @@ function createScene() {
 function fillMaterial() {
   return new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide, shininess: 18,
     transparent: true, opacity: FILL_OPACITY, depthWrite: false });
+}
+
+/** The joint layers' faint blue, see-through, lit material coloured per vertex. */
+function layerMaterial() {
+  return new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide, shininess: 18,
+    transparent: true, opacity: LAYER_OPACITY, depthWrite: false });
 }
 
 /** A line material coloured per vertex. */
@@ -279,25 +287,18 @@ function cellEdgeTables(message) {
   return { corner: Int32Array.from(corner), owner: Int32Array.from(owner) };
 }
 
-/** The joints' outlines: every edge of a joint face once, with the joints (and their two cells) that share it. */
-function jointEdgeTables(message) {
-  const byPair = new Map();
+/** The joint layers' blue edges: at each corner of a joint face, one segment across the gap between its two cells' inset copies. */
+function jointSideTables(message) {
+  const corner = [], owner = [], other = [], joint = [];
   message.faces.forEach((face, faceIndex) => {
     const [first, second] = message.face_cells[faceIndex], jointIndex = message.face_joint[faceIndex];
     if (first < 0 || second < 0 || jointIndex < 0) return;
-    face.forEach((point, side) => {
-      const next = face[(side + 1) % face.length], key = `${Math.min(point, next)}:${Math.max(point, next)}`;
-      if (!byPair.has(key)) byPair.set(key, { ends: [point, next], sharers: [] });
-      byPair.get(key).sharers.push(jointIndex, first, second);
-    });
+    for (const point of face) {
+      corner.push(point, point); owner.push(first, second); other.push(second, first); joint.push(jointIndex, jointIndex);
+    }
   });
-  const corner = [], offsets = [0], sharers = [];
-  for (const entry of byPair.values()) {
-    corner.push(...entry.ends);
-    sharers.push(...entry.sharers);
-    offsets.push(sharers.length / 3);
-  }
-  return { corner: Int32Array.from(corner), offsets: Int32Array.from(offsets), sharers: Int32Array.from(sharers) };
+  return { corner: Int32Array.from(corner), owner: Int32Array.from(owner), other: Int32Array.from(other),
+    joint: Int32Array.from(joint) };
 }
 
 /** Every cell's distinct corners, as offsets into one flat list, for its centre. */
@@ -326,7 +327,7 @@ function applyMesh(message) {
   if (!goodMesh(message)) { console.warn("bad mesh message"); return; }
   const reset = !mesh || message.step === 0 || message.step < (frame ? frame.step : 0);
   mesh = Object.assign({}, message, { cellTable: cellTables(message), wallTable: wallTables(message),
-    cellEdgeTable: cellEdgeTables(message), jointEdgeTable: jointEdgeTables(message),
+    cellEdgeTable: cellEdgeTables(message), jointEdgeTable: jointSideTables(message),
     centreTable: cellCorners(message), centres: new Float32Array(message.cell_count * 3),
     hidden: new Uint8Array(message.cell_count) });
   frame = null;
@@ -337,7 +338,7 @@ function applyMesh(message) {
   const cellGeometry = dynamicGeometry(mesh.cellTable.corner.length, mesh.cellTable.indices);
   const wallGeometry = dynamicGeometry(mesh.wallTable.corner.length, mesh.wallTable.indices);
   scene3d.cells = new THREE.Mesh(cellGeometry, fillMaterial());
-  scene3d.walls = new THREE.Mesh(wallGeometry, fillMaterial());
+  scene3d.walls = new THREE.Mesh(wallGeometry, layerMaterial());
   scene3d.cellLines = new THREE.LineSegments(lineGeometry(mesh.cellEdgeTable.corner.length), lineMaterial());
   scene3d.jointLines = new THREE.LineSegments(lineGeometry(mesh.jointEdgeTable.corner.length), lineMaterial());
   for (const part of [scene3d.cells, scene3d.walls, scene3d.cellLines, scene3d.jointLines]) {
@@ -422,12 +423,15 @@ function blend(from, to, share, target, offset) {
   for (let channel = 0; channel < 3; channel++) target[offset + channel] = from[channel] + (to[channel] - from[channel]) * share;
 }
 
-/** Write one table's vertices: its corner pulled GAP toward its cell's centre, collapsed when hidden. */
+/** Write one table's vertices: its corner pulled GAP toward its cell's centre; when hidden, collapsed onto one point
+ * (a joint table's vertices onto the lower-numbered of the joint's two cells, so no line spans the gap). */
 function writeVertices(table, positions, colours, colourOf, hiddenOf) {
   const corners = frame.corners, centres = mesh.centres, keep = 1 - GAP;
   for (let vertex = 0; vertex < table.corner.length; vertex++) {
-    const point = table.corner[vertex] * 3, centre = table.owner[vertex] * 3, slot = vertex * 3;
-    const share = hiddenOf(vertex) ? 0 : keep;
+    const hidden = hiddenOf(vertex), owner = table.owner[vertex];
+    const anchor = hidden && table.other ? Math.min(owner, table.other[vertex]) : owner;
+    const point = table.corner[vertex] * 3, centre = anchor * 3, slot = vertex * 3;
+    const share = hidden ? 0 : keep;
     for (let axis = 0; axis < 3; axis++) {
       positions[slot + axis] = centres[centre + axis] + share * (corners[point + axis] - centres[centre + axis]);
     }
@@ -435,20 +439,28 @@ function writeVertices(table, positions, colours, colourOf, hiddenOf) {
   }
 }
 
-/** Write the faint filled faces (only while "fill cells" is on). */
+/** Flag a geometry's positions and colours for upload. */
+function markChanged(geometry) {
+  geometry.attributes.position.needsUpdate = true;
+  geometry.attributes.color.needsUpdate = true;
+}
+
+/** Write the faint filled cell faces (only while "fill cells" is on). */
 function writeFill() {
-  const cellTable = mesh.cellTable, wallTable = mesh.wallTable, hidden = mesh.hidden;
-  const cellGeometry = scene3d.cells.geometry, wallGeometry = scene3d.walls.geometry;
-  writeVertices(cellTable, cellGeometry.attributes.position.array, cellGeometry.attributes.color.array,
+  const cellTable = mesh.cellTable, hidden = mesh.hidden, geometry = scene3d.cells.geometry;
+  writeVertices(cellTable, geometry.attributes.position.array, geometry.attributes.color.array,
     (vertex, colours, slot) => blend(VOLUME_LIGHT, VOLUME_DARK, frame.pull[cellTable.owner[vertex]] / 255, colours, slot),
     (vertex) => hidden[cellTable.owner[vertex]]);
-  writeVertices(wallTable, wallGeometry.attributes.position.array, wallGeometry.attributes.color.array,
-    (vertex, colours, slot) => blend(JOINT_DIM, JOINT_BRIGHT, frame.push[wallTable.joint[vertex]] / 255, colours, slot),
-    (vertex) => hidden[wallTable.owner[vertex]] || hidden[wallTable.other[vertex]]);
-  for (const geometry of [cellGeometry, wallGeometry]) {
-    geometry.attributes.position.needsUpdate = true;
-    geometry.attributes.color.needsUpdate = true;
-  }
+  markChanged(geometry);
+}
+
+/** Write a joint table (layer prisms or their gap-crossing edges): blue by push, gone when either cell is hidden. */
+function writeJointTable(table, geometry) {
+  const hidden = mesh.hidden;
+  writeVertices(table, geometry.attributes.position.array, geometry.attributes.color.array,
+    (vertex, colours, slot) => blend(JOINT_DIM, JOINT_BRIGHT, frame.push[table.joint[vertex]] / 255, colours, slot),
+    (vertex) => hidden[table.owner[vertex]] || hidden[table.other[vertex]]);
+  markChanged(geometry);
 }
 
 /** Write each volume's red outline: its corners pulled GAP toward its own centre, collapsed when hidden. */
@@ -468,43 +480,18 @@ function writeCellLines() {
   geometry.attributes.color.needsUpdate = true;
 }
 
-/** Write each joint's blue outline at the faces' true place, coloured by the hardest push among the shown joints sharing it. */
-function writeJointLines() {
-  const table = mesh.jointEdgeTable, geometry = scene3d.jointLines.geometry;
-  const positions = geometry.attributes.position.array, colours = geometry.attributes.color.array;
-  const corners = frame.corners, hidden = mesh.hidden, sharers = table.sharers;
-  const segments = table.offsets.length - 1;
-  for (let segment = 0; segment < segments; segment++) {
-    let hardest = -1;
-    for (let slot = table.offsets[segment]; slot < table.offsets[segment + 1]; slot++) {
-      if (hidden[sharers[slot * 3 + 1]] || hidden[sharers[slot * 3 + 2]]) continue;
-      hardest = Math.max(hardest, frame.push[sharers[slot * 3]]);
-    }
-    const startPoint = table.corner[segment * 2] * 3, endPoint = table.corner[segment * 2 + 1] * 3;
-    const drawnEnd = hardest < 0 ? startPoint : endPoint;   // hidden: a zero-length segment
-    for (let axis = 0; axis < 3; axis++) {
-      positions[segment * 6 + axis] = corners[startPoint + axis];
-      positions[segment * 6 + 3 + axis] = corners[drawnEnd + axis];
-    }
-    const push = Math.max(hardest, 0) / 255;
-    blend(JOINT_DIM, JOINT_BRIGHT, push, colours, segment * 6);
-    blend(JOINT_DIM, JOINT_BRIGHT, push, colours, segment * 6 + 3);
-  }
-  geometry.attributes.position.needsUpdate = true;
-  geometry.attributes.color.needsUpdate = true;
-}
-
-/** Redraw the current frame: red volume outlines, blue joint outlines (and the faint fill when on), coloured by pull and push. */
+/** Redraw the current frame: red volume outlines, blue joint layers (and the faint cell fill when on), coloured by pull and push. */
 function redraw() {
   if (!mesh || !frame || !scene3d.renderer) { showStats(); return; }
   updateCentres();
   const box = cornerBox();
   scene3d.drawnCells = updateHidden(box);
   writeCellLines();
-  writeJointLines();
+  writeJointTable(mesh.wallTable, scene3d.walls.geometry);
+  writeJointTable(mesh.jointEdgeTable, scene3d.jointLines.geometry);
   if (view.fill) writeFill();
-  scene3d.cellLines.visible = scene3d.jointLines.visible = true;
-  scene3d.cells.visible = scene3d.walls.visible = view.fill;
+  scene3d.cellLines.visible = scene3d.jointLines.visible = scene3d.walls.visible = true;
+  scene3d.cells.visible = view.fill;
   const reach = 0.5 * Math.hypot(box[1][0] - box[0][0], box[1][1] - box[0][1], box[1][2] - box[0][2]);
   if (orbit.follow) orbit.centre = [0, 1, 2].map((axis) => (box[0][axis] + box[1][axis]) / 2);
   orbit.reach = Math.max(reach, 1e-6);

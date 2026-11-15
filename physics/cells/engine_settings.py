@@ -29,7 +29,8 @@ Contract: frozen record of floats, read by step() each step:
   push_power       3.0    a round power, not tuned to a result: holding a joint at
                           the push limit takes s = 0.47, 9.3 times the background
                           squeeze (the straight spring needed 2 times); the swing's
-                          stiffness there, k 2^4 + s = 2.1, keeps the step stable (< 4)
+                          stiffness there is k 2^4 + s = 2.1 (swing_joints.py
+                          substeps any stiffness)
   push_limit       0.5    a joint below half its rest thickness gives way
   joint_rest       0.08   rest thickness 8% of the volumes' mean length: on a typical
                           Voronoi face (area about 0.375 V^(2/3)) the joint holds about
