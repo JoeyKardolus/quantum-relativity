@@ -301,6 +301,24 @@ function jointSideTables(message) {
     joint: Int32Array.from(joint) };
 }
 
+/** Each joint's two sides as full outlines: every edge of a joint face, once on each cell's side, so the joint
+ * reads as a blue box around the shared face (red | blue ... blue | red). */
+function jointOutlineTables(message) {
+  const corner = [], owner = [], other = [], joint = [];
+  message.faces.forEach((face, faceIndex) => {
+    const [first, second] = message.face_cells[faceIndex], jointIndex = message.face_joint[faceIndex];
+    if (first < 0 || second < 0 || jointIndex < 0) return;
+    for (const [cell, partner] of [[first, second], [second, first]]) {
+      face.forEach((point, side) => {
+        corner.push(point, face[(side + 1) % face.length]);
+        owner.push(cell, cell); other.push(partner, partner); joint.push(jointIndex, jointIndex);
+      });
+    }
+  });
+  return { corner: Int32Array.from(corner), owner: Int32Array.from(owner), other: Int32Array.from(other),
+    joint: Int32Array.from(joint) };
+}
+
 /** Every cell's distinct corners, as offsets into one flat list, for its centre. */
 function cellCorners(message) {
   const sets = Array.from({ length: message.cell_count }, () => new Set());
@@ -327,12 +345,12 @@ function applyMesh(message) {
   if (!goodMesh(message)) { console.warn("bad mesh message"); return; }
   const reset = !mesh || message.step === 0 || message.step < (frame ? frame.step : 0);
   mesh = Object.assign({}, message, { cellTable: cellTables(message), wallTable: wallTables(message),
-    cellEdgeTable: cellEdgeTables(message), jointEdgeTable: jointSideTables(message),
+    cellEdgeTable: cellEdgeTables(message), jointEdgeTable: jointSideTables(message), jointOutlineTable: jointOutlineTables(message),
     centreTable: cellCorners(message), centres: new Float32Array(message.cell_count * 3),
     hidden: new Uint8Array(message.cell_count) });
   frame = null;
   if (!scene3d.renderer) return;
-  for (const name of ["cells", "walls", "cellLines", "jointLines"]) {
+  for (const name of ["cells", "walls", "cellLines", "jointLines", "jointOutlines"]) {
     if (scene3d[name]) { scene3d.scene.remove(scene3d[name]); scene3d[name].geometry.dispose(); scene3d[name].material.dispose(); }
   }
   const cellGeometry = dynamicGeometry(mesh.cellTable.corner.length, mesh.cellTable.indices);
@@ -341,7 +359,8 @@ function applyMesh(message) {
   scene3d.walls = new THREE.Mesh(wallGeometry, layerMaterial());
   scene3d.cellLines = new THREE.LineSegments(lineGeometry(mesh.cellEdgeTable.corner.length), lineMaterial());
   scene3d.jointLines = new THREE.LineSegments(lineGeometry(mesh.jointEdgeTable.corner.length), lineMaterial());
-  for (const part of [scene3d.cells, scene3d.walls, scene3d.cellLines, scene3d.jointLines]) {
+  scene3d.jointOutlines = new THREE.LineSegments(lineGeometry(mesh.jointOutlineTable.corner.length), lineMaterial());
+  for (const part of [scene3d.cells, scene3d.walls, scene3d.cellLines, scene3d.jointLines, scene3d.jointOutlines]) {
     part.frustumCulled = false; part.visible = false; scene3d.scene.add(part);
   }
   drawCube(message.start_box);
@@ -425,8 +444,8 @@ function blend(from, to, share, target, offset) {
 
 /** Write one table's vertices: its corner pulled GAP toward its cell's centre; when hidden, collapsed onto one point
  * (a joint table's vertices onto the lower-numbered of the joint's two cells, so no line spans the gap). */
-function writeVertices(table, positions, colours, colourOf, hiddenOf) {
-  const corners = frame.corners, centres = mesh.centres, keep = 1 - GAP;
+function writeVertices(table, positions, colours, colourOf, hiddenOf, keep = 1 - GAP) {
+  const corners = frame.corners, centres = mesh.centres;
   for (let vertex = 0; vertex < table.corner.length; vertex++) {
     const hidden = hiddenOf(vertex), owner = table.owner[vertex];
     const anchor = hidden && table.other ? Math.min(owner, table.other[vertex]) : owner;
@@ -455,11 +474,11 @@ function writeFill() {
 }
 
 /** Write a joint table (layer prisms or their gap-crossing edges): blue by push, gone when either cell is hidden. */
-function writeJointTable(table, geometry) {
+function writeJointTable(table, geometry, keep = 1 - GAP) {
   const hidden = mesh.hidden;
   writeVertices(table, geometry.attributes.position.array, geometry.attributes.color.array,
     (vertex, colours, slot) => blend(JOINT_DIM, JOINT_BRIGHT, frame.push[table.joint[vertex]] / 255, colours, slot),
-    (vertex) => hidden[table.owner[vertex]] || hidden[table.other[vertex]]);
+    (vertex) => hidden[table.owner[vertex]] || hidden[table.other[vertex]], keep);
   markChanged(geometry);
 }
 
@@ -489,8 +508,9 @@ function redraw() {
   writeCellLines();
   writeJointTable(mesh.wallTable, scene3d.walls.geometry);
   writeJointTable(mesh.jointEdgeTable, scene3d.jointLines.geometry);
+  writeJointTable(mesh.jointOutlineTable, scene3d.jointOutlines.geometry, 1 - GAP / 2);   // the joint's sides, between red outline and shared face
   if (view.fill) writeFill();
-  scene3d.cellLines.visible = scene3d.jointLines.visible = true;
+  scene3d.cellLines.visible = scene3d.jointLines.visible = scene3d.jointOutlines.visible = true;
   scene3d.cells.visible = scene3d.walls.visible = view.fill;   // owner: wireframe only unless "fill cells" is on
   const reach = 0.5 * Math.hypot(box[1][0] - box[0][0], box[1][1] - box[0][1], box[1][2] - box[0][2]);
   if (orbit.follow) orbit.centre = [0, 1, 2].map((axis) => (box[0][axis] + box[1][axis]) / 2);
