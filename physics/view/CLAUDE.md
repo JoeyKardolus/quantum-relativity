@@ -32,14 +32,16 @@ points. Module map in `__init__.py`.
 
 ## Measured (2026-11-15, RTX 5080, WSL2, d3d12)
 
-Real engine, side 128, seed 1, unevenness 0.1: about 118 fps (the 120 Hz draw interval);
-3.6 to 4.3 steps/s in the first steps, about 1.1 once the ball has fallen into its core.
+Default command (side 128, seed 1, unevenness 0.3, slope -3), 20 s unpaused: 116 to 118 fps
+(the 120 Hz draw interval); 4.5 steps/s at steps 1 to 7, 0.9 to 1.2 once the cube has fallen
+into its core (27 steps in 20 s); points drawn 264k at step 6, 11 to 40 after step 12.
+Side 256: 64 to 118 fps at up to 3M points, 0.07 steps/s.
 Stand-in source at 2,003,424 boxes: 75 to 104 fps.
 
 ## Run
 
 ```
-PYTHONPATH=. .venv/bin/python -m physics.view [--side N] [--seed S] [--unevenness U] [--set name=value ...] [--steps-per-frame K]
+PYTHONPATH=. .venv/bin/python -m physics.view [--side N] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame K]
 PYTHONPATH=. .venv/bin/pytest -q physics/view
 ```
 Starts paused: space starts and pauses, drag rotates, wheel zooms, R resets, Esc quits.
