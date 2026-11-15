@@ -10,9 +10,9 @@ Contract: a frozen record of
                 energy per quantum sets its size; a split shares them by volume like
                 energy, a collapse hands them on with the energy, the leak never
                 moves them
-  volume        (n,) each energy volume's measured size: its tetrahedron's volume in
-                the mesh (cell_volumes.py), which follows rest_volume(energy, quanta)
-                (rule 4) as the corners relax, as far as the shared corners allow
+  volume        (n,) each energy volume's measured size: its own tetrahedron's volume
+                (cell_sizes.py), which follows rest_volume(energy, quanta) (rule 4) as
+                the corners relax, as far as its neighbours allow
   thickness     (k,) each joint's thickness, a length: the wall between its two volumes
   rate          (k,) each joint's rate of change of thickness per step (its momentum:
                 joints swing, swing_joints.py)
@@ -21,10 +21,10 @@ Contract: a frozen record of
   pull          (n,) derived, for drawing: the pull each energy volume exerts,
                 attraction * pull_potential / 2 (step.py)
   charge        (n,) per energy volume, zeros for now (what charge is, is still open)
-  seams         (r, 2) int rows (seam, joint): every joint around each seam, a mesh
-                edge where two or more joint walls meet (mesh_seams.py); the leak
-                flows only along seams (leak.py). The volumes around a seam are the
-                cells of its joints.
+  seams         (r, 2) int rows (seam, joint): every joint around each seam, a seam
+                cell two or more joint cells touch by their thin sides (mesh_seams.py);
+                the leak flows only along seams (leak.py). The volumes around a seam
+                are the energy volumes of its joints.
   seam_open     (m,) derived: each seam's openness, 1 relaxed, 0 sealed (seam_openness.py)
 total_energy() is the sum of energy, which no rule changes (the leak moves it,
 collapse hands it on, split shares it out). seam_count() is m.

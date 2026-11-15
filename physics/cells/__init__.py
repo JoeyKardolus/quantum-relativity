@@ -1,17 +1,18 @@
-"""Cells layer: the engine. Energy volumes and joints, the rules that step them, and the
-mesh of shared corners that is their exact, gap-free geometry in an open cube.
+"""Cells layer: the engine. Energy volumes and joint cells, the rules that step them, and the
+woven cells that are their exact, gap-free geometry in an open cube.
 
 The rules and every measurement read only energies, quanta, sizes, joint thicknesses
-and the neighbour graph (Grid). Every energy volume is a tetrahedron (as in causal
-dynamical triangulations), so it has exactly 4 faces, each a joint or the outside.
-The mesh (corners shared between tetrahedra, each inner triangle shared by the two
-of its joint) is cut once by Delaunay at the start; after that a step only moves
-corners, and the topology changes only by joint collapse (an edge of the joint's
-face drawn into one corner, its tetrahedra falling in) and volume split (the 1-4
-move), both leaving only tetrahedra.
+and the neighbour graph (Grid). A skeleton of tetrahedra (as in causal dynamical
+triangulations) is cut once by Delaunay at the start and says which cells neighbour
+which; from it the cells are cut (joint_cells.py): every energy volume a tetrahedron
+with its own four corners, every joint a cell of its own on the face between two
+energy volumes, and seam and corner cells of joint material where joints meet. After
+that a step only moves corners (every corner), and the topology changes only by joint
+collapse (an edge of the joint's skeleton face drawn into one corner, its tetrahedra
+falling in) and volume split (the 1-4 move), after which the cells are cut again.
 
 Module map:
-  engine.py             Engine: Grid + corners, tets, faces, face_cells, face_joint, counts
+  engine.py             Engine: Grid + corners, woven cells, skeleton, counts
   engine_settings.py    EngineSettings: rule strengths, all_on() defaults
   new_engine.py         new_engine: seeded uneven energy, first mesh, joints balanced, settled
   step.py               step: pure Engine -> Engine; pull, swing, leak, collapse, split, corners
@@ -30,18 +31,26 @@ Module map:
   pull_potential.py     pull_potential: grounded graph-Poisson spread of energy
   seam_openness.py      seam_openness: 1 relaxed .. 0 at the seal point, per seam
   leak.py               leak: each volume leaks energy along open seams, by pull
-  first_mesh.py         first_mesh: the one Delaunay cut of a jittered lattice, slivers dropped
-  tet_faces.py          tet_faces: each triangle once, outward from its first cell, its cells
+  first_mesh.py         first_mesh: the skeleton, the one Delaunay cut of a jittered lattice
+  cell_complex.py       CellComplex: corner keys, own tetrahedra, triangles, cell kinds
+  joint_cells.py        joint_cells: the cells cut from the skeleton, joints cells of their own
+  joint_offsets.py      joint_offsets: how far each energy volume's faces stand back
+  place_corners.py      place_corners: corner positions from the skeleton and offsets
+  woven_corners.py      woven_corners: corners kept where they fit, placed afresh elsewhere
+  keyed_corners.py      keyed_corners: where each corner was before, by its key
+  relax_skeleton.py     relax_skeleton: the skeleton's corners move so tetrahedra follow targets
+  cell_sizes.py         cell_sizes: every cell's measured volume from its triangles
+  tet_faces.py          tet_faces: each skeleton triangle once, outward from its first cell
   cell_volumes.py       cell_volumes: each tetrahedron's measured volume
   face_areas.py         face_areas: each triangle's area
-  cell_targets.py       cell_targets: energy volume plus half its joint walls, per cell
-  relax_corners.py      relax_corners: corners move so tetrahedra follow their targets
-  face_joints.py        face_joints: one joint per triangle between two tetrahedra
+  cell_targets.py       cell_targets: rest for volumes, thickness x area for joint cells
+  relax_corners.py      relax_corners: every corner moves so cells follow their targets
+  face_joints.py        face_joints: one joint per skeleton triangle between two tetrahedra
   joint_carry.py        joint_carry: thickness and rate carried to the new joints
-  mesh_seams.py         mesh_seams: edges where two or more joint walls meet
+  mesh_seams.py         mesh_seams: seam cells two or more joint cells touch
   collapse_edge.py      collapse_edge: one edge drawn into a corner, its tetrahedra fall in
-  split_cell.py         split_cell: the 1-4 move, a new corner at the centroid
-  drop_loose_corners.py drop_loose_corners: corners no tetrahedron uses go
+  split_cell.py         split_cell: the 1-4 move on the skeleton, a new corner at the centroid
+  drop_loose_corners.py drop_loose_corners: skeleton corners no tetrahedron uses go
 """
 from physics.cells.grid import Grid
 from physics.cells.rest_volume import VOLUME_SCALE, rest_volume
@@ -57,9 +66,17 @@ from physics.cells.leak import leak
 from physics.cells.tet_faces import tet_faces
 from physics.cells.cell_volumes import cell_volumes
 from physics.cells.face_areas import face_areas
+from physics.cells.cell_sizes import cell_sizes
 from physics.cells.cell_targets import cell_targets
 from physics.cells.relax_corners import relax_corners
 from physics.cells.first_mesh import first_mesh
+from physics.cells.cell_complex import CellComplex
+from physics.cells.joint_cells import joint_cells
+from physics.cells.joint_offsets import joint_offsets
+from physics.cells.place_corners import place_corners
+from physics.cells.woven_corners import woven_corners
+from physics.cells.keyed_corners import keyed_corners
+from physics.cells.relax_skeleton import relax_skeleton
 from physics.cells.face_joints import face_joints
 from physics.cells.joint_carry import joint_carry
 from physics.cells.mesh_seams import mesh_seams
@@ -77,6 +94,7 @@ from physics.cells.frame_arrays import frame_arrays
 __all__ = ["Grid", "VOLUME_SCALE", "rest_volume", "joint_rest", "EngineSettings", "pull_potential",
            "joint_push", "joint_balance", "joint_squeeze", "swing_joints", "seam_openness", "leak",
            "tet_faces", "cell_volumes", "face_areas", "cell_targets", "relax_corners",
-           "first_mesh", "face_joints", "joint_carry", "mesh_seams", "collapse_edge", "split_cell",
+           "first_mesh", "CellComplex", "joint_cells", "joint_offsets", "place_corners", "woven_corners",
+           "keyed_corners", "relax_skeleton", "cell_sizes", "face_joints", "joint_carry", "mesh_seams", "collapse_edge", "split_cell",
            "drop_loose_corners", "Engine", "new_engine", "step", "lumps", "engine_stats",
            "mesh_message", "frame_arrays"]

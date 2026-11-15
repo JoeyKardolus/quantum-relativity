@@ -78,7 +78,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-<canvas id="scene" aria-label="A see-through grid: each energy volume a tetrahedron outlined in red, drawn a little inside itself, and each joint a faint blue layer filling the gap between two red outlines; the cube's outer faces have no joint"></canvas>
+<canvas id="scene" aria-label="A see-through grid of cells: each energy volume a tetrahedron outlined in red, and each joint a cell of its own, at its real shape and size, outlined in blue between two energy volumes; the cube's outer faces have no joint"></canvas>
 
 <div id="below">
   <div id="hint">
@@ -87,7 +87,7 @@
   </div>
   <div id="legend">
     <span><i class="key volume"></i>red outline = energy volume (deeper red = pulls harder)</span>
-    <span><i class="key joint"></i>blue layer = joint between two volumes (brighter = pushes harder)</span>
+    <span><i class="key joint"></i>blue outline = joint cell between two volumes (brighter = pushes harder)</span>
     <span><i class="key cube"></i>the starting cube</span>
   </div>
 </div>
@@ -120,12 +120,12 @@
     <button type="button" id="fill" aria-pressed="false">fill cells</button>
   </div>
   <div id="viewSettings"></div>
-  <div class="caption">Each red outline is one energy volume, a tetrahedron with 4 faces, its corners shared with its neighbours and moved by the
-    engine every step; deeper red pulls harder. Every outline is drawn a little inside its volume, so where two volumes
-    meet you see two red outlines side by side, and the faint blue layer filling the gap between them is their one
-    shared joint; brighter blue pushes harder. So every inner volume sits wrapped in blue, while the cube's outer faces
-    border nothing and stay bare red (they have no joint). The gap is a drawing aid, the same share of every volume, not
-    the joint's real thickness. The faint box is the cube the grid started in. Move the cut slider to hide the volumes past a plane and look inside; "fill
+  <div class="caption">Each red outline is one energy volume, a tetrahedron with its own 4 corners, moved by the engine
+    every step; deeper red pulls harder. Each blue outline is a joint: a cell of its own between two energy volumes, drawn
+    at its real shape and size, its two big sides their faces, its thickness
+    its own (it swings); brighter blue pushes harder. Where joints meet along an edge or at a corner sits more joint
+    material, dim blue: the seams the leak flows along. The cube's outer faces border nothing and stay bare red. The faint
+    box is the cube the grid started in. Move the cut slider to hide the volumes past a plane and look inside; "fill
     cells" adds faint faces.</div>
 
   <h2>Run</h2>
@@ -155,19 +155,16 @@ const LABELS = {
   split_size: "split size (a volume this many times the start size splits)",
 };
 const RUN_SETTINGS = new Set(["speed", "unevenness"]);
-const GAP = 0.08;                // each volume's outline (and fill) drawn this share smaller about its centre; the joint sits in the gap
 const FRAME_MAGIC = 0x31465251;  // "QRF1", the binary frame's first word (physics/app/page_frame.py)
 const HEADER_BYTES = 32;         // 8 uint32 words
 const VOLUME_LIGHT = [1.0, 0.82, 0.78], VOLUME_DARK = [0.62, 0.0, 0.05];   // pale pink (pulls least) to deep red (pulls most)
 const FILL_OPACITY = 0.14;
-const LAYER_OPACITY = 0.15;      // the joint layers' blue fill, always drawn
 const JOINT_DIM = [0.06, 0.1, 0.28], JOINT_BRIGHT = [0.62, 0.92, 1.0];
 
 /* ---------- the 3D scene ---------- */
 const canvas = document.getElementById("scene");
 const THREE_READY = typeof window.THREE === "object" && window.THREE !== null;
-const scene3d = { renderer: null, scene: null, camera: null, cells: null, walls: null, cellLines: null, jointLines: null,
-  cube: null, drawnCells: 0 };
+const scene3d = { renderer: null, scene: null, camera: null, cells: null, cellLines: null, cube: null, drawnCells: 0 };
 const view = { fill: false };   // fill off: the see-through wireframe only
 const orbit = { theta: 0.7, phi: 1.15, distance: 10, follow: true, centre: [0, 0, 0], reach: 1 };
 const cut = { axis: 0, share: 1 };   // share 1 = no cut; below 1, cells whose centre is past the plane are hidden
@@ -194,12 +191,6 @@ function createScene() {
 function fillMaterial() {
   return new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide, shininess: 18,
     transparent: true, opacity: FILL_OPACITY, depthWrite: false });
-}
-
-/** The joint layers' faint blue, see-through, lit material coloured per vertex. */
-function layerMaterial() {
-  return new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide, shininess: 18,
-    transparent: true, opacity: LAYER_OPACITY, depthWrite: false });
 }
 
 /** A line material coloured per vertex. */
@@ -249,74 +240,29 @@ function cellTables(message) {
   return { corner: Int32Array.from(corner), owner: Int32Array.from(owner), indices };
 }
 
-/** Vertex tables for the joint walls: each joint face drawn twice (once shrunk toward each cell), joined at the sides. */
-function wallTables(message) {
-  const corner = [], owner = [], other = [], joint = [], indices = [];
-  message.faces.forEach((face, faceIndex) => {
-    const [first, second] = message.face_cells[faceIndex], jointIndex = message.face_joint[faceIndex];
-    if (first < 0 || second < 0 || jointIndex < 0) return;
-    const start = corner.length, count = face.length;
-    fan(start, count, indices);
-    fan(start + count, count, indices);
-    for (let side = 0; side < count; side++) {
-      const next = (side + 1) % count;
-      indices.push(start + side, start + next, start + count + next, start + side, start + count + next, start + count + side);
-    }
-    for (const [cell, partner] of [[first, second], [second, first]]) {
-      for (const point of face) { corner.push(point); owner.push(cell); other.push(partner); joint.push(jointIndex); }
-    }
-  });
-  return { corner: Int32Array.from(corner), owner: Int32Array.from(owner), other: Int32Array.from(other),
-    joint: Int32Array.from(joint), indices };
-}
-
-/** Each volume's own outline: every edge of its faces once per volume, two vertices per segment. */
+/** Each cell's own outline: every edge of its faces once per cell, two vertices per segment, leaving out a joint
+ * cell's edges inside one polygon (a four-sided face cut into two triangles, or one face between the same two cells);
+ * an energy volume keeps all six. */
 function cellEdgeTables(message) {
-  const seen = new Set(), corner = [], owner = [];
+  const across = new Map(), inside = new Set();
   message.faces.forEach((face, faceIndex) => {
-    for (const cell of message.face_cells[faceIndex]) {
+    const [first, second] = message.face_cells[faceIndex];
+    for (const [cell, other] of [[first, second], [second, first]]) {
       if (cell < 0) continue;
       face.forEach((point, side) => {
         const next = face[(side + 1) % face.length], key = `${cell}:${Math.min(point, next)}:${Math.max(point, next)}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        corner.push(point, next); owner.push(cell, cell);
+        if (!across.has(key)) across.set(key, other);
+        else if (across.get(key) === other && message.cell_kind[cell] !== 0) inside.add(key);
       });
     }
   });
+  const corner = [], owner = [];
+  for (const key of across.keys()) {
+    if (inside.has(key)) continue;
+    const [cell, point, next] = key.split(":").map(Number);
+    corner.push(point, next); owner.push(cell, cell);
+  }
   return { corner: Int32Array.from(corner), owner: Int32Array.from(owner) };
-}
-
-/** The joint layers' blue edges: at each corner of a joint face, one segment across the gap between its two cells' inset copies. */
-function jointSideTables(message) {
-  const corner = [], owner = [], other = [], joint = [];
-  message.faces.forEach((face, faceIndex) => {
-    const [first, second] = message.face_cells[faceIndex], jointIndex = message.face_joint[faceIndex];
-    if (first < 0 || second < 0 || jointIndex < 0) return;
-    for (const point of face) {
-      corner.push(point, point); owner.push(first, second); other.push(second, first); joint.push(jointIndex, jointIndex);
-    }
-  });
-  return { corner: Int32Array.from(corner), owner: Int32Array.from(owner), other: Int32Array.from(other),
-    joint: Int32Array.from(joint) };
-}
-
-/** Each joint's two sides as full outlines: every edge of a joint face, once on each cell's side, so the joint
- * reads as a blue box around the shared face (red | blue ... blue | red). */
-function jointOutlineTables(message) {
-  const corner = [], owner = [], other = [], joint = [];
-  message.faces.forEach((face, faceIndex) => {
-    const [first, second] = message.face_cells[faceIndex], jointIndex = message.face_joint[faceIndex];
-    if (first < 0 || second < 0 || jointIndex < 0) return;
-    for (const [cell, partner] of [[first, second], [second, first]]) {
-      face.forEach((point, side) => {
-        corner.push(point, face[(side + 1) % face.length]);
-        owner.push(cell, cell); other.push(partner, partner); joint.push(jointIndex, jointIndex);
-      });
-    }
-  });
-  return { corner: Int32Array.from(corner), owner: Int32Array.from(owner), other: Int32Array.from(other),
-    joint: Int32Array.from(joint) };
 }
 
 /** Every cell's distinct corners, as offsets into one flat list, for its centre. */
@@ -344,23 +290,19 @@ function goodMesh(message) {
 function applyMesh(message) {
   if (!goodMesh(message)) { console.warn("bad mesh message"); return; }
   const reset = !mesh || message.step === 0 || message.step < (frame ? frame.step : 0);
-  mesh = Object.assign({}, message, { cellTable: cellTables(message), wallTable: wallTables(message),
-    cellEdgeTable: cellEdgeTables(message), jointEdgeTable: jointSideTables(message), jointOutlineTable: jointOutlineTables(message),
+  const kind = Int32Array.from(message.cell_kind || []);
+  mesh = Object.assign({}, message, { cellTable: cellTables(message), cellEdgeTable: cellEdgeTables(message),
     centreTable: cellCorners(message), centres: new Float32Array(message.cell_count * 3),
-    hidden: new Uint8Array(message.cell_count) });
+    hidden: new Uint8Array(message.cell_count), kind, volumes: kind.filter((value) => value === 0).length });
   frame = null;
   if (!scene3d.renderer) return;
-  for (const name of ["cells", "walls", "cellLines", "jointLines", "jointOutlines"]) {
+  for (const name of ["cells", "cellLines"]) {
     if (scene3d[name]) { scene3d.scene.remove(scene3d[name]); scene3d[name].geometry.dispose(); scene3d[name].material.dispose(); }
   }
   const cellGeometry = dynamicGeometry(mesh.cellTable.corner.length, mesh.cellTable.indices);
-  const wallGeometry = dynamicGeometry(mesh.wallTable.corner.length, mesh.wallTable.indices);
   scene3d.cells = new THREE.Mesh(cellGeometry, fillMaterial());
-  scene3d.walls = new THREE.Mesh(wallGeometry, layerMaterial());
   scene3d.cellLines = new THREE.LineSegments(lineGeometry(mesh.cellEdgeTable.corner.length), lineMaterial());
-  scene3d.jointLines = new THREE.LineSegments(lineGeometry(mesh.jointEdgeTable.corner.length), lineMaterial());
-  scene3d.jointOutlines = new THREE.LineSegments(lineGeometry(mesh.jointOutlineTable.corner.length), lineMaterial());
-  for (const part of [scene3d.cells, scene3d.walls, scene3d.cellLines, scene3d.jointLines, scene3d.jointOutlines]) {
+  for (const part of [scene3d.cells, scene3d.cellLines]) {
     part.frustumCulled = false; part.visible = false; scene3d.scene.add(part);
   }
   drawCube(message.start_box);
@@ -394,7 +336,7 @@ function parseFrame(buffer) {
   const cornerBytes = cornerCount * 12;
   if (magic !== FRAME_MAGIC || buffer.byteLength !== HEADER_BYTES + cornerBytes + cellCount + jointCount) return null;
   return { step, meshId, corners: new Float32Array(buffer, HEADER_BYTES, cornerCount * 3),
-    pull: rankBytes(new Uint8Array(buffer, HEADER_BYTES + cornerBytes, cellCount)),
+    pull: new Uint8Array(buffer, HEADER_BYTES + cornerBytes, cellCount),
     push: rankBytes(new Uint8Array(buffer, HEADER_BYTES + cornerBytes + cellCount, jointCount)) };
 }
 
@@ -405,7 +347,10 @@ function applyFrame(buffer) {
   if (!mesh || parsed.meshId !== mesh.mesh_id) return;   // a frame for a mesh this page does not have
   if (parsed.corners.length !== mesh.corner_count * 3 || parsed.pull.length !== mesh.cell_count
       || parsed.push.length !== mesh.joint_count) { console.warn("frame does not fit its mesh"); return; }
-  frame = parsed;
+  const ranked = rankBytes(parsed.pull.subarray(0, mesh.volumes));   // rank the energy volumes among themselves
+  const pull = new Uint8Array(mesh.cell_count);
+  pull.set(ranked);
+  frame = Object.assign(parsed, { pull });
   redraw();
 }
 
@@ -451,19 +396,24 @@ function blend(from, to, share, target, offset) {
   for (let channel = 0; channel < 3; channel++) target[offset + channel] = from[channel] + (to[channel] - from[channel]) * share;
 }
 
-/** Write one table's vertices: its corner pulled GAP toward its cell's centre; when hidden, collapsed onto one point
- * (a joint table's vertices onto the lower-numbered of the joint's two cells, so no line spans the gap). */
-function writeVertices(table, positions, colours, colourOf, hiddenOf, keep = 1 - GAP) {
-  const corners = frame.corners, centres = mesh.centres;
+/** One cell's colour: an energy volume red by pull, a joint cell blue by push, other joint material dim blue. */
+function cellColour(cell, colours, slot) {
+  const kind = mesh.kind[cell];
+  if (kind === 0) blend(VOLUME_LIGHT, VOLUME_DARK, frame.pull[cell] / 255, colours, slot);
+  else if (kind === 1) blend(JOINT_DIM, JOINT_BRIGHT, frame.push[cell - mesh.volumes] / 255, colours, slot);
+  else blend(JOINT_DIM, JOINT_DIM, 0, colours, slot);
+}
+
+/** Write one table's vertices: every cell at its real corners; when hidden, collapsed onto the cell's centre. */
+function writeVertices(table, positions, colours) {
+  const corners = frame.corners, centres = mesh.centres, hidden = mesh.hidden;
   for (let vertex = 0; vertex < table.corner.length; vertex++) {
-    const hidden = hiddenOf(vertex), owner = table.owner[vertex];
-    const anchor = hidden && table.other ? Math.min(owner, table.other[vertex]) : owner;
-    const point = table.corner[vertex] * 3, centre = anchor * 3, slot = vertex * 3;
-    const share = hidden ? 0 : keep;
+    const owner = table.owner[vertex], point = table.corner[vertex] * 3, centre = owner * 3, slot = vertex * 3;
+    const share = hidden[owner] ? 0 : 1;
     for (let axis = 0; axis < 3; axis++) {
       positions[slot + axis] = centres[centre + axis] + share * (corners[point + axis] - centres[centre + axis]);
     }
-    colourOf(vertex, colours, slot);
+    cellColour(owner, colours, slot);
   }
 }
 
@@ -475,52 +425,28 @@ function markChanged(geometry) {
 
 /** Write the faint filled cell faces (only while "fill cells" is on). */
 function writeFill() {
-  const cellTable = mesh.cellTable, hidden = mesh.hidden, geometry = scene3d.cells.geometry;
-  writeVertices(cellTable, geometry.attributes.position.array, geometry.attributes.color.array,
-    (vertex, colours, slot) => blend(VOLUME_LIGHT, VOLUME_DARK, frame.pull[cellTable.owner[vertex]] / 255, colours, slot),
-    (vertex) => hidden[cellTable.owner[vertex]]);
+  const geometry = scene3d.cells.geometry;
+  writeVertices(mesh.cellTable, geometry.attributes.position.array, geometry.attributes.color.array);
   markChanged(geometry);
 }
 
-/** Write a joint table (layer prisms or their gap-crossing edges): blue by push, gone when either cell is hidden. */
-function writeJointTable(table, geometry, keep = 1 - GAP) {
-  const hidden = mesh.hidden;
-  writeVertices(table, geometry.attributes.position.array, geometry.attributes.color.array,
-    (vertex, colours, slot) => blend(JOINT_DIM, JOINT_BRIGHT, frame.push[table.joint[vertex]] / 255, colours, slot),
-    (vertex) => hidden[table.owner[vertex]] || hidden[table.other[vertex]], keep);
-  markChanged(geometry);
-}
-
-/** Write each volume's red outline: its corners pulled GAP toward its own centre, collapsed when hidden. */
+/** Write every cell's outline at its real shape: red energy volumes, blue joint cells. */
 function writeCellLines() {
-  const table = mesh.cellEdgeTable, geometry = scene3d.cellLines.geometry;
-  const positions = geometry.attributes.position.array, colours = geometry.attributes.color.array;
-  const corners = frame.corners, centres = mesh.centres, hidden = mesh.hidden, keep = 1 - GAP;
-  for (let vertex = 0; vertex < table.corner.length; vertex++) {
-    const cell = table.owner[vertex], point = table.corner[vertex] * 3, centre = cell * 3, slot = vertex * 3;
-    const share = hidden[cell] ? 0 : keep;
-    for (let axis = 0; axis < 3; axis++) {
-      positions[slot + axis] = centres[centre + axis] + share * (corners[point + axis] - centres[centre + axis]);
-    }
-    blend(VOLUME_LIGHT, VOLUME_DARK, frame.pull[cell] / 255, colours, slot);
-  }
-  geometry.attributes.position.needsUpdate = true;
-  geometry.attributes.color.needsUpdate = true;
+  const geometry = scene3d.cellLines.geometry;
+  writeVertices(mesh.cellEdgeTable, geometry.attributes.position.array, geometry.attributes.color.array);
+  markChanged(geometry);
 }
 
-/** Redraw the current frame: red volume outlines, blue joint layers (and the faint cell fill when on), coloured by pull and push. */
+/** Redraw the current frame: red volume outlines, blue joint cells (and the faint cell fill when on), coloured by pull and push. */
 function redraw() {
   if (!mesh || !frame || !scene3d.renderer) { showStats(); return; }
   updateCentres();
   const box = cornerBox();
   scene3d.drawnCells = updateHidden(box);
   writeCellLines();
-  writeJointTable(mesh.wallTable, scene3d.walls.geometry);
-  writeJointTable(mesh.jointEdgeTable, scene3d.jointLines.geometry);
-  writeJointTable(mesh.jointOutlineTable, scene3d.jointOutlines.geometry, 1 - GAP / 2);   // the joint's sides, between red outline and shared face
   if (view.fill) writeFill();
-  scene3d.cellLines.visible = scene3d.jointLines.visible = scene3d.jointOutlines.visible = true;
-  scene3d.cells.visible = scene3d.walls.visible = view.fill;   // owner: wireframe only unless "fill cells" is on
+  scene3d.cellLines.visible = true;
+  scene3d.cells.visible = view.fill;   // owner: wireframe only unless "fill cells" is on
   const reach = 0.5 * Math.hypot(box[1][0] - box[0][0], box[1][1] - box[0][1], box[1][2] - box[0][2]);
   if (orbit.follow) orbit.centre = [0, 1, 2].map((axis) => (box[0][axis] + box[1][axis]) / 2);
   orbit.reach = Math.max(reach, 1e-6);

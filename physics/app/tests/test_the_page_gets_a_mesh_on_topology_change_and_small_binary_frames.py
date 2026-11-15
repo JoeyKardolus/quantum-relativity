@@ -42,7 +42,7 @@ def _read_frame(data: bytes) -> dict:
     return {"magic": magic, "step": step, "mesh_id": mesh_id, "corners": corners, "pull": pull, "push": push}
 
 
-def test_the_mesh_message_indexes_real_corners_and_names_both_cells_and_the_joint_of_each_face():
+def test_the_mesh_message_indexes_real_corners_and_names_both_cells_the_joint_and_each_cells_kind():
     simulation = Simulation(CELLS, seed=2)
     message = page_mesh(simulation, mesh_id=7)
     assert message["type"] == "mesh" and message["mesh_id"] == 7 and message["step"] == 0
@@ -50,14 +50,16 @@ def test_the_mesh_message_indexes_real_corners_and_names_both_cells_and_the_join
     assert message["corner_count"] == len(corners) == len(simulation.engine.corners)
     assert message["cell_count"] == len(pull) and message["joint_count"] == len(push)
     faces, face_cells, face_joint = message["faces"], message["face_cells"], message["face_joint"]
-    assert len(faces) == len(face_cells) == len(face_joint) > 0
+    kind = message["cell_kind"]
+    assert len(faces) == len(face_cells) == len(face_joint) > 0 and len(kind) == message["cell_count"]
     for face, cells, joint in zip(faces, face_cells, face_joint):
         assert len(face) >= 3 and all(0 <= corner < message["corner_count"] for corner in face)
         assert len(cells) == 2 and 0 <= cells[0] < message["cell_count"] and -1 <= cells[1] < message["cell_count"]
         if cells[1] == -1:
             assert joint == -1
         else:
-            assert cells[0] != cells[1] and 0 <= joint < message["joint_count"]
+            assert cells[0] != cells[1]
+            assert (0 <= joint < message["joint_count"]) == (1 in (kind[cells[0]], kind[cells[1]]))
     assert {joint for joint in face_joint if joint >= 0} == set(range(message["joint_count"]))
     assert {cell for cells in face_cells for cell in cells if cell >= 0} == set(range(message["cell_count"]))
     low, high = (np.array(corner) for corner in message["start_box"])

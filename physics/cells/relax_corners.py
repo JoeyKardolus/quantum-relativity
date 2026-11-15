@@ -1,81 +1,112 @@
-"""Relax corners: move the shared corners so each tetrahedron's measured volume follows its target.
+"""Relax corners: move every corner so each cell's measured size follows its target.
 
-Contract: `relax_corners(corners, tets, targets, passes)` returns new corners (k, 3);
-the topology (tets) is untouched, so no two cells start or stop neighbouring here.
-Each pass is one regularised least-squares Gauss-Newton step on all tetrahedra at
-once: with e the errors target - V (cell_volumes.py), each clipped to MAX_CHANGE (5%)
-of the tetrahedron's volume (of its target when the volume is not positive), and G
-the gradients of the volumes over the corners (for (a, b, c, d):
-(c - a) x (d - a) / 6 at b, (d - a) x (b - a) / 6 at c, (b - a) x (c - a) / 6 at d,
-minus their sum at a), each row of both divided by the tetrahedron's volume (so
-every tetrahedron's error counts as a share of its size, and a small one is not
-crushed by big neighbours), the corners move by
-  dx = (G^T G + RIDGE * mean diagonal * I)^-1 G^T e
-(a sparse direct solve). A tetrahedral mesh has about six tetrahedra per corner, so
-there are more volumes than corner directions: the fit is least squares and a
-tetrahedron's size reaches its target only as far as its neighbours' let it.
-RIDGE (1e-2, Levenberg-Marquardt damping) keeps the system definite and the move small in
-the directions the volumes hold only weakly (it holds the mesh's free translations and
-turns still). A corner inside is shared by tetrahedra on all sides, so a squeeze
-inside spreads outward to the outside corners, which nothing pushes back: the open
-cube grows or shrinks at its edge. A pass whose move would leave any tetrahedron
-with less than KEEP_SHARE (1/2) of its volume is halved, up to HALVINGS (30) times,
-so no tetrahedron is flipped or flattened by the relaxation. Raises RuntimeError if
-the solve gives a value that is not finite or the halvings run out.
+Contract: `relax_corners(corners, faces, face_cells, targets, passes)` returns new corners
+(k, 3); the topology (faces, face_cells) is untouched, so no two cells start or stop
+neighbouring here. Every corner moves: the energy volumes' own corners and the joint
+cells', seam cells' and corner cells' alike; nothing holds a cell to one shape (rule 4),
+only its size is asked for. Each pass is one damped Gauss-Newton step on all cells at
+once: with e the errors target - V (cell_sizes.py), each clipped to MAX_CHANGE (5%) of
+the cell's size (of its target when the size is not positive), and G the gradients of
+the sizes over the corners (per triangle (a, b, c) turned outward from the cell,
+(b - r) x (c - r) / 6 at a and its turns at b and c), each row of both divided by the
+cell's size (so every cell's error counts as a share of its size, and a thin joint
+cell is not crushed by big energy volumes), the corners move by the least move that
+meets the errors,
+  dx = G^T (G G^T + RIDGE * diag(G G^T))^-1 e
+(conjugate gradients over the cells, Jacobi preconditioned, to a relative residual of
+SOLVE_TOLERANCE (1e-8), the system being symmetric positive definite). There are about
+three corners per cell, far more directions than sizes, so every size can be met and
+the rest of the shape is left as it is. RIDGE (1e-2, Levenberg-Marquardt damping per
+cell) keeps the system definite. The cells differ in size by many powers of ten (a
+packed energy volume's corner cells are tiny), so no corner moves further in one pass
+than REACH (0.25) of the smallest cell it is on, measured as 3 V / (its surface area),
+the inradius of a tetrahedron and about a joint cell's half thickness: a move is only
+asked of a cell where its linear step holds. A corner inside is shared by cells on all sides, so a squeeze inside spreads outward
+to the outside corners, which nothing pushes back: the open cube grows or shrinks at
+its edge. A pass whose move would leave any cell with less than KEEP_SHARE (1/2) of
+its size is halved, up to HALVINGS (30) times, so no cell is flipped or flattened by
+the relaxation. Raises RuntimeError if the solve does not converge or gives a value
+that is not finite, or the halvings run out.
 """
 from __future__ import annotations
 
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import cg
 
-from physics.cells.cell_volumes import cell_volumes
+from physics.cells.cell_sizes import cell_sizes
 
 MAX_CHANGE = 0.05
 RIDGE = 1e-2
 KEEP_SHARE = 0.5
 HALVINGS = 30
+REACH = 0.25
+SOLVE_TOLERANCE = 1e-8
 
 
-def relax_corners(corners: np.ndarray, tets: np.ndarray, targets: np.ndarray, passes: int) -> np.ndarray:
-    """Corners after `passes` least-squares steps of every tetrahedron toward its target volume."""
+def relax_corners(corners: np.ndarray, faces: np.ndarray, face_cells: np.ndarray, targets: np.ndarray,
+                  passes: int) -> np.ndarray:
+    """Corners after `passes` least-move steps of every cell toward its target size."""
     moved = np.array(corners, dtype=float)
-    rows = np.repeat(np.arange(len(tets)), 12)
-    columns = (tets[:, :, None] * 3 + np.arange(3)).reshape(-1)
+    count = len(targets)
+    cell, ring = _sides(faces, face_cells)
+    anchor = np.zeros(count, dtype=np.int64)
+    anchor[cell[::-1]] = ring[::-1, 0]
+    rows = np.repeat(cell, 9)
+    columns = (ring[:, :, None] * 3 + np.arange(3)).reshape(-1)
     for _ in range(passes):
-        volume = cell_volumes(moved, tets)
-        limit = MAX_CHANGE * np.where(volume > 0, volume, np.abs(targets))
-        scale = 1.0 / np.where(volume > 0, volume, np.abs(targets))
-        error = np.clip(targets - volume, -limit, limit) * scale
-        gradient = sp.csr_matrix(((_gradients(moved, tets) * scale[:, None, None]).ravel(),
-                                  (rows, columns)), shape=(len(tets), 3 * len(moved)))
-        system = (gradient.T @ gradient).tocsr()
-        diagonal = system.diagonal()
-        ridge = RIDGE * float(diagonal.mean()) if len(diagonal) else 0.0
-        system = system + sp.identity(system.shape[0], format="csr") * ridge
-        step = spsolve(system.tocsc(), gradient.T @ error)
+        size = cell_sizes(moved, faces, face_cells, count)
+        base = np.where(size > 0, size, np.abs(targets))
+        error = np.clip(targets - size, -MAX_CHANGE * base, MAX_CHANGE * base) / base
+        values = (_gradients(moved, ring, anchor[cell]) / base[cell][:, None, None]).reshape(-1)
+        gradient = sp.csr_matrix((values, (rows, columns)), shape=(count, 3 * len(moved)))
+        system = (gradient @ gradient.T).tocsr()
+        diagonal = (1 + RIDGE) * system.diagonal()
+        system = system + sp.diags(RIDGE * system.diagonal())
+        solved, failed = cg(system, error, rtol=SOLVE_TOLERANCE, M=sp.diags(1.0 / diagonal), maxiter=10 * count)
+        if failed:
+            raise RuntimeError("corner relaxation: the solve did not converge")
+        step = (gradient.T @ solved).reshape(-1, 3)
         if not np.isfinite(step).all():
             raise RuntimeError("corner relaxation: the solve gave a value that is not finite")
-        moved = _kept_shape(moved, step.reshape(-1, 3), tets, volume)
+        reach = REACH * _corner_scale(moved, ring, cell, size)
+        length = np.linalg.norm(step, axis=1)
+        step *= np.minimum(1.0, np.divide(reach, length, out=np.ones_like(length), where=length > 0))[:, None]
+        moved = _kept_shape(moved, step, faces, face_cells, size)
     return moved
 
 
-def _gradients(corners: np.ndarray, tets: np.ndarray) -> np.ndarray:
-    """Per tetrahedron (n, 4, 3) the gradient of its volume over each of its corners."""
-    first, second, third, fourth = (corners[tets[:, column]] for column in range(4))
-    at_second = np.cross(third - first, fourth - first) / 6
-    at_third = np.cross(fourth - first, second - first) / 6
-    at_fourth = np.cross(second - first, third - first) / 6
-    at_first = -(at_second + at_third + at_fourth)
-    return np.stack([at_first, at_second, at_third, at_fourth], axis=1)
+def _sides(faces: np.ndarray, face_cells: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Every (cell, triangle turned outward from it) pair, the outside left out."""
+    inner = face_cells[:, 1] >= 0
+    return (np.concatenate([face_cells[:, 0], face_cells[inner, 1]]),
+            np.concatenate([faces, faces[inner][:, ::-1]]))
 
 
-def _kept_shape(corners: np.ndarray, step: np.ndarray, tets: np.ndarray, volume: np.ndarray) -> np.ndarray:
-    """Corners moved by step, halved until every tetrahedron keeps KEEP_SHARE of its volume."""
-    floor = KEEP_SHARE * volume
+def _corner_scale(corners: np.ndarray, ring: np.ndarray, cell: np.ndarray, size: np.ndarray) -> np.ndarray:
+    """Per corner the smallest 3 V / (surface area) of the cells it is on."""
+    first, second, third = (corners[ring[:, column]] for column in range(3))
+    area = np.bincount(cell, np.linalg.norm(np.cross(second - first, third - first), axis=1) / 2, len(size))
+    scale = 3 * np.abs(size) / np.where(area > 0, area, 1.0)
+    smallest = np.full(len(corners), np.inf)
+    np.minimum.at(smallest, ring.ravel(), np.repeat(scale[cell], 3))
+    return smallest
+
+
+def _gradients(corners: np.ndarray, ring: np.ndarray, anchor: np.ndarray) -> np.ndarray:
+    """Per (cell, triangle) pair (m, 3, 3) the gradient of the cell's size over the triangle's corners."""
+    reference = corners[anchor]
+    first, second, third = (corners[ring[:, column]] - reference for column in range(3))
+    return np.stack([np.cross(second, third), np.cross(third, first), np.cross(first, second)], axis=1) / 6
+
+
+def _kept_shape(corners: np.ndarray, step: np.ndarray, faces: np.ndarray, face_cells: np.ndarray,
+                size: np.ndarray) -> np.ndarray:
+    """Corners moved by step, halved until every cell keeps KEEP_SHARE of its size."""
+    floor = KEEP_SHARE * size
     for _ in range(HALVINGS):
         moved = corners + step
-        if (cell_volumes(moved, tets) > floor).all():
+        if (cell_sizes(moved, faces, face_cells, len(size)) > floor).all():
             return moved
         step = step / 2
-    raise RuntimeError("corner relaxation: no move keeps every tetrahedron the right way out")
+    raise RuntimeError("corner relaxation: no move keeps every cell the right way out")

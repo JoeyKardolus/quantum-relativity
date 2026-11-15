@@ -1,21 +1,22 @@
-"""Topology changes only by its two events, both leaving only tetrahedra: a volume split is the 1-4 move and keeps
-space and energy exactly; a joint collapse draws an edge into one corner, keeps energy exactly and inverts nothing."""
+"""Topology changes only by its two events, on the skeleton, both leaving only tetrahedra: a volume split is the 1-4
+move and keeps space and energy exactly; a joint collapse draws an edge into one corner, keeps energy exactly and
+inverts nothing; the cells cut again after either are all the right way out."""
 from dataclasses import replace
 
 import numpy as np
 
-from physics.cells import (EngineSettings, cell_volumes, collapse_edge, engine_stats, joint_rest,
+from physics.cells import (EngineSettings, cell_sizes, cell_volumes, collapse_edge, engine_stats, joint_rest,
                            new_engine, rest_volume, split_cell, step, tet_faces)
 
 
 def test_the_1_4_move_keeps_every_other_tetrahedron_and_the_total_space():
     engine = new_engine(200, 6, 0.5)
-    before = cell_volumes(engine.corners, engine.tets)
-    corners, tets, children, shares = split_cell(engine.corners, engine.tets, 7)
+    before = cell_volumes(engine.skeleton_corners, engine.skeleton_tets)
+    corners, tets, children, shares = split_cell(engine.skeleton_corners, engine.skeleton_tets, 7)
     after = cell_volumes(corners, tets)
-    assert len(tets) == len(engine.tets) + 3 and len(corners) == len(engine.corners) + 1
+    assert len(tets) == len(engine.skeleton_tets) + 3 and len(corners) == len(engine.skeleton_corners) + 1
     assert (after > 0).all()
-    others = np.delete(np.arange(len(engine.tets)), 7)
+    others = np.delete(np.arange(len(engine.skeleton_tets)), 7)
     assert np.array_equal(after[others], before[others])
     assert np.isclose(after[children].sum(), before[7], rtol=1e-13)
     assert np.isclose(after.sum(), before.sum(), rtol=1e-13)
@@ -64,24 +65,24 @@ def test_a_split_leaves_each_child_below_the_trigger_so_it_does_not_split_again(
 
 def test_an_inner_edge_collapse_keeps_its_space_and_every_total_and_inverts_nothing():
     engine = new_engine(300, 3, 0.5)
-    faces, face_cells = tet_faces(engine.tets)
+    faces, face_cells = tet_faces(engine.skeleton_tets)
     outer = np.unique(faces[face_cells[:, 1] < 0])
-    inner = np.setdiff1d(np.arange(len(engine.corners)), outer)
+    inner = np.setdiff1d(np.arange(len(engine.skeleton_corners)), outer)
     values = np.column_stack([engine.grid.energy, engine.grid.quanta])
     result = None
     for corner in inner:
-        partner = next(other for other in engine.tets[(engine.tets == corner).any(axis=1)].ravel()
+        partner = next(other for other in engine.skeleton_tets[(engine.skeleton_tets == corner).any(axis=1)].ravel()
                        if other != corner and other in inner)
-        result = collapse_edge(engine.corners, engine.tets, values, (corner, partner))
+        result = collapse_edge(engine.skeleton_corners, engine.skeleton_tets, values, (corner, partner))
         if result is not None:
             break
     assert result is not None
     corners, tets, handed, kept, gone = result
-    star = (engine.tets == corner).any(axis=1) | (engine.tets == partner).any(axis=1)
-    space_before = cell_volumes(engine.corners, engine.tets[star]).sum()
+    star = (engine.skeleton_tets == corner).any(axis=1) | (engine.skeleton_tets == partner).any(axis=1)
+    space_before = cell_volumes(engine.skeleton_corners, engine.skeleton_tets[star]).sum()
     space_after = cell_volumes(corners, tets[star[kept]]).sum()
     assert np.isclose(space_after, space_before, rtol=1e-12)
-    assert len(tets) < len(engine.tets) and not (tets == gone).any()
+    assert len(tets) < len(engine.skeleton_tets) and not (tets == gone).any()
     assert (cell_volumes(corners, tets) > 0).all()
     assert np.allclose(handed.sum(axis=0), values.sum(axis=0), rtol=1e-14)
 
@@ -92,11 +93,12 @@ def test_one_joint_below_its_limit_collapses_and_the_energy_is_kept_exactly():
     grid = engine.grid
     settings = EngineSettings.all_on(leak=0.0, split_size=np.inf, joint_push=0.0)
     rest = joint_rest(grid.volume, grid.joints, settings.joint_rest)
-    inner_corner = np.ones(len(engine.corners), dtype=bool)
-    inner_corner[engine.faces[engine.face_cells[:, 1] < 0].ravel()] = False
-    joint_face = engine.face_joint >= 0
-    deep = np.flatnonzero(joint_face & inner_corner[engine.faces].all(axis=1))
-    chosen = int(engine.face_joint[deep[0]])
+    woven = engine.woven
+    inner_corner = np.ones(len(engine.skeleton_corners), dtype=bool)
+    inner_corner[woven.skeleton_faces[woven.skeleton_face_cells[:, 1] < 0].ravel()] = False
+    joint_face = woven.skeleton_face_joint >= 0
+    deep = np.flatnonzero(joint_face & inner_corner[woven.skeleton_faces].all(axis=1))
+    chosen = int(woven.skeleton_face_joint[deep[0]])
     thickness = grid.thickness.copy()
     thickness[chosen] = 0.1 * rest[chosen]
     rate = grid.rate.copy()
@@ -106,4 +108,6 @@ def test_one_joint_below_its_limit_collapses_and_the_energy_is_kept_exactly():
     assert np.isclose(after.grid.total_energy(), grid.total_energy(), rtol=1e-14)
     assert np.isclose(after.grid.quanta.sum(), grid.quanta.sum(), rtol=1e-14)
     assert (cell_volumes(after.corners, after.tets) > 0).all()
-    assert (np.bincount(after.face_cells[after.face_cells >= 0], minlength=after.grid.cell_count) == 4).all()
+    assert (cell_sizes(after.corners, after.faces, after.face_cells, len(after.cell_kind)) > 0).all()
+    count = after.grid.cell_count
+    assert (np.bincount(after.face_cells[after.face_cells >= 0], minlength=count)[:count] == 4).all()
