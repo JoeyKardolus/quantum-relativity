@@ -29,7 +29,7 @@ The core depth/seam vocabulary used by `improve-codebase-architecture`, `tdd`, `
 - **shallow**: interface nearly as complex as the implementation. _Avoid_: thin, anaemic.
 - **volume split**: an energy volume grown too big tearing apart, the tear becoming a new joint; the mirror of joint collapse and the only way new volumes and joints appear. _Avoid_: division, creation, spawning.
 - **Planck box**: one of the fixed, smallest units of space in the engine's grid; boxes never move or stretch, energy flows through them as a fluid, and every cell (energy volume or joint) is a group of them, its size being how many it holds. _Avoid_: voxel, pixel, cell (a cell is a group of Planck boxes).
-- **seam**: the passage through a joint by which energy leaks from one energy volume to the next (A to B to A); it narrows as the joint is squeezed and closes past the seal point. _Avoid_: channel, pore, edge, Plateau border.
+- **seam**: a place where joints meet in the joint web; energy leaks from one energy volume to the next through the joints and along the seams, less the more the joints are squeezed, and not at all past the seal point. _Avoid_: channel, pore, edge, Plateau border.
 - **adapter**: concrete thing satisfying an interface at a seam. _Avoid_: impl, plugin.
 - **port**: interface defined for cross-seam dependencies.
 - **leverage**: what callers get from depth. _Avoid_: reuse.
@@ -44,15 +44,14 @@ The core depth/seam vocabulary used by `improve-codebase-architecture`, `tdd`, `
 ## Quantum-relativity theory (physics/)
 
 - **quantum-relativity theory**: the owner's hobby theory that space, matter and forces all come from one woven grid of energy volumes and joints. Rules in `docs/bible.md#physicsquantum-relativity`. _Avoid_: connection theory (its earlier name, which covered only the network), string theory, theory of everything, the model.
-- **joint**: a B in the ABAB structure: a volume of energy that pushes, harder the more it is squeezed below the size its energy wants, and collapses past its limit; it touches only energy volumes. _Avoid_: node, vertex, point, wall, layer, B volume.
+- **joint**: a B in the ABAB structure: a cell of energy that pushes, harder the more it is squeezed below the size its energy wants, and collapses past its limit; joints wrap every energy volume completely and touch each other, forming one connected web. _Avoid_: node, vertex, point, wall, layer, B volume.
 - **connection**: the pull between two neighbouring energy volumes, through the joint between them; it has no volume of its own. _Avoid_: edge, link, string, bond.
 - **drift**: the growth of energy volumes that lose energy through the leak to harder-pulling neighbours; not a separate rule. _Avoid_: dark energy (that is what drift may explain), inflation, stretch.
-- **ABAB structure**: the owner's foundation: energy volumes (A) and joints (B) arranged as a 3D checkerboard so every A touches only B's and every B only A's; the start is an actual grid, made uneven by energy. _Avoid_: lattice, crystal, network.
+- **ABAB structure**: the owner's foundation: energy volumes (A) each fully wrapped in joints (B), so no energy volume ever touches another, not even at an edge or corner, while the joints form one connected web; the start is an actual grid, made uneven by energy. _Avoid_: lattice, crystal, network, checkerboard.
 - **energy volume**: an A in the ABAB structure: a volume of energy that pulls on nearby energy volumes; its size is set by its energy (more energy, smaller); it touches only joints. _Avoid_: mass, cell, tetrahedron, region, A volume.
 - **joint collapse**: a joint giving way when the squeeze on it passes its limit, so the two energy volumes it separated fall into each other, keeping their energy; the network's version of gravitational collapse. _Avoid_: black hole (what collapse may produce, not the rule), merge, implosion.
 - **energy event**: a particle (electron, proton) seen as a pattern of energy travelling through the grid, not a structure of its own; far bigger than one energy volume. _Avoid_: particle as a thing, ball, structure.
 - **position**: where a volume is in the simulation; the rules move it (pull through joints, joint push, links that bend but never stretch), and the drawing shows it as it is. _Avoid_: map position (the earlier idea that positions decide nothing), layout, coordinate.
-- **seam**: an edge where joint walls meet; the leak flows along seams into the energy volumes around them, never through the middle of a joint, and a seam narrows as its joints are squeezed. _Avoid_: channel, pore, edge, Plateau border.
 - **reference spacetime**: a network built from points scattered in a flat space or spacetime whose true dimension and proper times are known; used to validate a measurement before it is trusted. _Avoid_: test grid, ground truth, toy universe.
 
 ## Project vocabulary
