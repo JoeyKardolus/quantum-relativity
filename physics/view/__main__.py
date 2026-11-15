@@ -1,10 +1,11 @@
-"""Command line: `python -m physics.view [--side N] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame K]`.
+"""Command line: `python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame F]`.
 
 Contract: sets the Mesa GPU variables (`use_gpu_driver`) before pyglet is imported,
-builds a `FluidSource` (physics.fluid, all rules on, `--set` overrides of `Settings`
-fields, each a float; an unknown name or a value that is not a number exits with a
-message), steps it on a `Stepper` thread, K steps between drawn frames, starting
-paused (space starts), and opens the `PointWindow` until it is closed.
+builds a `CellsSource` (physics.potts, a checkerboard of N^3 cells of K^3 Planck
+boxes each inside an empty margin, `--set` overrides of `Settings` fields, each a
+float; an unknown name or a value that is not a number exits with a message),
+steps it on a `Stepper` thread, F steps between drawn frames, starting paused
+(space starts), and opens the `PointWindow` until it is closed.
 """
 from __future__ import annotations
 
@@ -16,7 +17,8 @@ from physics.view.gpu_driver import use_gpu_driver
 def main() -> None:
     """Parse the options, then step and draw until the window closes."""
     parser = argparse.ArgumentParser(prog="python -m physics.view")
-    parser.add_argument("--side", type=int, default=128, help="boxes along each edge of the grid")
+    parser.add_argument("--cells", type=int, default=8, help="cells along each edge of the start's checkerboard")
+    parser.add_argument("--boxes-per-cell", type=int, default=6, help="Planck boxes along each edge of a start cell")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--unevenness", type=float, default=0.3,
                         help="root mean square of the log energy across the start")
@@ -36,9 +38,10 @@ def main() -> None:
         except ValueError:
             parser.error(f"--set {pair}: expected name=number")
     use_gpu_driver()
-    from physics.view.fluid_source import FluidSource
+    from physics.view.cells_source import CellsSource
     try:
-        source = FluidSource(arguments.side, arguments.seed, arguments.unevenness, overrides, arguments.slope)
+        source = CellsSource(arguments.cells, arguments.boxes_per_cell, arguments.seed,
+                             arguments.unevenness, arguments.slope, overrides)
     except TypeError as raised:
         parser.error(f"--set: {raised}")
     from physics.view.point_window import PointWindow

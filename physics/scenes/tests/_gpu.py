@@ -5,4 +5,4 @@ import pytest
 import warp as wp
 
 wp.config.quiet = True
-needs_gpu = pytest.mark.skipif(wp.get_cuda_device_count() == 0, reason="the scenes run the fluid engine on a CUDA GPU")
+needs_gpu = pytest.mark.skipif(wp.get_cuda_device_count() == 0, reason="the scenes run the cell engine on a CUDA GPU")

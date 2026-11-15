@@ -4,8 +4,9 @@ Contract: `PointWindow(stepper)` opens a resizable pyglet window (vsync off) tha
 every draw, uploads the stepper's newest snapshot (if any) to a `PointCloud` and
 draws it through an `orbit_camera`. Positions are box centres in box units. On the
 first snapshot and after each reset (a new generation) the view is fitted to the
-whole grid: centre at its middle, distance so half its side fills the view (the
-start's ball sits in the middle with room to grow), a dot POINT_BOXES boxes
+occupied boxes (the snapshot's low and high corners): centre at their middle,
+distance so their widest extent fills about half the view (room for space to grow
+into the empty margin), a dot POINT_BOXES boxes
 across so neighbouring soft dots overlap into a cloud. Controls: mouse drag
 rotates, wheel zooms, space starts and pauses, R resets the source (and the
 view), Esc quits. The title (`title_line`) refreshes 4 times a
@@ -52,7 +53,7 @@ class PointWindow(pyglet.window.Window):
         if snapshot is not None:
             self.cloud.upload(snapshot.positions, snapshot.colours)
             if snapshot.generation != self.generation:
-                self._fit(snapshot.side)
+                self._fit(snapshot.low, snapshot.high)
                 self.generation = snapshot.generation
             self.snapshot = snapshot
         width, height = self.get_framebuffer_size()
@@ -92,9 +93,10 @@ class PointWindow(pyglet.window.Window):
         """Run the window loop until it closes."""
         pyglet.app.run(interval)
 
-    def _fit(self, side: int) -> None:
-        self.centre = np.full(3, side / 2.0)
-        self.distance = 1.1 * (side / 2.0) / np.sin(np.radians(FOV_DEGREES) / 2.0)
+    def _fit(self, low: np.ndarray, high: np.ndarray) -> None:
+        extent = max(float(np.max(high - low)), 1.0)
+        self.centre = (np.asarray(low, float) + np.asarray(high, float)) / 2.0
+        self.distance = 1.1 * extent / np.sin(np.radians(FOV_DEGREES) / 2.0)
 
     def _count_frame(self) -> None:
         self._frames += 1

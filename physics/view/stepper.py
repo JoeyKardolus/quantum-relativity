@@ -1,11 +1,12 @@
 """Stepper: steps a source on its own thread and hands the window snapshots to draw.
 
 Contract: `Stepper(source, steps_per_frame, paused=False)` starts a daemon thread
-that publishes the start, then runs `steps_per_frame` source steps (the source interface is in `fluid_source.py`),
+that publishes the start, then runs `steps_per_frame` source steps,
 then publishes a Snapshot, and repeats while not paused. A Snapshot carries the
-step count, side, the shown boxes' positions (float32 (n, 3)) and colours (uint8
-(n, 4)) gathered on the GPU (`BoxPoints`), the count of boxes with negative
-energy, the latest stats (refreshed at most every STATS_EVERY seconds, and on
+step count, the shown boxes' positions (float32 (n, 3)) and colours (uint8
+(n, 4)) gathered on the GPU (`BoxPoints`) from the source's `view()` (the source
+interface is in `cells_source.py`), the count of boxes with negative energy, the
+occupied boxes' bounding corners low and high, the latest stats (refreshed at most every STATS_EVERY seconds, and on
 every reset or pause), steps per second, paused, error and generation (bumped on
 each reset, so the window can re-fit). The light reference (`start_reference`)
 is taken at the start and on each reset, then held fixed. `latest()` returns the
@@ -34,10 +35,11 @@ class Snapshot:
     """What the window draws and titles: one moment of the source."""
 
     step: int
-    side: int
     positions: np.ndarray
     colours: np.ndarray
     negative: int
+    low: np.ndarray
+    high: np.ndarray
     stats: dict
     steps_per_second: float
     paused: bool
@@ -128,15 +130,17 @@ class Stepper:
             return False
 
     def _publish(self) -> None:
+        view = self.source.view()
         if self._reference is None:
-            self._reference = start_reference(self.source.a_energy, self.source.b_energy)
-        gathered = self._points.boxes(self.source.a_energy, self.source.b_energy, self._reference)
+            self._reference = start_reference(view.density)
+        gathered = self._points.boxes(view, self._reference)
         now = time.perf_counter()
         if now - self._stats_at >= STATS_EVERY:
             self._stats, self._stats_at = self.source.stats(), now
-        snapshot = Snapshot(step=int(self.source.steps), side=int(self.source.side),
+        snapshot = Snapshot(step=int(self.source.steps),
                             positions=gathered.positions, colours=gathered.colours,
-                            negative=gathered.negative, stats=self._stats,
+                            negative=gathered.negative, low=gathered.low, high=gathered.high,
+                            stats=self._stats,
                             steps_per_second=self._rate, paused=self.paused,
                             error=self.error, generation=self.generation)
         with self._lock:

@@ -1,30 +1,30 @@
-"""The viewer: the fluid engine in a GPU window, drawn as soft additive points (the only viewer).
+"""The viewer: the Planck-box engine in a GPU window, drawn as soft additive points (the only viewer).
 
-`python -m physics.view [--side N] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame K]`.
-Boxes denser than the start's mean (plus a fixed 1% sample of the rest) are soft
-points of light at their centres: red for pulling (A) energy, blue for pushing
-(B), both in the same point; the light reads the box's density contrast on a
-fixed log scale normalised by the line of sight, so an even universe is nearly
-black and only denser zones glow; light is summed in a float buffer. No link
-lines. A source is anything with reset(), step(), steps, side, a_energy,
-b_energy and stats() (`fluid_source.py` has the contract). The shown boxes are
-gathered on the GPU and copied to the host once per frame (CUDA-GL sharing fails
-under WSL2 with error 304), then uploaded to GL.
+`python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame F]`.
+Every occupied Planck box is a soft point of light at its centre: red in an
+energy volume (A), blue in a joint (B), a cell's border boxes brighter so the
+checkerboard of cells shows; empty boxes are not drawn. The light reads the box's
+density over the start's mean on a fixed log scale normalised by the line of
+sight, so an even universe is nearly black and only denser zones glow; light is
+summed in a float buffer. No link lines. A source is anything with reset(),
+step(), steps, view() and stats() (`cells_source.py` has the contract). The shown
+boxes are gathered on the GPU and copied to the host once per frame (CUDA-GL
+sharing fails under WSL2 with error 304), then uploaded to GL.
 
 Module map:
   opacity.py           the light a box adds from its density contrast: fixed log scale (Warp)
   light_code.py        a point's light as one log byte, decoded by the window (Warp)
-  start_reference.py   the start's mean A and B energy per occupied box, the fixed unit
+  start_reference.py   the start's mean density per occupied box and boxes deep, the fixed unit
   box_points.py        BoxPoints: selects and gathers drawn boxes on the GPU
   orbit_camera.py      view-projection matrix of a camera circling a centre
   title_line.py        the window title from a snapshot's stats
   gpu_driver.py        Mesa d3d12 variables so OpenGL draws on the NVIDIA card
-  fluid_source.py      FluidSource: physics.fluid's grid behind the source interface
+  cells_source.py      CellsSource: physics.potts's state behind the source interface
   stepper.py           Stepper, Snapshot: steps a source on a thread, hands out snapshots
   point_cloud.py       PointCloud: GL points summed in a float buffer, fixed curve (needs GL)
   point_window.py      PointWindow: the pyglet window, controls and title (needs GL)
   __main__.py          the command line
-Only modules that need no OpenGL (nor physics.fluid) are imported here, so tests run headless.
+Only modules that need no OpenGL (nor the engine) are imported here, so tests run headless.
 """
 from physics.view.opacity import opacity
 from physics.view.light_code import light_code

@@ -44,7 +44,7 @@ to the GPU by itself.
 
 | Path | What it is |
 |---|---|
-| `physics/fluid/` | the engine: energy as a fluid on a fine grid of boxes on the GPU |
+| `physics/potts/` | the engine: cells made of fixed Planck boxes, the energy a fluid inside them, on the GPU |
 | `physics/view/` | the GPU window that shows it |
 | `docs/bible.md` | how everything works; the theory is the chapter `physics/quantum-relativity` |
 

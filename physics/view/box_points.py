@@ -1,30 +1,29 @@
-"""Box points: the fluid grid's boxes as drawable points of light, selected and gathered on the GPU.
+"""Box points: the occupied Planck boxes as drawable points of light, gathered on the GPU.
 
-Contract: `BoxPoints()` keeps GPU buffers between calls. `boxes(a_energy, b_energy,
-reference)` takes the two per-box energy arrays (Warp arrays on one device, any
-dtype Warp can cast to float32, shape (side^3,) or (side, side, side), box index
-(x * side + y) * side + z) and the start reference (`start_reference`, the mean
-A and B energy) and returns a `Gathered`: positions (n, 3) float32 box centres in
-box units (x + 0.5, y + 0.5, z + 0.5), colours (n, 4) uint8, dense (boxes at or
-above CONTRAST_SHOWN) and negative (boxes with an energy below zero).
+Contract: `BoxPoints()` keeps GPU buffers between calls. `boxes(view, reference)`
+takes the source's view (`cells_source.py`: `positions` (n, 3) box centres in box
+units, as an (n, 3) array of numbers or an (n,) array of 3-vectors; `density` (n,)
+energy per box; `kind` (n,) the kind of the cell owning the box, ENERGY_VOLUME or
+JOINT; `border` (n,) nonzero where the box touches a box of another cell; Warp
+arrays on one device or numpy, which is read on the CPU) and the start reference
+(`start_reference`: mean density, boxes deep) and returns a `Gathered`: positions
+(m, 3) float32, colours (m, 4) uint8, negative (boxes with a density below zero),
+low and high (float32 (3,), the corners of the occupied boxes' bounding box, for
+fitting the view; zeros when there are none).
 
-A box's contrast is (A + B) / (reference[0] + reference[1]), its density over the
-start's mean density. Which boxes become points: every box at or above
-CONTRAST_SHOWN (the structure), plus a fixed random SAMPLE of the rest (the
-background, the same boxes every frame, so it does not flicker). When those
-would be more than MOST_POINTS, the dense boxes are thinned by one uniform random
-share, never by order or rank (a random share can overshoot by a few points;
-those past MOST_POINTS are dropped). A point's light is `opacity(contrast, side)`
-(`opacity.py`, fixed log scale, line of sight normalised by the side), divided
-by the share of its kind that was kept, so the expected light of the whole grid
-is the same as drawing every box; a point whose light codes to 0 is left out.
-Colour: with ratios a = A / reference[0] and b = B / reference[1], RGB is
-(RED a + BLUE b) / (a + b), so red is pulling (A), blue pushing (B); alpha is the
-light as a log byte (`light_code.py`), decoded by the window. The selection runs
-on the arrays' device in two passes (count, then gather); the result is copied to
-the host once per call (the counts, then the n positions and colours). Point
-order is not fixed (additive drawing does not need it). Raises ValueError when
-any box energy is not finite; that frame is not drawn.
+Every occupied box is a candidate; empty boxes are never in the view, so never
+drawn. A box's light is `opacity(density / mean density, boxes deep)` (fixed log
+scale, `opacity.py`), times BORDER_GAIN on a cell border, so the checkerboard of
+cells shows. Past MOST_POINTS boxes one uniform random share is kept (never by
+order or rank; a few past MOST_POINTS are dropped) and each kept point's light is
+divided by that share, so the expected light of the whole is unchanged. A point
+whose light codes to 0 is left out. Colour: RED in an energy volume (A), BLUE in
+a joint (B); alpha is the light as a log byte (`light_code.py`), decoded by the
+window. Two passes on the view's device (check and bound, then gather); the
+result is copied to the host once per call. Point order is not fixed (additive
+drawing does not need it). Raises ValueError when the arrays disagree in length
+or device, when a density or position is not finite, or a kind is neither
+ENERGY_VOLUME nor JOINT; that frame is not drawn.
 """
 from __future__ import annotations
 
@@ -37,17 +36,18 @@ import warp as wp
 from physics.view.light_code import light_code
 from physics.view.opacity import opacity
 
-CONTRAST_SHOWN = 1.5
-SAMPLE = 0.01
+ENERGY_VOLUME = 0
+JOINT = 1
+BORDER_GAIN = 2.0
 MOST_POINTS = 3_000_000
 RED = (255, 64, 38)
 BLUE = (64, 115, 255)
 _RED = wp.constant(wp.vec3(*RED))
 _BLUE = wp.constant(wp.vec3(*BLUE))
-_BACKGROUND_SEED = 7919
 _THINNING_SEED = 104729
+_HUGE = 3.0e38
 
-_DENSE, _BACKGROUND, _BROKEN, _NEGATIVE, _SLOTS = 0, 1, 2, 3, 4
+_BROKEN, _NEGATIVE, _BAD_KIND, _SLOTS = 0, 1, 2, 3
 
 
 @dataclass(frozen=True)
@@ -56,128 +56,152 @@ class Gathered:
 
     positions: np.ndarray
     colours: np.ndarray
-    dense: int
     negative: int
-
-
-@wp.func
-def _in_background_sample(box: int) -> bool:
-    state = wp.rand_init(_BACKGROUND_SEED, box)
-    return wp.randf(state) < wp.float32(SAMPLE)
+    low: np.ndarray
+    high: np.ndarray
 
 
 @wp.kernel
-def _count(a_energy: wp.array(dtype=Any), b_energy: wp.array(dtype=Any), mean_density: float,
-           counts: wp.array(dtype=wp.int32)):
+def _rows(vectors: wp.array(dtype=Any), rows: wp.array(dtype=wp.float32, ndim=2)):
     box = wp.tid()
-    pulling = wp.float32(a_energy[box])
-    pushing = wp.float32(b_energy[box])
-    if not (wp.isfinite(pulling) and wp.isfinite(pushing)):
+    vector = vectors[box]
+    for axis in range(3):
+        rows[box, axis] = wp.float32(vector[axis])
+
+
+@wp.kernel
+def _check(positions: wp.array(dtype=Any, ndim=2), density: wp.array(dtype=Any),
+           kind: wp.array(dtype=Any), counts: wp.array(dtype=wp.int32),
+           low: wp.array(dtype=wp.float32), high: wp.array(dtype=wp.float32)):
+    box = wp.tid()
+    energy = wp.float32(density[box])
+    finite = wp.isfinite(energy)
+    for axis in range(3):
+        coordinate = wp.float32(positions[box, axis])
+        if not wp.isfinite(coordinate):
+            finite = False
+        else:
+            wp.atomic_min(low, axis, coordinate)
+            wp.atomic_max(high, axis, coordinate)
+    if not finite:
         wp.atomic_add(counts, _BROKEN, 1)
-        return
-    if pulling < 0.0 or pushing < 0.0:
+    elif energy < 0.0:
         wp.atomic_add(counts, _NEGATIVE, 1)
-    if (pulling + pushing) / mean_density >= wp.float32(CONTRAST_SHOWN):
-        wp.atomic_add(counts, _DENSE, 1)
-    elif _in_background_sample(box):
-        wp.atomic_add(counts, _BACKGROUND, 1)
+    owner_kind = wp.int32(kind[box])
+    if owner_kind != ENERGY_VOLUME and owner_kind != JOINT:
+        wp.atomic_add(counts, _BAD_KIND, 1)
 
 
 @wp.kernel
-def _gather(a_energy: wp.array(dtype=Any), b_energy: wp.array(dtype=Any), side: int,
-            reference_a: float, reference_b: float, dense_kept: float,
-            counts: wp.array(dtype=wp.int32), positions: wp.array(dtype=wp.vec3),
-            colours: wp.array(dtype=wp.uint8, ndim=2)):
+def _gather(positions: wp.array(dtype=Any, ndim=2), density: wp.array(dtype=Any),
+            kind: wp.array(dtype=Any), border: wp.array(dtype=Any), mean_density: float,
+            boxes_deep: float, kept: float, slots: wp.array(dtype=wp.int32),
+            points: wp.array(dtype=wp.vec3), colours: wp.array(dtype=wp.uint8, ndim=2)):
     box = wp.tid()
-    pulling = wp.max(wp.float32(a_energy[box]), 0.0)
-    pushing = wp.max(wp.float32(b_energy[box]), 0.0)
-    contrast = (pulling + pushing) / (reference_a + reference_b)
-    kept = wp.float32(1.0)
-    if contrast >= wp.float32(CONTRAST_SHOWN):
-        if dense_kept < 1.0:
-            state = wp.rand_init(_THINNING_SEED, box)
-            if wp.randf(state) >= dense_kept:
-                return
-            kept = dense_kept
-    elif _in_background_sample(box):
-        kept = wp.float32(SAMPLE)
-    else:
-        return
-    code = wp.round(light_code(opacity(contrast, wp.float32(side)) / kept))
+    if kept < 1.0:
+        state = wp.rand_init(_THINNING_SEED, box)
+        if wp.randf(state) >= kept:
+            return
+    contrast = wp.max(wp.float32(density[box]), 0.0) / mean_density
+    light = opacity(contrast, wp.float32(boxes_deep)) / kept
+    if wp.int32(border[box]) != 0:
+        light = light * wp.float32(BORDER_GAIN)
+    code = wp.round(light_code(light))
     if code < 1.0:
         return
-    slot = wp.atomic_add(counts, 0, 1)
-    if slot >= positions.shape[0]:
+    slot = wp.atomic_add(slots, 0, 1)
+    if slot >= points.shape[0]:
         return
-    column = box // side
-    positions[slot] = wp.vec3(float(column // side) + 0.5, float(column % side) + 0.5,
-                              float(box % side) + 0.5)
-    ratio_a = pulling / reference_a
-    ratio_b = pushing / reference_b
-    mixed = (_RED * ratio_a + _BLUE * ratio_b) / (ratio_a + ratio_b)
-    colours[slot, 0] = wp.uint8(wp.round(mixed[0]))
-    colours[slot, 1] = wp.uint8(wp.round(mixed[1]))
-    colours[slot, 2] = wp.uint8(wp.round(mixed[2]))
+    points[slot] = wp.vec3(wp.float32(positions[box, 0]), wp.float32(positions[box, 1]),
+                           wp.float32(positions[box, 2]))
+    tint = _BLUE
+    if wp.int32(kind[box]) == ENERGY_VOLUME:
+        tint = _RED
+    colours[slot, 0] = wp.uint8(tint[0])
+    colours[slot, 1] = wp.uint8(tint[1])
+    colours[slot, 2] = wp.uint8(tint[2])
     colours[slot, 3] = wp.uint8(code)
 
 
 class BoxPoints:
-    """Selects and gathers drawn boxes on the GPU into reused buffers and copies them out once."""
+    """Gathers the occupied boxes as points into reused GPU buffers and copies them out once."""
 
     def __init__(self) -> None:
         self._buffers = None
 
-    def boxes(self, a_energy: wp.array, b_energy: wp.array, reference: np.ndarray) -> Gathered:
-        """The drawn boxes' centres and colours, on the host."""
-        a_flat, b_flat = _flat(a_energy), _flat(b_energy)
-        if a_flat.shape != b_flat.shape or a_flat.device != b_flat.device:
-            raise ValueError(f"A energy {a_flat.shape} on {a_flat.device} but B energy "
-                             f"{b_flat.shape} on {b_flat.device}")
-        size = a_flat.shape[0]
-        side = round(size ** (1.0 / 3.0))
-        if side ** 3 != size:
-            raise ValueError(f"{size} boxes is not a cube")
-        reference_a, reference_b = (float(value) for value in reference)
-        counts, slots, positions, colours = self._buffers_for(min(size, MOST_POINTS), a_flat.device)
+    def boxes(self, view, reference) -> Gathered:
+        """The drawn boxes' centres and colours, and the occupied bounds, on the host."""
+        density = _warp(view.density)
+        device = density.device
+        positions, kind, border = (_warp(array, device) for array in (view.positions, view.kind, view.border))
+        positions = _as_rows(positions)
+        size = density.shape[0]
+        for name, array in (("positions", positions), ("kind", kind), ("border", border)):
+            if array.shape[0] != size or array.device != device:
+                raise ValueError(f"{name}: {array.shape[0]} boxes on {array.device}, "
+                                 f"density: {size} on {device}")
+        mean_density, boxes_deep = (float(value) for value in reference)
+        counts, slots, low, high, points, colours = self._buffers_for(min(size, MOST_POINTS), device)
         counts.zero_()
         slots.zero_()
-        wp.launch(_count, dim=size, device=a_flat.device,
-                  inputs=[a_flat, b_flat, reference_a + reference_b, counts])
-        dense, background, broken, negative = (int(value) for value in counts.numpy())
+        low.fill_(_HUGE)
+        high.fill_(-_HUGE)
+        if size == 0:
+            return _nothing(0, np.zeros(3, np.float32), np.zeros(3, np.float32))
+        wp.launch(_check, dim=size, device=device, inputs=[positions, density, kind, counts, low, high])
+        broken, negative, bad_kind = (int(value) for value in counts.numpy())
         if broken:
-            raise ValueError(f"{broken} boxes hold an energy that is not finite")
-        dense_kept = _dense_kept(dense, background)
-        wp.launch(_gather, dim=size, device=a_flat.device,
-                  inputs=[a_flat, b_flat, side, reference_a, reference_b, dense_kept,
-                          slots, positions, colours])
-        drawn = min(int(slots.numpy()[0]), positions.shape[0])
+            raise ValueError(f"{broken} boxes hold a density or position that is not finite")
+        if bad_kind:
+            raise ValueError(f"{bad_kind} boxes belong to a cell kind that is neither "
+                             f"{ENERGY_VOLUME} (energy volume) nor {JOINT} (joint)")
+        kept = 1.0 if size <= MOST_POINTS else MOST_POINTS / size
+        wp.launch(_gather, dim=size, device=device,
+                  inputs=[positions, density, kind, border, mean_density, boxes_deep, kept,
+                          slots, points, colours])
+        low_host, high_host = low.numpy().copy(), high.numpy().copy()
+        drawn = min(int(slots.numpy()[0]), points.shape[0])
         if drawn == 0:
-            return Gathered(np.zeros((0, 3), np.float32), np.zeros((0, 4), np.uint8), dense, negative)
-        positions_host = positions[:drawn].numpy().reshape(drawn, 3)
+            return _nothing(negative, low_host, high_host)
+        points_host = points[:drawn].numpy().reshape(drawn, 3)
         colours_host = colours[:drawn].numpy()
-        if a_flat.device.is_cpu:
+        if device.is_cpu:
             # .numpy() of a CPU array shares the reused buffer, so the next gather would
             # overwrite a snapshot still being drawn; take an own copy.
-            positions_host, colours_host = positions_host.copy(), colours_host.copy()
-        return Gathered(positions_host, colours_host, dense, negative)
+            points_host, colours_host = points_host.copy(), colours_host.copy()
+        return Gathered(points_host, colours_host, negative, low_host, high_host)
 
     def _buffers_for(self, capacity: int, device) -> tuple:
         if self._buffers is None or self._buffers[0] != (capacity, str(device)):
             self._buffers = ((capacity, str(device)),
                              wp.zeros(_SLOTS, dtype=wp.int32, device=device),
                              wp.zeros(1, dtype=wp.int32, device=device),
-                             wp.empty(capacity, dtype=wp.vec3, device=device),
-                             wp.empty((capacity, 4), dtype=wp.uint8, device=device))
+                             wp.zeros(3, dtype=wp.float32, device=device),
+                             wp.zeros(3, dtype=wp.float32, device=device),
+                             wp.empty(max(capacity, 1), dtype=wp.vec3, device=device),
+                             wp.empty((max(capacity, 1), 4), dtype=wp.uint8, device=device))
         return self._buffers[1:]
 
 
-def _dense_kept(dense: int, background: int) -> float:
-    """The share of dense boxes kept so dense plus background fits MOST_POINTS."""
-    room = MOST_POINTS - background
-    if dense <= room:
-        return 1.0
-    return max(room, 0) / dense
+def _nothing(negative: int, low: np.ndarray, high: np.ndarray) -> Gathered:
+    return Gathered(np.zeros((0, 3), np.float32), np.zeros((0, 4), np.uint8), negative, low, high)
 
 
-def _flat(array: wp.array) -> wp.array:
-    return array if array.ndim == 1 else array.flatten()
+def _warp(array, device=None) -> wp.array:
+    """A Warp array as is; numpy (bool as uint8) onto the given device, or the CPU."""
+    if isinstance(array, wp.array):
+        return array
+    host = np.asarray(array)
+    if host.dtype == np.bool_:
+        host = host.astype(np.uint8)
+    return wp.array(host, device=device or "cpu")
+
+
+def _as_rows(positions: wp.array) -> wp.array:
+    """Positions as an (n, 3) array: an (n,) array of 3-vectors is copied to float32 rows."""
+    if positions.ndim == 2:
+        return positions
+    rows = wp.empty((positions.shape[0], 3), dtype=wp.float32, device=positions.device)
+    if positions.shape[0]:
+        wp.launch(_rows, dim=positions.shape[0], device=positions.device, inputs=[positions, rows])
+    return rows

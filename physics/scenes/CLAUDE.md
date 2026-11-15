@@ -1,7 +1,7 @@
 # physics/scenes/
 
 The fit's scorecard (bible `physics/quantum-relativity`, "How results are trusted"): each
-scene builds a start, runs the fluid engine and returns measured numbers. Module map in
+scene builds a start, runs the cell engine (`physics.potts`) and returns measured numbers. Module map in
 `__init__.py`.
 
 ## Must not get wrong
@@ -9,28 +9,29 @@ scene builds a start, runs the fluid engine and returns measured numbers. Module
 - **Numbers, no verdict.** A scene returns what it measured beside the known value where
   there is one (Kepler's 4 pi^2 / GM, the Hubble 73.5 / 67.4). No pass/fail, no threshold,
   and never change a default setting, seed or start to make a scene look better; report it.
-- **Only the engine's public face**: `new_grid`, `step`, `stats`, `Settings`, and
-  `Grid.from_host` for placed blobs (`blob_start.py`); energies read from `grid.a_energy`
-  and `grid.b_energy`. The engine's rules change under these scenes; its internals must not
-  be reached into.
+- **Only the engine's public face**: `new_universe`, `step`, `stats`, `Settings`,
+  `cell_sums`, `contact_pairs` and `Universe.from_host` for placed blobs (`blob_start.py`);
+  read only the Universe fields its contract lists (owner, energy, kind, labels, cell sums,
+  rest_a). The engine's rules change under these scenes; its kernels must not be reached into.
 - **All rules on.** Scenes take `settings` (default `Settings.all_on()`); a rule switched off
   is only for a side-by-side run.
-- **Box units.** The engine's boxes are fixed; its length from energy (rule 4,
-  `fluid/local_length.py`) is measured only, so every size here is a box count or a
-  distance in boxes: it says where the energy is, not that space grew.
+- **Box units.** Planck boxes are fixed; cells claim or give up boxes, so the occupied box
+  count is the size of space and an energy radius says where the energy is.
 - **Placed blobs** (orbit, black hole) break "nothing placed by hand" on purpose: those two
-  test one mechanism. The expansion, structure, bound lump and Hubble scenes start from
-  `new_grid`'s uneven field only.
-- **Small and quick**: defaults are side 48 to 64 and under about 2 minutes each on the
-  RTX 5080. Tests run every scene on side 16 and check only that the numbers are finite.
+  test one mechanism. A blob is extra energy in an even checkerboard, never a ball in empty
+  space (empty space has no boxes to flow through). The other scenes start from
+  `new_universe`'s uneven field only.
+- **Small and quick**: defaults are grids of 56 to 64 boxes a side. Tests run every scene on
+  4 or 6 cells of 4 boxes and check only that the numbers are finite.
 
-## Measured (2026-11-15, defaults, all rules on incl. local clocks)
+## Measured (2026-11-15, defaults, all rules on, cell engine)
 
-Expansion: energy radius 27.3 to 3.2 boxes, drift 0. Hubble gap: late / early 0.18
-(known 1.09). Structure: contrast 0.79 to 18.8, lumps 359 to 1. Bound lump: 208 boxes,
-surroundings shrink to 0.23. Orbit: early period 49 at distance 10 and 62 at 14 (Newton
-62.5, 103.6), then the small blob smears (spread 28 boxes). Black hole: sealed radius 1.24
-at every energy (power 0; a horizon gives 1).
+Expansion (8^3 cells of 6^3, 60 steps): occupied x1.55, radius 29.8 to 34.5, energy radius
+23.7 to 22.5, drift 0, edge share 0.006. Hubble gap: late / early 0.0007 (known 1.09): growth
+stops at the grid's edge. Structure: contrast 1.97 to 2.8, lumps 0 to 0. Bound lump: no lump
+forms. Orbit: the small blob falls in at distance 10 (early period 62, Newton 62.5) and turns
+0.6 of a turn at 14 (early period 34, Newton 104). Black hole: no ball seals (core energy
+about 100 to 155 of 250 to 2000; one collapse at 2000).
 
 ## Run
 

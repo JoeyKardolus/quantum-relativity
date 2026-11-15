@@ -1,15 +1,17 @@
-"""Black hole scene: the sealed region's radius against the energy that collapsed.
+"""Black hole scene: the sealed region's radius against the energy that fell together.
 
-Contract: `black_hole(side=48, energies=(250.0, 500.0, 1000.0, 2000.0), radius=6.0,
-steps=40, settings=None, device="cuda")` runs one start per energy: an even ball of
-that much A-energy (and its joint share of B, blob_start.py) at rest in the middle of
-empty space, falling in on itself by its own pull for `steps` steps with settings
-(default Settings.all_on()). After the run it measures the sealed region round the
-most squeezed box (sealed_region.py). Returns a dict (no verdict):
-  side, radius, steps, settings (dict), energies
-  sealed_boxes, sealed_radius, sealed_energy, collapsed_energy   one per energy
-  max_compression        stats "max_compression" at the end, one per energy
-  radius_per_energy      sealed_radius / collapsed_energy per run (0 with nothing collapsed);
+Contract: `black_hole(cells_per_side=10, boxes_per_cell_side=4, energies=(250.0, 500.0,
+1000.0, 2000.0), radius=6.0, steps=40, settings=None, device="cuda")` runs one start
+per energy: an even checkerboard holding a ball of that much extra energy at rest in
+its middle (blob_start.py), falling in on itself by its own pull for `steps` steps with
+settings (default Settings.all_on()). After the run it measures the sealed region round
+the densest energy volume (sealed_region.py). Returns a dict (no verdict):
+  cells_per_side, boxes_per_cell_side, radius, steps, settings (dict), energies
+  sealed, sealed_boxes, sealed_radius, sealed_energy, collapsed_energy, core_boxes,
+  core_labels, core_compression_min   one per energy
+  max_compression        stats "joint_compression_max" at the end, one per energy
+  collapses              stats "collapses" at the end, one per energy
+  radius_per_energy      sealed_radius / collapsed_energy per run (0 when not sealed);
                          relativity's horizon keeps this constant
   radius_energy_power    least-squares slope of ln sealed_radius against ln collapsed_energy
                          over the runs where both are > 0 (1 = in proportion; NaN with
@@ -22,27 +24,34 @@ from dataclasses import asdict
 
 import numpy as np
 
-from physics.fluid import Settings, stats, step
+from physics.potts import Settings, stats, step
 from physics.scenes.blob_start import blob_start
 from physics.scenes.sealed_region import sealed_region
 
+_KEYS = ("sealed", "sealed_boxes", "sealed_radius", "sealed_energy", "collapsed_energy", "core_boxes", "core_labels",
+         "core_compression_min", "max_compression", "collapses")
 
-def black_hole(side: int = 48, energies: tuple[float, ...] = (250.0, 500.0, 1000.0, 2000.0), radius: float = 6.0,
-               steps: int = 40, settings: Settings | None = None, device: str = "cuda") -> dict:
-    """Sealed region and collapsed energy after each ball's fall, and how the radius scales."""
+
+def black_hole(cells_per_side: int = 10, boxes_per_cell_side: int = 4,
+               energies: tuple[float, ...] = (250.0, 500.0, 1000.0, 2000.0), radius: float = 6.0, steps: int = 40,
+               settings: Settings | None = None, device: str = "cuda") -> dict:
+    """Sealed region and fallen-together energy after each ball's fall, and how the radius scales."""
     settings = settings or Settings.all_on()
-    middle = (side - 1) / 2.0
     runs = []
     for energy in energies:
-        grid = blob_start(side, [{"centre": (middle,) * 3, "radius": radius, "energy": energy,
-                                  "velocity": (0.0, 0.0, 0.0)}], device=device)
+        universe = blob_start(cells_per_side, boxes_per_cell_side, [{"offset": (0.0, 0.0, 0.0), "radius": radius,
+                                                                     "energy": energy, "velocity": (0.0, 0.0, 0.0)}],
+                              device=device)
         for _ in range(steps):
-            step(grid, settings)
-        runs.append(sealed_region(grid, settings) | {"max_compression": stats(grid, settings)["max_compression"]})
-    result = {"side": side, "radius": radius, "steps": steps, "settings": asdict(settings), "energies": list(energies)}
-    for key in ("sealed_boxes", "sealed_radius", "sealed_energy", "collapsed_energy", "max_compression"):
+            step(universe, settings)
+        end = stats(universe, settings)
+        runs.append(sealed_region(universe, settings) | {"max_compression": end["joint_compression_max"],
+                                                         "collapses": float(end["collapses"])})
+    result = {"cells_per_side": cells_per_side, "boxes_per_cell_side": boxes_per_cell_side, "radius": radius,
+              "steps": steps, "settings": asdict(settings), "energies": list(energies)}
+    for key in _KEYS:
         result[key] = [run[key] for run in runs]
-    result["radius_per_energy"] = [run["sealed_radius"] / run["collapsed_energy"] if run["collapsed_energy"] > 0 else 0.0
+    result["radius_per_energy"] = [run["sealed_radius"] / run["collapsed_energy"] if run["sealed"] else 0.0
                                    for run in runs]
     result["radius_energy_power"] = _power(result["collapsed_energy"], result["sealed_radius"])
     return result

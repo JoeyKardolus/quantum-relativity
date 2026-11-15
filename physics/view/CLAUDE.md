@@ -1,18 +1,19 @@
 # physics/view/
 
-The only viewer: a pyglet GPU window of the fluid engine (`physics.fluid`) as soft additive
-points. Module map in `__init__.py`.
+The only viewer: a pyglet GPU window of the Planck-box engine (`physics.potts`) as soft
+additive points. Module map in `__init__.py`.
 
 ## Must not get wrong
 
-- **Draw the simulation as it is.** A point per box at its centre in box units: every box at or
-  above `CONTRAST_SHOWN` (1.5x the start's mean density), plus a fixed random 1% of the rest
-  standing in for them (light x 100); past `MOST_POINTS` (3M) the dense ones are thinned by one
-  uniform share (light / share), never by order or rank. No layout, no link lines. Red = pulling
-  (A), blue = pushing (B), mixed in one point (`box_points.py`).
+- **Draw the simulation as it is.** A point per occupied Planck box at its centre in box units;
+  empty boxes are never drawn. Red = the box's cell is an energy volume (A), blue = a joint (B);
+  border boxes (touching another cell) get `BORDER_GAIN` (2x) light so the checkerboard of
+  cells shows. Past `MOST_POINTS` (3M) one uniform share is kept (light / share), never by
+  order or rank. No layout, no link lines (`box_points.py`).
 - **Light is a fixed contrast scale** (`opacity.py`, a Warp function, the only copy): log-linear
   in a box's density over the start's mean density (`start_reference.py`, taken at start and on
-  reset, then held), 1 at 16x, and at 1x only `AVERAGE_GLOW` / side, so a line of sight of
+  reset, then held, with boxes deep = cube root of the start's occupied boxes), 1 at 16x, and
+  at 1x only `AVERAGE_GLOW` / boxes deep, so a line of sight of
   average boxes sums to 0.02: an even universe is black, thinner than average is nothing. Never
   rank-based or re-normalised per frame, or growth of structure would never show. Tests pin it.
 - **Light is summed in a half-float buffer, shown through 1 - exp(-sum)** (`point_cloud.py`).
@@ -22,26 +23,26 @@ points. Module map in `__init__.py`.
   `MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA` before pyglet loads; without them Mesa draws on the
   CPU. CUDA-GL sharing fails on WSL (error 304), so the shown boxes are gathered on the GPU and
   copied to the host once per frame, then uploaded (`point_cloud.py`, orphaned stream buffers).
-- **Source interface** (`fluid_source.py` docstring): reset(), step(), steps, side, a_energy,
-  b_energy (Warp arrays, side^3 boxes, index (x * side + y) * side + z), stats(). Stepping and
-  every gather run on the stepper thread (`stepper.py`), so a slow step never freezes the
-  camera; a source or gather error (a non-finite box) stops stepping and shows in the title.
+- **Source interface** (`cells_source.py` docstring): reset(), step(), steps, stats(), view()
+  (occupied boxes: positions (n, 3) or (n,) 3-vectors, density, kind 0 = energy volume /
+  1 = joint, border; Warp arrays on one device). Stepping and every gather run on the stepper
+  thread (`stepper.py`), so a slow step never freezes the camera; a source or gather error (a
+  non-finite box, an unknown kind) stops stepping and shows in the title. The view fits the
+  occupied boxes' bounds on start and reset, filling about half the window.
 - **A CPU Warp array's `.numpy()` shares its buffer**: `box_points.py` copies on CPU.
-- **Headless tests**: `__init__.py` imports neither OpenGL nor physics.fluid; tests use a fake
+- **Headless tests**: `__init__.py` imports neither OpenGL nor the engine; tests use a fake
   source on the Warp CPU device. Never a fake source in the shipped command.
 
-## Measured (2026-11-15, RTX 5080, WSL2, d3d12)
+## Measured (2026-11-15, RTX 5080, WSL2)
 
-Default command (side 128, seed 1, unevenness 0.3, slope -3), 20 s unpaused: 116 to 118 fps
-(the 120 Hz draw interval); 4.5 steps/s at steps 1 to 7, 0.9 to 1.2 once the cube has fallen
-into its core (27 steps in 20 s); points drawn 264k at step 6, 11 to 40 after step 12.
-Side 256: 64 to 118 fps at up to 3M points, 0.07 steps/s.
-Stand-in source at 2,003,424 boxes: 75 to 104 fps.
+Gather of 884,736 boxes: 5.9 ms. Real engine, 20 s, seed 1: default 8^3 cells of 6^3, 113 to
+118 fps, 7 to 14 steps/s; 10^3 cells, 117 fps but 0.5 steps/s from step 15. Boxes whose light
+codes to 0 are not drawn.
 
 ## Run
 
 ```
-PYTHONPATH=. .venv/bin/python -m physics.view [--side N] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame K]
+PYTHONPATH=. .venv/bin/python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame F]
 PYTHONPATH=. .venv/bin/pytest -q physics/view
 ```
 Starts paused: space starts and pauses, drag rotates, wheel zooms, R resets, Esc quits.
