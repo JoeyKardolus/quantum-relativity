@@ -1,16 +1,18 @@
 """Stepper: steps a source on its own thread and hands the window snapshots to draw.
 
-Contract: `Stepper(source, steps_per_frame)` starts a daemon thread that runs
-`steps_per_frame` source steps, then publishes a Snapshot, and repeats while not
-paused. A Snapshot carries the step count, positions (float32, (n, 3)), colours
-(`point_colours`, uint8 (n, 4)), the latest stats (refreshed at most every
-STATS_EVERY seconds, and on every reset or pause), steps per second, paused,
-error and generation (bumped on each reset, so the window can re-centre).
-The colour reference (`density_reference`) is taken at the start and on each
-reset, then held fixed. `latest()` returns the newest Snapshot, or None when none
-is new since the last call. `toggle_pause()`, `reset()` and `stop()` are safe from
-any thread. When the source raises, stepping stops and the error is in the
-snapshot (and its traceback is printed); nothing is swallowed.
+Contract: `Stepper(source, steps_per_frame, paused=False)` starts a daemon thread
+that publishes the start, then runs `steps_per_frame` source steps (the source interface is in `fluid_source.py`),
+then publishes a Snapshot, and repeats while not paused. A Snapshot carries the
+step count, side, the shown boxes' positions (float32 (n, 3)) and colours (uint8
+(n, 4)) gathered on the GPU (`BoxPoints`), the count of boxes with negative
+energy, the latest stats (refreshed at most every STATS_EVERY seconds, and on
+every reset or pause), steps per second, paused, error and generation (bumped on
+each reset, so the window can re-fit). The opacity reference (`start_reference`)
+is taken at the start and on each reset, then held fixed. `latest()` returns the
+newest Snapshot, or None when none is new since the last call. `toggle_pause()`,
+`reset()` and `stop()` are safe from any thread. All GPU work (steps, gathers)
+runs on the stepping thread. When the source or the gather raises, stepping stops
+and the error is in the snapshot (its traceback printed); nothing is swallowed.
 """
 from __future__ import annotations
 
@@ -21,8 +23,8 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from physics.view.density_reference import density_reference
-from physics.view.point_colours import point_colours
+from physics.view.box_points import BoxPoints
+from physics.view.start_reference import start_reference
 
 STATS_EVERY = 0.5
 
@@ -32,8 +34,10 @@ class Snapshot:
     """What the window draws and titles: one moment of the source."""
 
     step: int
+    side: int
     positions: np.ndarray
     colours: np.ndarray
+    negative: int
     stats: dict
     steps_per_second: float
     paused: bool
@@ -44,10 +48,10 @@ class Snapshot:
 class Stepper:
     """Runs a source on a thread; the window reads its snapshots."""
 
-    def __init__(self, source, steps_per_frame: int = 1) -> None:
+    def __init__(self, source, steps_per_frame: int = 1, paused: bool = False) -> None:
         self.source = source
         self.steps_per_frame = max(1, int(steps_per_frame))
-        self.paused = False
+        self.paused = paused
         self.error = ""
         self.generation = 0
         self._reset_wanted = threading.Event()
@@ -59,6 +63,7 @@ class Stepper:
         self._rate = 0.0
         self._reference = None
         self._last = None
+        self._points = BoxPoints()
         self._thread = threading.Thread(target=self._run, name="stepper", daemon=True)
         self._thread.start()
 
@@ -105,8 +110,8 @@ class Stepper:
         started = time.perf_counter()
         for _ in range(self.steps_per_frame):
             self.source.step()
-        self._rate = self.steps_per_frame / max(time.perf_counter() - started, 1e-9)
         self._publish()
+        self._rate = self.steps_per_frame / max(time.perf_counter() - started, 1e-9)
 
     def _guarded(self, action) -> bool:
         """Run one action; when it raises, print it, stop stepping and show the error."""
@@ -123,21 +128,16 @@ class Stepper:
             return False
 
     def _publish(self) -> None:
-        kind = _host(self.source.kind)
-        density = _host(self.source.density)
         if self._reference is None:
-            self._reference = density_reference(kind, density)
+            self._reference = start_reference(self.source.a_energy, self.source.b_energy)
+        gathered = self._points.boxes(self.source.a_energy, self.source.b_energy, self._reference)
         now = time.perf_counter()
         if now - self._stats_at >= STATS_EVERY:
             self._stats, self._stats_at = self.source.stats(), now
-        snapshot = Snapshot(step=int(self.source.steps),
-                            positions=np.ascontiguousarray(_host(self.source.positions), dtype=np.float32),
-                            colours=point_colours(kind, density, self._reference),
-                            stats=self._stats, steps_per_second=self._rate,
-                            paused=self.paused, error=self.error, generation=self.generation)
+        snapshot = Snapshot(step=int(self.source.steps), side=int(self.source.side),
+                            positions=gathered.positions, colours=gathered.colours,
+                            negative=gathered.negative, stats=self._stats,
+                            steps_per_second=self._rate, paused=self.paused,
+                            error=self.error, generation=self.generation)
         with self._lock:
             self._latest = self._last = snapshot
-
-
-def _host(array) -> np.ndarray:
-    return array.numpy() if hasattr(array, "numpy") else np.asarray(array)

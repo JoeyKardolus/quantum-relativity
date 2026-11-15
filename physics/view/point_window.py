@@ -2,11 +2,13 @@
 
 Contract: `PointWindow(stepper)` opens a resizable pyglet window (vsync off) that, on
 every draw, uploads the stepper's newest snapshot (if any) to a `PointCloud` and
-draws it through an `orbit_camera`. On the first snapshot and after each reset
-(a new generation) the view is fitted: centre at the mean position, distance so
-the 99th-percentile reach fills the view, and a dot about half the mean spacing
-across. Controls: mouse drag rotates, wheel zooms, space pauses, R resets the
-source (and the view), Esc quits. The title (`title_line`) refreshes 4 times a
+draws it through an `orbit_camera`. Positions are box centres in box units. On the
+first snapshot and after each reset (a new generation) the view is fitted to the
+whole grid: centre at its middle, distance so half its side fills the view (the
+start's ball sits in the middle with room to grow), a dot POINT_BOXES boxes
+across so neighbouring soft dots overlap into a cloud. Controls: mouse drag
+rotates, wheel zooms, space starts and pauses, R resets the source (and the
+view), Esc quits. The title (`title_line`) refreshes 4 times a
 second. Closing the window stops the stepper. `run(interval)` runs the pyglet loop,
 drawing every `interval` seconds (0: as fast as it can).
 """
@@ -25,6 +27,7 @@ from physics.view.title_line import title_line
 FOV_DEGREES = 45.0
 TURN_PER_PIXEL = 0.01
 ZOOM_PER_NOTCH = 0.9
+POINT_BOXES = 1.5
 
 
 class PointWindow(pyglet.window.Window):
@@ -37,7 +40,7 @@ class PointWindow(pyglet.window.Window):
         self.cloud = PointCloud()
         self.snapshot = None
         self.generation = -1
-        self.centre, self.distance, self.point_world = np.zeros(3), 1.0, 0.05
+        self.centre, self.distance = np.zeros(3), 1.0
         self.yaw, self.pitch = 0.6, 0.35
         self._frames, self._frames_since = 0, time.perf_counter()
         self.frames_per_second = 0.0
@@ -49,7 +52,7 @@ class PointWindow(pyglet.window.Window):
         if snapshot is not None:
             self.cloud.upload(snapshot.positions, snapshot.colours)
             if snapshot.generation != self.generation:
-                self._fit(snapshot.positions)
+                self._fit(snapshot.side)
                 self.generation = snapshot.generation
             self.snapshot = snapshot
         width, height = self.get_framebuffer_size()
@@ -59,7 +62,7 @@ class PointWindow(pyglet.window.Window):
         camera = orbit_camera(self.centre, self.distance, self.yaw, self.pitch,
                               width / max(height, 1), FOV_DEGREES)
         focal = 1.0 / np.tan(np.radians(FOV_DEGREES) / 2.0)
-        self.cloud.draw(camera, self.point_world * focal * height / 2.0)
+        self.cloud.draw(camera, POINT_BOXES * focal * height / 2.0)
         self._count_frame()
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers) -> None:
@@ -72,7 +75,7 @@ class PointWindow(pyglet.window.Window):
         self.distance *= ZOOM_PER_NOTCH ** scroll_y
 
     def on_key_press(self, symbol, modifiers) -> None:
-        """Space pauses, R resets, Esc quits."""
+        """Space starts and pauses, R resets, Esc quits."""
         if symbol == key.SPACE:
             self.stepper.toggle_pause()
         elif symbol == key.R:
@@ -89,15 +92,9 @@ class PointWindow(pyglet.window.Window):
         """Run the window loop until it closes."""
         pyglet.app.run(interval)
 
-    def _fit(self, positions: np.ndarray) -> None:
-        positions = np.asarray(positions, dtype=float)
-        if positions.size == 0:
-            return
-        self.centre = positions.mean(axis=0)
-        reach = float(np.percentile(np.linalg.norm(positions - self.centre, axis=1), 99)) or 1.0
-        self.distance = 1.1 * reach / np.sin(np.radians(FOV_DEGREES) / 2.0)
-        spacing = 2.0 * reach / np.cbrt(len(positions))
-        self.point_world = 0.5 * spacing
+    def _fit(self, side: int) -> None:
+        self.centre = np.full(3, side / 2.0)
+        self.distance = 1.1 * (side / 2.0) / np.sin(np.radians(FOV_DEGREES) / 2.0)
 
     def _count_frame(self) -> None:
         self._frames += 1

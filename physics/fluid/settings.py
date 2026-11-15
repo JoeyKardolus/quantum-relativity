@@ -24,7 +24,7 @@ ball is 1 (new_grid.py).
                         fraction of the start's mean A per box
   lump_factor           a box is in a lump when its A-energy is at least this times the
                         start's mean A per box (abab's LUMP_FACTOR)
-`Settings.all_on(**overrides)` gives the defaults. Carried from physics.abab, not tuned:
+`Settings.all_on(**overrides)` gives the defaults. Carried from the earlier ABAB engine (git history), not tuned:
 attraction 0.005, push 0.1, push_power 3, b_rest 0.03 (the joint's 3% price), the seal
 at abab's seal_point 0.4 and the collapse at its push_limit 0.5 as density ratios
 (1/0.6)**3 and (1/0.5)**3, lump_factor 2. Chosen as units, not tuned: friction 1,
