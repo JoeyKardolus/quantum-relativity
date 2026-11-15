@@ -1,14 +1,18 @@
 """Fastest wave: the largest per-box wave-speed sum, which sets the stable substep (CFL).
 
 Contract: `fastest_wave(grid, settings)` returns, as a host float, the maximum over
-boxes of the sum over the three axes of max(s_A, s_B + c_B) along that axis, with
+boxes of the box's clock rate (grid.clock, clock_rate.py: the box's own time per unit
+of step time) times the sum over the three axes of max(s_A, s_B + c_B) along that
+axis plus settings.leak where its A counts (the leak gives at most leak per unit of
+own time, leak.py), with
 s_A, s_B the sending speeds (sending_speed.py: |u| of the flow velocity,
 flow_velocity.py, but 0 into a closed wall) and c_B the B wave speed
 (b_wave_speed.py), where a kind holding less than floor = settings.cfl_floor *
 grid.start_a_mean energy in a box adds nothing for that box (its term is 0). A
 substep of courant / fastest_wave keeps every flux a kind above the floor sends out
-within its content (donor cell, transport.py). A kind below the floor is near-empty
-vapour; its outflow is capped at its content instead (transport.py). Measured with
+within its content (donor cell, transport.py). The clock is the point of local time:
+a packed core runs slowly, so its fast inner flow no longer sets every box's substep.
+A kind below the floor is near-empty vapour; its outflow is capped at its content instead (transport.py). Measured with
 every box counted: on the earlier ball start (seed 1, side 64, unevenness 0.5) from
 step 18 the substep was set by A vapour of about 1e-6 per box (just above the
 velocity floor) falling at 20 to 65 boxes per time unit into the sealed core, 100
@@ -36,8 +40,8 @@ _WORK: dict[str, wp.array] = {}
 @wp.kernel
 def _row_fastest(a_energy: wp.array3d(dtype=wp.int64), b_energy: wp.array3d(dtype=wp.int64),
                  a_momentum: wp.array3d(dtype=wp.vec3), b_momentum: wp.array3d(dtype=wp.vec3),
-                 side: int, b_rest: float, push: float, power: float, collapse: float, floor: float,
-                 fastest: wp.array(dtype=float)):
+                 clock: wp.array3d(dtype=float), side: int, b_rest: float, push: float, power: float,
+                 collapse: float, floor: float, leak: float, fastest: wp.array(dtype=float)):
     """Each thread scans one row along z and raises the maximum once."""
     i, j = wp.tid()
     row = float(0.0)
@@ -60,21 +64,23 @@ def _row_fastest(a_energy: wp.array3d(dtype=wp.int64), b_energy: wp.array3d(dtyp
                 if not b_counts:
                     b_wave = 0.0
                 total += wp.max(a_wave, b_wave)
-        row = wp.max(row, total)
+        if a_counts:
+            total += leak
+        row = wp.max(row, clock[i, j, k] * total)
     wp.atomic_max(fastest, 0, row)
 
 
 def fastest_wave(grid: Grid, settings: Settings) -> float:
-    """The largest sum of wave speeds over the axes in any box above the CFL floor."""
+    """The largest clock-weighted sum of wave speeds over the axes in any box above the CFL floor."""
     device = str(grid.a_energy.device)
     if device not in _WORK:
         _WORK[device] = wp.zeros(1, dtype=float, device=device)
     fastest = _WORK[device]
     fastest.zero_()
     wp.launch(_row_fastest, dim=(grid.side, grid.side), device=device,
-              inputs=[grid.a_energy, grid.b_energy, grid.a_momentum, grid.b_momentum, grid.side,
+              inputs=[grid.a_energy, grid.b_energy, grid.a_momentum, grid.b_momentum, grid.clock, grid.side,
                       settings.b_rest, settings.push, settings.push_power, settings.collapse_compression,
-                      settings.cfl_floor * grid.start_a_mean / QUANTUM, fastest])
+                      settings.cfl_floor * grid.start_a_mean / QUANTUM, settings.leak, fastest])
     speed = float(fastest.numpy()[0])
     if not math.isfinite(speed) or speed >= 1.0e30:
         raise ValueError("a flow velocity stopped being finite")

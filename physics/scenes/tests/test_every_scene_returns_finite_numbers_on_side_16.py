@@ -13,7 +13,7 @@ SCENES = {
     "bound_lump": lambda: bound_lump(side=16, steps=6, every=2),
     "orbit": lambda: orbit(side=16, distances=(5.0, 6.0), big_energy=100.0, big_radius=1.0, small_energy=2.0,
                            small_radius=1.0, steps=6),
-    "black_hole": lambda: black_hole(side=16, energies=(100.0, 400.0), radius=3.0, steps=10),
+    "black_hole": lambda: black_hole(side=16, energies=(100.0, 400.0), radius=3.0, steps=20),
 }
 
 

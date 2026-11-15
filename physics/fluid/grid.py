@@ -7,6 +7,11 @@ Contract: a Grid holds Warp arrays on its device (cuda unless given), each index
   a_momentum  vec3, A-energy times A's flow velocity (energy * boxes / time)
   b_momentum  vec3, the same for B
   potential   float32, the pull potential (pull_potential.py), kept to warm-start the next solve
+  clock       float32, each box's clock rate: its own time per unit of step time
+              (clock_rate.py), set at the start of every substep; 1 until the first
+  heat        float32, the undirected jiggling energy friction made from directed flow
+              (rub.py), carried with the energy it sits in (transport.py); kept apart
+              from the A- and B-energy, which stay exact in quanta
 Energy is held as whole quanta so that every flux between two boxes is one integer
 taken from one and given to the other: total energy is exact, not merely close.
 QUANTUM = 2**-32 energy; a box holding more than about 2e9 energy would overflow.
@@ -18,6 +23,8 @@ Start references, set by `Grid.from_host` and never changed by a step:
   start_a_mean    mean A-energy per box over the boxes holding A at the start
   start_occupied  boxes holding energy above settings.occupied_floor * start_a_mean
                   (default floor) at the start
+  start_proper_volume  the occupied boxes' summed length cubed at the start
+                  (local_length.py, default b_rest), the size expansion is measured against
 steps counts step() calls since the start; substeps the substeps they took.
 `Grid.from_host(a, b, a_velocity, b_velocity, device)` builds one from numpy arrays:
 a, b float energy per box (>= 0, shape (side, side, side)), velocities (side, side,
@@ -30,6 +37,7 @@ from dataclasses import dataclass
 import numpy as np
 import warp as wp
 
+from physics.fluid.local_length import local_length
 from physics.fluid.settings import Settings
 
 QUANTUM = 2.0 ** -32
@@ -37,7 +45,7 @@ QUANTUM = 2.0 ** -32
 
 @dataclass(eq=False)
 class Grid:
-    """A-energy, B-energy, their momenta and the pull potential per box, plus the start references."""
+    """A- and B-energy, their momenta, the pull potential, clock rate and heat per box, plus the start references."""
 
     side: int
     a_energy: wp.array
@@ -45,9 +53,12 @@ class Grid:
     a_momentum: wp.array
     b_momentum: wp.array
     potential: wp.array
+    clock: wp.array
+    heat: wp.array
     start_total: int
     start_a_mean: float
     start_occupied: int
+    start_proper_volume: float
     steps: int = 0
     substeps: int = 0
 
@@ -67,16 +78,22 @@ class Grid:
         a_float, b_float = a_quanta * QUANTUM, b_quanta * QUANTUM
         holding = a_float > 0
         start_a_mean = float(a_float[holding].mean()) if holding.any() else 1.0
-        floor = Settings.all_on().occupied_floor * start_a_mean
+        defaults = Settings.all_on()
+        floor = defaults.occupied_floor * start_a_mean
+        occupied = (a_float + b_float) > floor
+        length = local_length(a_float, b_float, start_a_mean, defaults.b_rest)
         return cls(side=side,
                    a_energy=wp.array(a_quanta, dtype=wp.int64, device=device),
                    b_energy=wp.array(b_quanta, dtype=wp.int64, device=device),
                    a_momentum=wp.array(_momentum(a_float, a_velocity), dtype=wp.vec3, device=device),
                    b_momentum=wp.array(_momentum(b_float, b_velocity), dtype=wp.vec3, device=device),
                    potential=wp.zeros((side, side, side), dtype=wp.float32, device=device),
+                   clock=wp.full((side, side, side), 1.0, dtype=wp.float32, device=device),
+                   heat=wp.zeros((side, side, side), dtype=wp.float32, device=device),
                    start_total=int(a_quanta.sum()) + int(b_quanta.sum()),
                    start_a_mean=start_a_mean,
-                   start_occupied=int(((a_float + b_float) > floor).sum()))
+                   start_occupied=int(occupied.sum()),
+                   start_proper_volume=float((length[occupied] ** 3).sum()))
 
 
 def _momentum(energy: np.ndarray, velocity: np.ndarray | None) -> np.ndarray:
