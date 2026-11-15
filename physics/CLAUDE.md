@@ -5,8 +5,7 @@ Rules: `docs/bible.md#physicsquantum-relativity` ("The foundation" first); words
 
 The core is `abab/`: the engine on the owner's irregular ABAB structure, open (not wrapped).
 A = energy volume (pulls), B = joint (pushes); every A touches only B's, every B only A's.
-`app/` is the live simulator on it. `network/`, `rules/`, `measure/`, `experiments/`, `viewer/`:
-earlier milestones.
+`app/` is the live simulator on it. The earlier milestone code was deleted (owner, 2026-11-15); it is in git history.
 
 ## Must not get wrong
 
@@ -42,8 +41,6 @@ earlier milestones.
 ```
 PYTHONPATH=. .venv/bin/pytest -q physics                 # all tests
 PYTHONPATH=. .venv/bin/python -m physics.app             # live page, localhost:8765
-PYTHONPATH=. .venv/bin/python -m physics                 # network milestones, minutes
-PYTHONPATH=. .venv/bin/python -m physics.viewer          # network gravity scenes as a 3D page
 ```
 
 Exempt from the test register (owner, 2026-11-14): plain pytest under `<module>/tests/`, no rows.

@@ -1,10 +1,7 @@
-"""Quantum-relativity theory simulation (bible: physics/quantum-relativity). Tier M.
+"""Quantum-relativity theory simulation (bible: physics/quantum-relativity).
 
 Module map:
-  network/      joints and connections with energy and length; no coordinates
-  measure/      dimension, distance, proper time, expansion, read from the network only
-  rules/        energy-length, drift, attraction, joint repulsion; steps the network
-  experiments/  one per milestone; each returns a result dict with measured vs known
-  report/       build_page: one self-contained HTML results page, plots embedded
-  __main__.py   python -m physics [--seed N] [--out DIR]: run all, write DIR/index.html
+  abab/   the engine: the ABAB structure of energy volumes (A) and joints (B); physics keeps
+          only kind, energy and size per volume and who touches whom
+  app/    the live simulator on the engine: `python -m physics.app`, http://localhost:8765
 """
