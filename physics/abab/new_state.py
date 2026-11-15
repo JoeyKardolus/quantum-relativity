@@ -1,12 +1,13 @@
-"""New state: an irregular ABAB structure with slightly uneven energy, nothing placed by hand.
+"""New state: a 3D checkerboard grid of energy volumes and joints with slightly uneven energy.
 
 Contract: `new_state(volumes, seed, unevenness)` returns (State, positions):
-  scatter   `volumes` points uniform in an open cube of volume `volumes` (seeded)
-  kinds     a random half (volumes // 2) are energy volumes, the rest joints
-  contacts  every point joins its NEIGHBOURS (6) nearest points of the other kind,
-            and the union of those pairs is the contacts, so every A touches only
-            B's and every B only A's, about 6 to 8 each; points on the outside are
-            chosen by fewer and have fewer contacts (open, not wrapped)
+  grid      side = round(cbrt(volumes)) (at least 3), side**3 volumes on a cubic grid
+            (owner, 2026-11-15: start from an actual grid; the unevenness comes from the
+            energy, not from placement)
+  kinds     the 3D checkerboard: (i + j + k) even is an energy volume, odd a joint
+  contacts  every volume joins its face neighbours on the grid (up to 6; fewer on the
+            outside, open, not wrapped), which are always of the other kind, so every
+            A touches only B's and every B only A's
   energy    per volume eps = 1 + unevenness * u, u uniform in [-1, 1] (seeded):
             an energy volume holds eps ** 4 at size 1 (the cells engine's start: an
             uneven energy density, an even size), a joint JOINT_ENERGY * eps and
@@ -16,14 +17,13 @@ Contract: `new_state(volumes, seed, unevenness)` returns (State, positions):
 collapses 0, splits 0, start_size the sum of all sizes, start_mean_size the mean
 energy volume's size (1). positions (volumes, 3) are for drawing only; the State
 holds none and nothing reads them. Raises ValueError for unevenness outside [0, 1)
-(energy must stay positive) or fewer than 2 * (NEIGHBOURS + 1) volumes.
+(energy must stay positive).
 """
 from __future__ import annotations
 
 from dataclasses import replace
 
 import numpy as np
-from scipy.spatial import cKDTree
 
 from physics.abab.joint_balance import joint_balance
 from physics.abab.joint_rest_size import JOINT_ENERGY, joint_rest_size
@@ -32,26 +32,24 @@ from physics.abab.pull_potential import pull_potential
 from physics.abab.settings import Settings
 from physics.abab.state import KIND_A, KIND_B, State
 
-NEIGHBOURS = 6
-
 
 def new_state(volumes: int, seed: int, unevenness: float) -> tuple[State, np.ndarray]:
     """An irregular ABAB structure of `volumes` volumes, joints balanced, and its drawing positions."""
     if not 0 <= unevenness < 1:
         raise ValueError("unevenness must be in [0, 1) so every energy stays positive")
-    if volumes < 2 * (NEIGHBOURS + 1):
-        raise ValueError(f"need at least {2 * (NEIGHBOURS + 1)} volumes")
     generator = np.random.default_rng(seed)
-    positions = generator.uniform(0.0, np.cbrt(volumes), size=(volumes, 3))
-    kind = np.full(volumes, KIND_B, dtype=np.uint8)
-    kind[generator.permutation(volumes)[:volumes // 2]] = KIND_A
+    side = max(3, int(round(np.cbrt(volumes))))
+    index = np.indices((side, side, side)).reshape(3, -1).T
+    positions = index.astype(float)
+    volumes = len(index)
+    kind = np.where(index.sum(axis=1) % 2 == 0, KIND_A, KIND_B).astype(np.uint8)
     eps = 1 + unevenness * generator.uniform(-1.0, 1.0, size=volumes)
     is_volume = kind == KIND_A
     energy = np.where(is_volume, eps ** 4, JOINT_ENERGY * eps)
     rest = joint_rest_size(energy)
     size = np.where(is_volume, 1.0, rest)
     state = State(kind=kind, energy=energy, size=size, rate=np.zeros(volumes),
-                  contacts=_contacts(positions, is_volume), collapses=0, splits=0,
+                  contacts=_grid_contacts(index, side, is_volume), collapses=0, splits=0,
                   start_size=0.0, start_mean_size=1.0)
     settings = Settings.all_on()
     squeeze = joint_squeeze(state, pull_potential(state), settings.attraction)
@@ -59,11 +57,14 @@ def new_state(volumes: int, seed: int, unevenness: float) -> tuple[State, np.nda
     return replace(state, size=size, start_size=float(size.sum())), positions
 
 
-def _contacts(positions: np.ndarray, is_volume: np.ndarray) -> np.ndarray:
-    """Unique sorted (energy volume, joint) rows: each point to its NEIGHBOURS nearest of the other kind."""
-    volume_ids, joint_ids = np.flatnonzero(is_volume), np.flatnonzero(~is_volume)
-    _, nearest_joints = cKDTree(positions[joint_ids]).query(positions[volume_ids], k=NEIGHBOURS)
-    _, nearest_volumes = cKDTree(positions[volume_ids]).query(positions[joint_ids], k=NEIGHBOURS)
-    from_volumes = np.column_stack([np.repeat(volume_ids, NEIGHBOURS), joint_ids[nearest_joints.ravel()]])
-    from_joints = np.column_stack([volume_ids[nearest_volumes.ravel()], np.repeat(joint_ids, NEIGHBOURS)])
-    return np.unique(np.vstack([from_volumes, from_joints]), axis=0)
+def _grid_contacts(index: np.ndarray, side: int, is_volume: np.ndarray) -> np.ndarray:
+    """Unique sorted (energy volume, joint) rows: every pair of face neighbours on the grid."""
+    flat = (index[:, 0] * side + index[:, 1]) * side + index[:, 2]
+    rows = []
+    for axis, stride in enumerate((side * side, side, 1)):
+        here = flat[index[:, axis] < side - 1]
+        rows.append(np.column_stack([here, here + stride]))
+    pairs = np.vstack(rows)
+    first_is_volume = is_volume[pairs[:, 0]]
+    ordered = np.where(first_is_volume[:, None], pairs, pairs[:, ::-1])
+    return np.unique(ordered, axis=0)

@@ -15,8 +15,8 @@ def _abab(state) -> bool:
 @pytest.mark.parametrize("overrides", [{}, {"push_limit": 0.85, "split_size": 1.5}])
 def test_every_contact_joins_an_energy_volume_and_a_joint(overrides):
     """Defaults (splits) and a high push limit (collapses too): ABAB holds every step for 60 steps."""
-    state, positions = new_state(400, 2, 0.5)
-    assert positions.shape == (400, 3) and _abab(state)
+    state, positions = new_state(343, 2, 0.5)
+    assert positions.shape == (343, 3) and _abab(state)
     settings = Settings.all_on(**overrides)
     for _ in range(60):
         state = step(state, settings)

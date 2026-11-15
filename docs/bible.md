@@ -924,7 +924,7 @@ Budget: this chapter holds the owner's theory rules in full, one place, changed 
 
 Owner, 2026-11-15, replacing every earlier picture of the structure:
 
-1. **ABAB structure.** Two kinds of energy volume: **A**, the energy volumes that pull, and **B**, the joints, which push. Every A touches only B's and every B touches only A's. The arrangement is irregular, scattered like a random mix of black and white marbles, so there is no up, down, left or right built in.
+1. **ABAB structure.** Two kinds of energy volume: **A**, the energy volumes that pull, and **B**, the joints, which push. Every A touches only B's and every B touches only A's. The sim starts from an actual 3D checkerboard grid (owner): every A has up to 6 B neighbours and the other way round; the unevenness comes from slightly different energies, and one correction lets sizes follow energy, after which the rules bend, squeeze and stretch the grid.
 2. **A pulls** on nearby A's, the pull spreading out and fading with distance. **B pushes** back, harder the more it is squeezed, steeply, and collapses past its limit.
 3. **Energy sets size** for both kinds: more energy makes a volume smaller and more packed. A B is squeezed when it is pressed smaller than its energy wants.
 4. **Everything else** (the leak, seams, drift, light, time) is how energy moves through this structure. Energy leaks from energy volume to energy volume only through a joint (A to B to A); the more squeezed the joint, the less it lets through, and past the seal point nothing passes, so packed lumps seal themselves. The physics keeps only each volume's kind, energy and size and who touches whom; shapes and positions exist only for drawing.

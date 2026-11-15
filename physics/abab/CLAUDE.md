@@ -1,7 +1,7 @@
 # physics/abab/
 
-The owner's foundation (bible `physics/quantum-relativity`, "The foundation"): an irregular ABAB
-structure. A = energy volume (pulls), B = joint (pushes). Module map in `__init__.py`.
+The owner's foundation (bible `physics/quantum-relativity`, "The foundation"): an ABAB
+structure, started as an actual 3D checkerboard grid (`new_state.py`), uneven only in energy. A = energy volume (pulls), B = joint (pushes). Module map in `__init__.py`.
 
 ## Must not get wrong
 
