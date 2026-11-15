@@ -7,7 +7,7 @@ step count, side, the shown boxes' positions (float32 (n, 3)) and colours (uint8
 (n, 4)) gathered on the GPU (`BoxPoints`), the count of boxes with negative
 energy, the latest stats (refreshed at most every STATS_EVERY seconds, and on
 every reset or pause), steps per second, paused, error and generation (bumped on
-each reset, so the window can re-fit). The opacity reference (`start_reference`)
+each reset, so the window can re-fit). The light reference (`start_reference`)
 is taken at the start and on each reset, then held fixed. `latest()` returns the
 newest Snapshot, or None when none is new since the last call. `toggle_pause()`,
 `reset()` and `stop()` are safe from any thread. All GPU work (steps, gathers)

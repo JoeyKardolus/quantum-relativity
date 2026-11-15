@@ -62,7 +62,7 @@ class PointWindow(pyglet.window.Window):
         camera = orbit_camera(self.centre, self.distance, self.yaw, self.pitch,
                               width / max(height, 1), FOV_DEGREES)
         focal = 1.0 / np.tan(np.radians(FOV_DEGREES) / 2.0)
-        self.cloud.draw(camera, POINT_BOXES * focal * height / 2.0)
+        self.cloud.draw(camera, POINT_BOXES * focal * height / 2.0, width, height)
         self._count_frame()
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers) -> None:

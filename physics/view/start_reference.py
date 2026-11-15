@@ -1,11 +1,11 @@
-"""Start reference: the start's mean energy per occupied box, per kind, the fixed unit of opacity.
+"""Start reference: the start's mean energy per occupied box, per kind, the fixed unit of contrast.
 
 Contract: `start_reference(a_energy, b_energy)` takes the two per-box energy arrays
 (numpy, or anything with `.numpy()` such as a Warp array; any shape, same size)
 and returns a float64 array of two values: index 0 the mean pulling (A) energy and
 index 1 the mean pushing (B) energy, each over the boxes holding any energy at all
 (A + B > 0). Taken once at the start (and again on reset) and then held fixed, so
-opacity reads a box against where the energy began, never against the current
+contrast reads a box against where the energy began, never against the current
 spread. A kind with no occupied box, or no finite positive mean, gets 1.0. Each
 kind has its own unit so a kind that starts with little energy is not invisible
 from the first step. Copies both arrays to the host once; meant for resets only.

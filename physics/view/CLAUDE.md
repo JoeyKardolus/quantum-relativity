@@ -5,14 +5,19 @@ points. Module map in `__init__.py`.
 
 ## Must not get wrong
 
-- **Draw the simulation as it is.** One point per box above the `SHOWN` line (1% of the start's
-  mean of either kind), at the box centre in box units; no layout, no correction, no link lines.
-  Red = pulling (A) energy, blue = pushing (B), both in one point (`box_points.py`).
-- **Opacity is a fixed scale** (`opacity.py`, a Warp function, the only copy): log of a box's
-  energy over the start's mean of that kind (`start_reference.py`, taken at start and on reset,
-  then held). Never rank-based or re-normalised per frame, or a mass packing would never show.
-  The test pins it.
-- **Additive blending, depth write off**: order-free, faint dots add up into clouds.
+- **Draw the simulation as it is.** A point per box at its centre in box units: every box at or
+  above `CONTRAST_SHOWN` (1.5x the start's mean density), plus a fixed random 1% of the rest
+  standing in for them (light x 100); past `MOST_POINTS` (3M) the dense ones are thinned by one
+  uniform share (light / share), never by order or rank. No layout, no link lines. Red = pulling
+  (A), blue = pushing (B), mixed in one point (`box_points.py`).
+- **Light is a fixed contrast scale** (`opacity.py`, a Warp function, the only copy): log-linear
+  in a box's density over the start's mean density (`start_reference.py`, taken at start and on
+  reset, then held), 1 at 16x, and at 1x only `AVERAGE_GLOW` / side, so a line of sight of
+  average boxes sums to 0.02: an even universe is black, thinner than average is nothing. Never
+  rank-based or re-normalised per frame, or growth of structure would never show. Tests pin it.
+- **Light is summed in a half-float buffer, shown through 1 - exp(-sum)** (`point_cloud.py`).
+  An 8-bit screen rounds 1e-4 light to 0; the uint8 alpha carries light as a log byte
+  (`light_code.py`). Additive, depth write off: order-free.
 - **GPU under WSL2**: `use_gpu_driver()` sets `GALLIUM_DRIVER=d3d12` and
   `MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA` before pyglet loads; without them Mesa draws on the
   CPU. CUDA-GL sharing fails on WSL (error 304), so the shown boxes are gathered on the GPU and
