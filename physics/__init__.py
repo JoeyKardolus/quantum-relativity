@@ -5,4 +5,6 @@ Module map:
           every box holds pulling (A) and pushing (B) energy and how each flows
   view/   the viewer: a pyglet GPU window of the grid's boxes as additive points,
           `python -m physics.view`
+  scenes/ the fit's scorecard: scenes that build a start, run the engine and return
+          measured numbers (expansion, structure, orbit, bound lump, black hole, Hubble gap)
 """

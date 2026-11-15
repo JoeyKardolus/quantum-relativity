@@ -3,10 +3,11 @@
 Rules: `docs/bible.md#physicsquantum-relativity` ("The foundation" and "How the engine holds
 the foam" first); words: `CONTEXT.md` (never node, edge, vertex, or merge for joint collapse).
 
-Two packages. `fluid/` is the engine: energy as a fluid on a fixed cube of boxes on the GPU
+Three packages. `fluid/` is the engine: energy as a fluid on a fixed cube of boxes on the GPU
 (Warp, CUDA), every box holding pulling (A) and pushing (B) energy and a momentum per kind.
 Energy volumes and joints are regions of the fluid; the ABAB pattern lives below the box size.
-Nothing is a ball or a link. `view/` is the only viewer, a pyglet window on the GPU. The
+Nothing is a ball or a link. `view/` is the only viewer, a pyglet window on the GPU. `scenes/`
+is the scorecard: each scene runs the engine and returns measured numbers, no verdict. The
 earlier ABAB engine (`abab/`), the browser app (`app/`) and the milestone code were removed
 (owner, 2026-11-15); they are in git history.
 
