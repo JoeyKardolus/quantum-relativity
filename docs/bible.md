@@ -966,8 +966,9 @@ rerun it. Misses are reported. Settings may be fitted to measurements, but only 
 2. **Grid dynamics**: the energy-length, drift, attraction and repulsion rules run.
 3. **Gravity test**: with the attraction rule off, do lumps of energy still move toward each other from the network's shape alone?
 4. **Expansion test**: does drift give accelerating expansion while dense clusters stay bound?
-5. **Space test**: does the network settle into something that behaves like 3D space?
-6. **Quantum**: superposition and entanglement without signalling (later). Lead: different kinds of vibration of the same grid (volumes swelling and shrinking, joints pushing back and forth, energy sloshing along seams) are the different fields, each with any number of frequencies. Lead: the network as a superposition of configurations, with each connection holding a few numbers rather than one, so several fields are different ways the same network moves (Levin and Wen, string-net condensation, 2005). There the quantum part is assumed, not derived, and gravity does not emerge; the geometry rules here would supply it.
+5. **Black hole test**: a collapsed core shrinks, but the sealed region around it (joints past the seal point, nothing leaking out) is the black hole; its radius, measured along the structure, should grow in proportion to the collapsed energy, as relativity's horizon does.
+6. **Space test**: does the network settle into something that behaves like 3D space?
+7. **Quantum**: superposition and entanglement without signalling (later). Lead: different kinds of vibration of the same grid (volumes swelling and shrinking, joints pushing back and forth, energy sloshing along seams) are the different fields, each with any number of frequencies. Lead: the network as a superposition of configurations, with each connection holding a few numbers rather than one, so several fields are different ways the same network moves (Levin and Wen, string-net condensation, 2005). There the quantum part is assumed, not derived, and gravity does not emerge; the geometry rules here would supply it.
 
 Success tiers: (1) known physics (falling, bending light, expansion) from the rules; (2) space
 and gravity emerge without being forced; (3) a testable prediction that holds, such as the
