@@ -5,7 +5,7 @@ space the test measures in (a step solves only round the occupied boxes, pull.py
 """
 import numpy as np
 
-from physics.potts import ENERGY_VOLUME, QUANTUM, Settings, Universe, cell_sums, pull
+from physics.potts import ENERGY_VOLUME, Settings, Universe, cell_sums, pull
 from physics.potts.tests._gpu import needs_gpu
 
 
@@ -22,7 +22,7 @@ def test_the_potential_outside_a_blob_is_minus_g_m_over_r():
     cell_sums(universe, settings)
     pull(universe, settings)
     potential = universe.potential.numpy()
-    mass = int(universe.energy.numpy().sum()) * QUANTUM
+    mass = float((universe.psi.numpy() ** 2).sum())
     outside = (distance > radius + 1.5) & (distance < side / 2.0 - 2.0)
     expected = -settings.attraction * mass / distance[outside]
     assert outside.sum() > 1000

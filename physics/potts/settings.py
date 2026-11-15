@@ -16,27 +16,30 @@ occupied box is 1 (new_universe.py; energy volumes and joints alike).
                         empty space, in units of its energy per box (box_moves.py; the
                         cellular Potts method's border term): keeps cells compact
   push                  a joint's push, a pressure P = push * c**push_power per box,
-                        c = want / n, the joint's compression (B squeezed when c > 1)
+                        c = want / n, the joint's compression (B squeezed when c > 1);
+                        in the energy fluid the same push stiffens a joint's fluid: its
+                        nonlinear term is g * (1 + push * c**push_power) (on_site.py)
   push_power            how steeply the push rises as a joint is squeezed (> 0)
   seal_compression      c at or past which nothing crosses the joint's border (the seal)
   collapse_compression  c at or past which the joint collapses: it vanishes and its A
                         neighbours fall together into one energy volume
-  friction              crossing an A-B border keeps 1 / (1 + friction * c) of the
-                        crossing energy's momentum; nowhere else is there friction
-  sound                 the fluid's sound speed, both kinds: pressure = sound**2 * energy
-                        per box (kick.py); also sets a joint's swing, omega = pi * sound
-                        / n**(1/3) (joint_swing.py)
+  friction              across an A-B face the fluid's phase difference (its flow there)
+                        keeps 1 / (1 + friction * c * dt) of itself per hop of length dt,
+                        the lost flow energy booked as heat (hop.py); nowhere else is
+                        there friction
+  sound                 the energy fluid's sound speed at the start's mean density, both
+                        kinds: its nonlinear term g = sound**2 / rest (on_site.py);
+                        also sets a joint's swing, omega = pi * sound / n**(1/3)
+                        (joint_swing.py)
   clock_scale           s in a cell's clock rate (s + 1) / (s + q), q its concentration
   step_time             counter time per step
-  courant               each cell's own substep keeps (|u| + sound) * clock * dt under this
+  courant               each cell's own substep keeps (|u| + local sound) * clock * dt
+                        under this (time_levels.py; u the flow from the phase)
   potential_cycles      multigrid V-cycles per step, warm-started
   max_level             a cell needing a substep finer than step_time / 2**max_level
                         raises ValueError (runaway guard)
   move_share            a cell may gain, and lose, at most this share of its boxes per
                         sweep of box moves (one sweep per step), at least one plate (4)
-  link_stiffness        a link between touching cells longer than its rest length (the
-                        two cells' half widths, n**(1/3) / 2 each) costs link_stiffness *
-                        mean E * (length / rest - 1)**2: links bend, never stretch
   split_boxes           an energy volume holding more than split_boxes * k**3 boxes tears
                         in two, the tear a new joint (rule 8, volume split; size, not
                         density, is the trigger)
@@ -45,7 +48,7 @@ occupied box is 1 (new_universe.py; energy volumes and joints alike).
                         the start's mean
 Defaults were chosen once as units or carried over, not tuned: attraction 0.005, push 0.1,
 push_power 3, seal (1/0.6)**3, collapse (1/0.5)**3, friction 1, lump_factor 2 from the
-earlier fluid engine; size_power 3 from rule 4; stiffness 1, link_stiffness 1, sound 1,
+earlier fluid engine; size_power 3 from rule 4; stiffness 1, sound 1,
 clock_scale 1, step_time 1, courant 0.4, potential_cycles 2 as units; move_share 1/8 (an
 eighth of a cell per step, as before); split_boxes 8 (twice a start cell's width);
 proposals 4; surface 0.1 (a tenth of a box's energy per border face, chosen once as a
@@ -58,7 +61,7 @@ from dataclasses import dataclass, replace
 
 @dataclass(frozen=True)
 class Settings:
-    """Pull, size, push, seal, collapse, friction, fluid sound, clocks, time levels, moves, links, splits."""
+    """Pull, size, push, seal, collapse, friction, fluid sound, clocks, time levels, moves, splits."""
 
     attraction: float = 0.005
     size_power: float = 3.0
@@ -76,7 +79,6 @@ class Settings:
     potential_cycles: float = 2.0
     max_level: float = 20.0
     move_share: float = 1.0 / 8.0
-    link_stiffness: float = 1.0
     split_boxes: float = 8.0
     proposals: float = 4.0
     lump_factor: float = 2.0

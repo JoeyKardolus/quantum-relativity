@@ -1,35 +1,53 @@
-"""Box points: the occupied Planck boxes as drawable points of light, gathered on the GPU.
+"""Box points: the occupied Planck boxes as drawable points, gathered on the GPU.
 
 Contract: `BoxPoints()` keeps GPU buffers between calls. `boxes(view, reference,
-shown=SHOW_BOTH)` takes the source's view (`cells_source.py`: `positions` (n, 3) box centres in box
-units, as an (n, 3) array of numbers or an (n,) array of 3-vectors; `density` (n,)
-energy per box; `kind` (n,) the kind of the cell owning the box, ENERGY_VOLUME or
-JOINT; `border` (n,) nonzero where the box touches a box of another cell; Warp
-arrays on one device or numpy, which is read on the CPU) and the start reference
+shown=SHOW_BOTH, look=GLOW, slice_offset=None)` takes the source's view
+(`cells_source.py`: `positions` (n, 3) box centres in box units, as an (n, 3)
+array of numbers or an (n,) array of 3-vectors; `density` (n,) energy per box;
+`kind` (n,) the kind of the cell owning the box, ENERGY_VOLUME or JOINT; `border`
+(n,) nonzero where the box touches a box of another cell; Warp arrays on one
+device or numpy, which is read on the CPU), the start reference
 (`start_reference`: the energy volumes' mean density, the joints' mean density,
-boxes deep) and `shown`, which kinds to draw (SHOW_ENERGY_VOLUMES, SHOW_JOINTS or
-SHOW_BOTH, the default), and returns a `Gathered`: positions
-(m, 3) float32, colours (m, 4) uint8, negative (boxes with a density below zero),
-low and high (float32 (3,), the corners of the occupied boxes' bounding box, for
-fitting the view, over every occupied box whatever is shown; zeros when there are
-none).
+boxes deep), `shown`, which kinds to draw (SHOW_ENERGY_VOLUMES, SHOW_JOINTS or
+SHOW_BOTH), `look`, how they are lit (GLOW or NEAREST), and `slice_offset`, None
+for the whole space or a whole number of boxes from the middle layer along
+SLICE_AXIS (z), and returns a `Gathered`: positions (m, 3) float32, colours
+(m, 4) uint8, negative (boxes with a density below zero), low and high (float32
+(3,), the corners of the occupied boxes' bounding box, for fitting the view, over
+every occupied box whatever is shown or sliced; zeros when there are none),
+slice_at (the slice's centre along SLICE_AXIS, NaN without a slice) and
+slice_offset (the offset actually used, after clamping to the occupied layers;
+None without a slice).
 
 Every occupied box is a candidate; empty boxes are never in the view, so never
-drawn, and a box of a kind not shown is left out. A box's light is
-`opacity(density / its own kind's start mean density, boxes deep)` (fixed log
-scale, `opacity.py`), so each kind has its own fixed contrast scale and a joint at
-its kind's mean is as bright as an energy volume at its own; times BORDER_GAIN on
-a cell border, so cells read as cells. Past MOST_POINTS shown boxes one uniform
-random share is kept (never by
-order or rank; a few past MOST_POINTS are dropped) and each kept point's light is
-divided by that share, so the expected light of the whole is unchanged. A point
-whose light codes to 0 is left out. Colour: RED in an energy volume (A), BLUE in
-a joint (B); alpha is the light as a log byte (`light_code.py`), decoded by the
-window. Two passes on the view's device (check and bound, then gather); the
-result is copied to the host once per call. Point order is not fixed (additive
-drawing does not need it). Raises ValueError when the arrays disagree in length
-or device, when a density or position is not finite, or a kind is neither
-ENERGY_VOLUME nor JOINT, or `shown` is none of the three; that frame is not drawn.
+drawn, and a box of a kind not shown is left out. With a slice only boxes whose
+centre lies within SLICE_BOXES / 2 of the slice centre are kept: the slice centre
+is the occupied box layer nearest the middle of the bounds along SLICE_AXIS, moved
+by slice_offset layers and held inside the occupied layers.
+
+GLOW: a box's light is `opacity(density / its own kind's start mean density,
+boxes deep)` (fixed log scale, `opacity.py`), so each kind has its own fixed
+contrast scale and a joint at its kind's mean is as bright as an energy volume at
+its own; times BORDER_GAIN on a cell border, so cells read as cells. A point
+whose light codes to 0 is left out. Alpha is the light as a log byte
+(`light_code.py`), decoded by the window, which sums it additively.
+
+NEAREST: every shown box is drawn, coloured by kind at a fixed light, its density
+only a brightness tint: the kind's colour times `_shade(contrast)`, from
+NEAREST_DIMMEST at contrast 1 / PACKED or below, through the middle at the start
+mean, to 1 at PACKED or above (log-linear, the fixed `opacity.py` PACKED; never
+re-normalised). Alpha is 255. The window draws these depth-tested, the nearest
+box hiding those behind it, so the structure reads.
+
+Past MOST_POINTS shown boxes (whole space only) one uniform random share is kept
+(never by order or rank) and in GLOW each kept point's light is divided by that
+share, so the expected light of the whole is unchanged; a slice is never thinned
+(a few past MOST_POINTS are dropped). Colour: RED in an energy volume (A), BLUE in
+a joint (B). Two passes on the view's device (check and bound, then gather); the
+result is copied to the host once per call. Point order is not fixed. Raises
+ValueError when the arrays disagree in length or device, when a density or
+position is not finite, or a kind is neither ENERGY_VOLUME nor JOINT, or `shown`
+or `look` is none of its choices; that frame is not drawn.
 """
 from __future__ import annotations
 
@@ -40,7 +58,7 @@ import numpy as np
 import warp as wp
 
 from physics.view.light_code import light_code
-from physics.view.opacity import opacity
+from physics.view.opacity import PACKED, opacity
 
 ENERGY_VOLUME = 0
 JOINT = 1
@@ -49,6 +67,11 @@ MOST_POINTS = 3_000_000
 SHOW_ENERGY_VOLUMES = 1
 SHOW_JOINTS = 2
 SHOW_BOTH = SHOW_ENERGY_VOLUMES | SHOW_JOINTS
+GLOW = 0
+NEAREST = 1
+NEAREST_DIMMEST = 0.35
+SLICE_AXIS = 2
+SLICE_BOXES = 1.0
 RED = (255, 64, 38)
 BLUE = (64, 115, 255)
 _RED = wp.constant(wp.vec3(*RED))
@@ -68,6 +91,8 @@ class Gathered:
     negative: int
     low: np.ndarray
     high: np.ndarray
+    slice_at: float = float("nan")
+    slice_offset: int | None = None
 
 
 @wp.func
@@ -111,16 +136,28 @@ def _check(positions: wp.array(dtype=Any, ndim=2), density: wp.array(dtype=Any),
         wp.atomic_add(counts, _SHOWN, 1)
 
 
+@wp.func
+def _shade(contrast: wp.float32) -> wp.float32:
+    """Brightness of a nearest-drawn box: NEAREST_DIMMEST at 1 / PACKED, 1 at PACKED, log-linear."""
+    place = wp.float32(0.5) + wp.float32(0.5) * wp.log(wp.max(contrast, wp.float32(1e-30))) / wp.log(wp.float32(PACKED))
+    place = wp.clamp(place, wp.float32(0.0), wp.float32(1.0))
+    return wp.float32(NEAREST_DIMMEST) + (wp.float32(1.0) - wp.float32(NEAREST_DIMMEST)) * place
+
+
 @wp.kernel
 def _gather(positions: wp.array(dtype=Any, ndim=2), density: wp.array(dtype=Any),
             kind: wp.array(dtype=Any), border: wp.array(dtype=Any), volume_mean: float,
-            joint_mean: float, boxes_deep: float, shown: wp.int32, kept: float,
+            joint_mean: float, boxes_deep: float, shown: wp.int32, look: wp.int32, kept: float,
+            slicing: wp.int32, slice_centre: float,
             slots: wp.array(dtype=wp.int32),
             points: wp.array(dtype=wp.vec3), colours: wp.array(dtype=wp.uint8, ndim=2)):
     box = wp.tid()
     owner_kind = wp.int32(kind[box])
     if not _is_shown(owner_kind, shown):
         return
+    if slicing != 0:
+        if wp.abs(wp.float32(positions[box, SLICE_AXIS]) - wp.float32(slice_centre)) >= wp.float32(0.5 * SLICE_BOXES):
+            return
     if kept < 1.0:
         state = wp.rand_init(_THINNING_SEED, box)
         if wp.randf(state) >= kept:
@@ -129,12 +166,17 @@ def _gather(positions: wp.array(dtype=Any, ndim=2), density: wp.array(dtype=Any)
     if owner_kind == ENERGY_VOLUME:
         mean_density = wp.float32(volume_mean)
     contrast = wp.max(wp.float32(density[box]), 0.0) / mean_density
-    light = opacity(contrast, wp.float32(boxes_deep)) / kept
-    if wp.int32(border[box]) != 0:
-        light = light * wp.float32(BORDER_GAIN)
-    code = wp.round(light_code(light))
-    if code < 1.0:
-        return
+    shade = wp.float32(1.0)
+    code = wp.float32(255.0)
+    if look == NEAREST:
+        shade = _shade(contrast)
+    else:
+        light = opacity(contrast, wp.float32(boxes_deep)) / kept
+        if wp.int32(border[box]) != 0:
+            light = light * wp.float32(BORDER_GAIN)
+        code = wp.round(light_code(light))
+        if code < 1.0:
+            return
     slot = wp.atomic_add(slots, 0, 1)
     if slot >= points.shape[0]:
         return
@@ -143,9 +185,9 @@ def _gather(positions: wp.array(dtype=Any, ndim=2), density: wp.array(dtype=Any)
     tint = _BLUE
     if owner_kind == ENERGY_VOLUME:
         tint = _RED
-    colours[slot, 0] = wp.uint8(tint[0])
-    colours[slot, 1] = wp.uint8(tint[1])
-    colours[slot, 2] = wp.uint8(tint[2])
+    colours[slot, 0] = wp.uint8(wp.round(tint[0] * shade))
+    colours[slot, 1] = wp.uint8(wp.round(tint[1] * shade))
+    colours[slot, 2] = wp.uint8(wp.round(tint[2] * shade))
     colours[slot, 3] = wp.uint8(code)
 
 
@@ -155,7 +197,8 @@ class BoxPoints:
     def __init__(self) -> None:
         self._buffers = None
 
-    def boxes(self, view, reference, shown: int = SHOW_BOTH) -> Gathered:
+    def boxes(self, view, reference, shown: int = SHOW_BOTH, look: int = GLOW,
+              slice_offset: int | None = None) -> Gathered:
         """The drawn boxes' centres and colours, and the occupied bounds, on the host."""
         density = _warp(view.density)
         device = density.device
@@ -170,6 +213,8 @@ class BoxPoints:
         if shown not in (SHOW_ENERGY_VOLUMES, SHOW_JOINTS, SHOW_BOTH):
             raise ValueError(f"shown: {shown}, expected {SHOW_ENERGY_VOLUMES} (energy volumes), "
                              f"{SHOW_JOINTS} (joints) or {SHOW_BOTH} (both)")
+        if look not in (GLOW, NEAREST):
+            raise ValueError(f"look: {look}, expected {GLOW} (glow) or {NEAREST} (nearest)")
         counts, slots, low, high, points, colours = self._buffers_for(min(size, MOST_POINTS), device)
         counts.zero_()
         slots.zero_()
@@ -184,21 +229,25 @@ class BoxPoints:
         if bad_kind:
             raise ValueError(f"{bad_kind} boxes belong to a cell kind that is neither "
                              f"{ENERGY_VOLUME} (energy volume) nor {JOINT} (joint)")
-        kept = 1.0 if shown_count <= MOST_POINTS else MOST_POINTS / shown_count
+        low_host, high_host = low.numpy().copy(), high.numpy().copy()
+        slice_at, used_offset = float("nan"), None
+        if slice_offset is not None:
+            slice_at, used_offset = _slice_layer(low_host, high_host, int(slice_offset))
+        kept = 1.0 if shown_count <= MOST_POINTS or used_offset is not None else MOST_POINTS / shown_count
         wp.launch(_gather, dim=size, device=device,
                   inputs=[positions, density, kind, border, volume_mean, joint_mean, boxes_deep,
-                          int(shown), kept, slots, points, colours])
-        low_host, high_host = low.numpy().copy(), high.numpy().copy()
+                          int(shown), int(look), kept, int(used_offset is not None),
+                          0.0 if used_offset is None else slice_at, slots, points, colours])
         drawn = min(int(slots.numpy()[0]), points.shape[0])
         if drawn == 0:
-            return _nothing(negative, low_host, high_host)
+            return _nothing(negative, low_host, high_host, slice_at, used_offset)
         points_host = points[:drawn].numpy().reshape(drawn, 3)
         colours_host = colours[:drawn].numpy()
         if device.is_cpu:
             # .numpy() of a CPU array shares the reused buffer, so the next gather would
             # overwrite a snapshot still being drawn; take an own copy.
             points_host, colours_host = points_host.copy(), colours_host.copy()
-        return Gathered(points_host, colours_host, negative, low_host, high_host)
+        return Gathered(points_host, colours_host, negative, low_host, high_host, slice_at, used_offset)
 
     def _buffers_for(self, capacity: int, device) -> tuple:
         if self._buffers is None or self._buffers[0] != (capacity, str(device)):
@@ -212,8 +261,19 @@ class BoxPoints:
         return self._buffers[1:]
 
 
-def _nothing(negative: int, low: np.ndarray, high: np.ndarray) -> Gathered:
-    return Gathered(np.zeros((0, 3), np.float32), np.zeros((0, 4), np.uint8), negative, low, high)
+def _nothing(negative: int, low: np.ndarray, high: np.ndarray, slice_at: float = float("nan"),
+             slice_offset: int | None = None) -> Gathered:
+    return Gathered(np.zeros((0, 3), np.float32), np.zeros((0, 4), np.uint8), negative, low, high,
+                    slice_at, slice_offset)
+
+
+def _slice_layer(low: np.ndarray, high: np.ndarray, offset: int) -> tuple[float, int]:
+    """The slice centre along SLICE_AXIS and the offset used: the middle layer moved, held in the occupied layers."""
+    first = float(low[SLICE_AXIS])
+    layers = int(np.floor(float(high[SLICE_AXIS]) - first + 0.5)) + 1
+    middle = int(np.floor((layers - 1) / 2.0 + 0.5))
+    used = min(max(middle + offset, 0), layers - 1) - middle
+    return first + middle + used, used
 
 
 def _warp(array, device=None) -> wp.array:

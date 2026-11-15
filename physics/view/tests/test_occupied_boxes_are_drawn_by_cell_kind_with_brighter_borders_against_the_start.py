@@ -13,7 +13,7 @@ import pytest
 import warp as wp
 
 from physics.view import box_points
-from physics.view.box_points import BLUE, BORDER_GAIN, ENERGY_VOLUME, JOINT, RED, BoxPoints
+from physics.view.box_points import BLUE, BORDER_GAIN, ENERGY_VOLUME, GLOW, JOINT, RED, BoxPoints
 from physics.view.light_code import LOG_DIMMEST, LOG_SPAN
 from physics.view.opacity import AVERAGE_GLOW, PACKED
 from physics.view.start_reference import start_reference
@@ -135,7 +135,7 @@ def test_arrays_of_different_lengths_are_refused():
 
 
 def test_a_packing_box_lights_up_against_a_reference_that_never_moves():
-    stepper = Stepper(_PackingSource(), steps_per_frame=1, paused=True)
+    stepper = Stepper(_PackingSource(), steps_per_frame=1, paused=True, look=GLOW)
     try:
         start = _wait(stepper, lambda snapshot: True)
         assert start.step == 0 and start.low.tolist() == [10.5] * 3 and start.high.tolist() == [13.5] * 3

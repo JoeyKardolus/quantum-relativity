@@ -1,6 +1,6 @@
 """Stepper: steps a source on its own thread and hands the window snapshots to draw.
 
-Contract: `Stepper(source, steps_per_frame, paused=False)` starts a daemon thread
+Contract: `Stepper(source, steps_per_frame, paused=False, look=NEAREST)` starts a daemon thread
 that publishes the start, then runs `steps_per_frame` source steps,
 then publishes a Snapshot, and repeats while not paused. A Snapshot carries the
 step count, the shown boxes' positions (float32 (n, 3)) and colours (uint8
@@ -13,8 +13,14 @@ is taken at the start and on each reset, then held fixed. `latest()` returns the
 newest Snapshot, or None when none is new since the last call. `show(kinds)`
 picks which kinds are drawn (`box_points` SHOW_ENERGY_VOLUMES, SHOW_JOINTS or
 SHOW_BOTH, the start; a snapshot is published again even while paused; any other
-value raises ValueError). `toggle_pause()`, `show()`, `reset()` and `stop()` are
-safe from any thread. All GPU work (steps, gathers)
+value raises ValueError). `draw_as(look)` picks how they are lit (`box_points`
+NEAREST, the start, or GLOW; any other value raises ValueError). `toggle_slice()`
+turns the slice through the middle on (at the middle layer) or off, and
+`move_slice(layers)` moves it by whole box layers (held inside the occupied
+layers; nothing while it is off). Each of these republishes even while paused,
+and the snapshot carries look and slice_at (NaN without a slice).
+`toggle_pause()`, `show()`, `draw_as()`, `toggle_slice()`, `move_slice()`,
+`reset()` and `stop()` are safe from any thread. All GPU work (steps, gathers)
 runs on the stepping thread. When the source or the gather raises, stepping stops
 and the error is in the snapshot (its traceback printed); nothing is swallowed.
 """
@@ -27,7 +33,8 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from physics.view.box_points import SHOW_BOTH, SHOW_ENERGY_VOLUMES, SHOW_JOINTS, BoxPoints
+from physics.view.box_points import (GLOW, NEAREST, SHOW_BOTH, SHOW_ENERGY_VOLUMES, SHOW_JOINTS,
+                                     BoxPoints)
 from physics.view.start_reference import start_reference
 
 STATS_EVERY = 0.5
@@ -48,13 +55,21 @@ class Snapshot:
     paused: bool
     error: str
     generation: int
+    look: int = NEAREST
+    slice_at: float = float("nan")
 
 
 class Stepper:
     """Runs a source on a thread; the window reads its snapshots."""
 
-    def __init__(self, source, steps_per_frame: int = 1, paused: bool = False) -> None:
+    def __init__(self, source, steps_per_frame: int = 1, paused: bool = False,
+                 look: int = NEAREST) -> None:
+        if look not in (GLOW, NEAREST):
+            raise ValueError(f"look: {look}, expected {GLOW} (glow) or {NEAREST} (nearest)")
         self.source = source
+        self.look = look
+        self.slicing = False
+        self.slice_offset = 0
         self.steps_per_frame = max(1, int(steps_per_frame))
         self.paused = paused
         self.shown = SHOW_BOTH
@@ -90,6 +105,25 @@ class Stepper:
             raise ValueError(f"kinds: {kinds}, expected {SHOW_ENERGY_VOLUMES}, {SHOW_JOINTS} or {SHOW_BOTH}")
         self.shown = kinds
         self._stats_at = 0.0
+
+    def draw_as(self, look: int) -> None:
+        """Light the boxes as NEAREST (depth-tested, by kind) or GLOW (additive), from the next snapshot on."""
+        if look not in (GLOW, NEAREST):
+            raise ValueError(f"look: {look}, expected {GLOW} (glow) or {NEAREST} (nearest)")
+        self.look = look
+        self._stats_at = 0.0
+
+    def toggle_slice(self) -> None:
+        """Draw only the slice through the middle layer, or the whole space again."""
+        self.slicing = not self.slicing
+        self.slice_offset = 0
+        self._stats_at = 0.0
+
+    def move_slice(self, layers: int) -> None:
+        """Move the slice by whole box layers; nothing while it is off."""
+        if self.slicing:
+            self.slice_offset += int(layers)
+            self._stats_at = 0.0
 
     def reset(self) -> None:
         """Ask for a fresh start on the stepping thread."""
@@ -144,7 +178,10 @@ class Stepper:
         view = self.source.view()
         if self._reference is None:
             self._reference = start_reference(view.density, view.kind)
-        gathered = self._points.boxes(view, self._reference, self.shown)
+        asked = self.slice_offset if self.slicing else None
+        gathered = self._points.boxes(view, self._reference, self.shown, self.look, asked)
+        if gathered.slice_offset is not None and self.slicing and self.slice_offset == asked:
+            self.slice_offset = gathered.slice_offset  # held inside the occupied layers
         now = time.perf_counter()
         if now - self._stats_at >= STATS_EVERY:
             self._stats, self._stats_at = self.source.stats(), now
@@ -153,6 +190,7 @@ class Stepper:
                             negative=gathered.negative, low=gathered.low, high=gathered.high,
                             stats=self._stats,
                             steps_per_second=self._rate, paused=self.paused,
-                            error=self.error, generation=self.generation)
+                            error=self.error, generation=self.generation,
+                            look=self.look, slice_at=gathered.slice_at)
         with self._lock:
             self._latest = self._last = snapshot

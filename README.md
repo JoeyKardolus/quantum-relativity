@@ -7,13 +7,15 @@ orbits.
 
 ## The idea in short
 
-- **Space is a foam of two kinds of energy volume**, alternating like a 3D checkerboard: volumes that
-  **pull** (A) and **joints** that **push** (B). Every A touches only B's, and every B only A's.
+- **Space is a foam of two kinds of cell**: energy volumes that **pull** (A) and **joints** that **push**
+  (B). Every A is wrapped in joints on all sides, edges and corners included; joints touch each other
+  and form one web, like mortar between bricks.
 - **Energy sets size**: the more energy packed into a region, the smaller and denser it is.
 - **A pulls** on other A's through the joints between them, fading with distance, like gravity.
   **A joint pushes back**, harder the more it is squeezed, until it gives way past a limit and the
   region collapses, like a star becoming a black hole.
-- **Energy behaves like a fluid**: frictionless inside a volume, with friction only in passing a joint.
+- **Energy is a quantum fluid**, one complex number per Planck box: frictionless inside a volume, whirls
+  turning only in whole steps, friction only in passing a joint.
   Squeezed joints let less through and past a seal point nothing, so packed lumps seal themselves.
 - **Time is local**: where energy is more packed, everything happens more slowly.
 
@@ -46,6 +48,8 @@ to the GPU by itself.
 |---|---|
 | `physics/potts/` | the engine: cells made of fixed Planck boxes, the energy a fluid inside them, on the GPU |
 | `physics/view/` | the GPU window that shows it |
+| `physics/scenes/` | the scorecard: each scene runs the engine and returns measured numbers |
+| `physics/measure/` | graph and whirl measures the scenes use (dimension, winding, circulation) |
 | `docs/bible.md` | how everything works; the theory is the chapter `physics/quantum-relativity` |
 
 ## Built with

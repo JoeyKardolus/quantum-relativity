@@ -2,13 +2,19 @@
 
 Contract: `title_line(snapshot, frames_per_second)` returns one line: step, cells
 (with the cell count's growth since the start), joints, collapses, occupied boxes vs
-start, lumps, sealed lumps, total energy, drawn boxes, steps/s, frames/s, plus
+start, lumps, sealed lumps, total energy, drawn boxes, the look ("nearest" or
+"glow", from the snapshot's `look`, default nearest) and "slice z <centre>" when
+the snapshot's `slice_at` is a number, steps/s, frames/s, plus
 "negative <n>" when boxes hold negative energy, "paused" when paused and
 "STOPPED: <error>" when the source raised. Stats keys read (the engine's `stats`):
 cells, joints, collapses, cell_count_growth, occupied_growth, lumps, sealed_lumps,
 total_energy; a missing key shows as "?".
 """
 from __future__ import annotations
+
+import math
+
+from physics.view.box_points import GLOW
 
 
 def title_line(snapshot, frames_per_second: float) -> str:
@@ -23,8 +29,12 @@ def title_line(snapshot, frames_per_second: float) -> str:
              f"sealed {stats.get('sealed_lumps', '?')}",
              _energy(stats.get("total_energy")),
              f"{len(snapshot.positions):,} boxes drawn",
+             "glow" if getattr(snapshot, "look", None) == GLOW else "nearest",
              f"{snapshot.steps_per_second:.1f} steps/s",
              f"{frames_per_second:.0f} fps"]
+    slice_at = getattr(snapshot, "slice_at", float("nan"))
+    if not math.isnan(slice_at):
+        parts.insert(len(parts) - 2, f"slice z {slice_at:g}")
     if snapshot.negative:
         parts.append(f"negative {snapshot.negative}")
     if snapshot.paused:

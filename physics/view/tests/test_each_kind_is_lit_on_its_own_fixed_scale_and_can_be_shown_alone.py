@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import warp as wp
 
-from physics.view.box_points import (BLUE, ENERGY_VOLUME, JOINT, RED, SHOW_BOTH, SHOW_ENERGY_VOLUMES,
+from physics.view.box_points import (BLUE, ENERGY_VOLUME, GLOW, JOINT, RED, SHOW_BOTH, SHOW_ENERGY_VOLUMES,
                                      SHOW_JOINTS, BoxPoints)
 from physics.view.light_code import LOG_DIMMEST, LOG_SPAN
 from physics.view.opacity import AVERAGE_GLOW
@@ -110,7 +110,7 @@ class _EvenSource:
 
 
 def test_choosing_a_kind_redraws_even_while_paused():
-    stepper = Stepper(_EvenSource(), paused=True)
+    stepper = Stepper(_EvenSource(), paused=True, look=GLOW)
     try:
         _wait(stepper, lambda snapshot: len(snapshot.positions) == 64)
         stepper.show(SHOW_JOINTS)

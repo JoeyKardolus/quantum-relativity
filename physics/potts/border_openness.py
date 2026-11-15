@@ -1,20 +1,35 @@
-"""Border openness (Warp function): how much of a flow may cross from one box into its face neighbour.
+"""Border openness (Warp function): how freely the energy fluid may hop from one box into its face neighbour.
 
 Contract: `border_openness(owner, kind, compression, seam, here, there, seal, side)` takes two
 face-neighbouring boxes and returns 1 when both belong to one cell (frictionless,
-nothing in the way); 0 when `there` is empty or outside the grid, between two cells of
-the same kind (ABAB forbids them touching), when the joint's box of the two (the B
-side) is not on a seam (seam[box] == 0, seam_flags.py; rule 6: the leak runs along the seams, never
-through a joint's middle), or when that joint is squeezed to `seal` or past it (bible:
-past the seal point nothing passes); else 1 for a joint at or under compression 1,
-falling straight to 0 at the seal (the more squeezed the joint, the narrower its seam
-and the less it lets through).
+nothing in the way); 0 when either is empty or outside the grid, between two energy
+volumes (they never touch: each is wrapped in joints), or when a joint's box of the two
+is not on a seam (seam[box] == 0, seam_flags.py; rule 6: the leak runs along the
+seams, never through a joint's middle). Otherwise, an energy volume against a joint or
+two joints meeting in the web, the most squeezed joint of the two, at compression c,
+sets it: 0 at or past `seal` (bible: past the seal point nothing passes), 1 at or
+under c = 1, falling straight to 0 between (the more squeezed, the narrower the seam).
+The fluid's hop across that face is scaled by this number (hop.py).
 """
 from __future__ import annotations
 
 import warp as wp
 
 from physics.potts.box_owner import box_owner
+
+
+@wp.func
+def _joint_openness(compression: wp.array(dtype=wp.float32), seam: wp.array3d(dtype=wp.int32), joint: int,
+                    box: wp.vec3i, seal: float) -> float:
+    """1 for a relaxed joint's seam box, down to 0 at the seal; 0 off the seams."""
+    if seam[box[0], box[1], box[2]] == 0:
+        return 0.0
+    squeeze = compression[joint]
+    if squeeze >= seal:
+        return 0.0
+    if squeeze <= 1.0:
+        return 1.0
+    return (seal - squeeze) / (seal - 1.0)
 
 
 @wp.func
@@ -29,18 +44,11 @@ def border_openness(owner: wp.array3d(dtype=wp.int32), kind: wp.array(dtype=wp.i
         return 0.0
     if sender == receiver:
         return 1.0
-    if kind[sender] == kind[receiver]:
+    if kind[sender] == 0 and kind[receiver] == 0:
         return 0.0
-    joint = receiver
-    joint_box = there
+    openness = float(1.0)
     if kind[sender] == 1:
-        joint = sender
-        joint_box = here
-    if seam[joint_box[0], joint_box[1], joint_box[2]] == 0:
-        return 0.0
-    squeeze = compression[joint]
-    if squeeze >= seal:
-        return 0.0
-    if squeeze <= 1.0:
-        return 1.0
-    return (seal - squeeze) / (seal - 1.0)
+        openness = wp.min(openness, _joint_openness(compression, seam, sender, here, seal))
+    if kind[receiver] == 1:
+        openness = wp.min(openness, _joint_openness(compression, seam, receiver, there, seal))
+    return openness

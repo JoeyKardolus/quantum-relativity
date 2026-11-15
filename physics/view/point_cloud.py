@@ -15,6 +15,11 @@ by piling more squares on each pixel. Then the sum is shown on the
 framebuffer that was bound, through 1 - exp(-sum) per channel: a fixed curve,
 never scaled by the frame's own brightest pixel. view_projection is a (4, 4)
 row-major world-to-clip matrix (`orbit_camera`). No link lines.
+`draw(..., nearest=True)` instead draws straight onto the bound framebuffer,
+depth-tested with depth write on and no blending, so the nearest box hides those
+behind it: each square in its RGB as given (alpha ignored), SQUARE_PIXELS across or
+a box's true size when that is larger, so a near face of boxes closes without gaps.
+The window's framebuffer needs a depth buffer (pyglet's default config has one).
 """
 from __future__ import annotations
 
@@ -57,6 +62,28 @@ void main() {
 }
 """
 
+_NEAREST_VERTEX = f"""#version 330 core
+layout(location = 0) in vec3 position;
+layout(location = 1) in vec4 colour;
+uniform mat4 view_projection;
+uniform float point_scale;
+out vec3 dot_colour;
+void main() {{
+    vec4 clip = view_projection * vec4(position, 1.0);
+    gl_Position = clip;
+    gl_PointSize = max({SQUARE_PIXELS!r}, point_scale / max(clip.w, 1e-6));
+    dot_colour = colour.rgb;
+}}
+"""
+
+_NEAREST_FRAGMENT = """#version 330 core
+in vec3 dot_colour;
+out vec4 out_colour;
+void main() {
+    out_colour = vec4(dot_colour, 1.0);
+}
+"""
+
 _SCREEN_VERTEX = """#version 330 core
 out vec2 place;
 void main() {
@@ -82,6 +109,8 @@ class PointCloud:
 
     def __init__(self) -> None:
         self.program = ShaderProgram(Shader(_VERTEX, "vertex"), Shader(_FRAGMENT, "fragment"))
+        self.nearest = ShaderProgram(Shader(_NEAREST_VERTEX, "vertex"),
+                                     Shader(_NEAREST_FRAGMENT, "fragment"))
         self.screen = ShaderProgram(Shader(_SCREEN_VERTEX, "vertex"),
                                     Shader(_SCREEN_FRAGMENT, "fragment"))
         self.count = 0
@@ -112,7 +141,34 @@ class PointCloud:
             gl.glBufferData(gl.GL_ARRAY_BUFFER, values.nbytes, values.ctypes.data, gl.GL_STREAM_DRAW)
         self.count = positions.shape[0]
 
-    def draw(self, view_projection: np.ndarray, point_scale: float, width: int, height: int) -> None:
+    def draw(self, view_projection: np.ndarray, point_scale: float, width: int, height: int,
+             nearest: bool = False) -> None:
+        """Draw the points: summed light through the fixed curve, or nearest box in front."""
+        if nearest:
+            self._draw_nearest(view_projection, point_scale, width, height)
+        else:
+            self._draw_glow(view_projection, point_scale, width, height)
+
+    def _draw_nearest(self, view_projection: np.ndarray, point_scale: float, width: int, height: int) -> None:
+        """Opaque squares on the bound framebuffer, depth-tested: the nearest box wins."""
+        gl.glViewport(0, 0, width, height)
+        gl.glClearDepth(1.0)
+        gl.glClear(gl.GL_DEPTH_BUFFER_BIT)
+        gl.glDisable(gl.GL_BLEND)
+        gl.glEnable(gl.GL_DEPTH_TEST)
+        gl.glDepthFunc(gl.GL_LESS)
+        gl.glDepthMask(gl.GL_TRUE)
+        gl.glEnable(gl.GL_PROGRAM_POINT_SIZE)
+        self.nearest.use()
+        self.nearest["view_projection"] = tuple(np.asarray(view_projection, dtype=float).T.ravel())
+        self.nearest["point_scale"] = float(point_scale)
+        gl.glBindVertexArray(self._array)
+        gl.glDrawArrays(gl.GL_POINTS, 0, self.count)
+        gl.glBindVertexArray(0)
+        self.nearest.stop()
+        gl.glDisable(gl.GL_DEPTH_TEST)
+
+    def _draw_glow(self, view_projection: np.ndarray, point_scale: float, width: int, height: int) -> None:
         """Sum every point's light in the float buffer, then show it on the bound framebuffer."""
         shown_on = gl.GLint()
         gl.glGetIntegerv(gl.GL_DRAW_FRAMEBUFFER_BINDING, ctypes.byref(shown_on))

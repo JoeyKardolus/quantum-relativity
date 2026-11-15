@@ -1,10 +1,12 @@
 """Orbit scene: a small blob given sideways speed past a big one, inside the foam; radius, period, Kepler.
 
-Contract: `orbit(cells_per_side=12, boxes_per_cell_side=4, distances=(10.0, 14.0),
+Contract: `orbit(cells_per_side=11, boxes_per_cell_side=4, distances=(8.0, 16.0),
 big_energy=2000.0, big_radius=3.0, small_energy=20.0, small_radius=1.5, steps=120,
 settings=None, device="cuda")` runs one start per distance (blob_start.py): an even
-checkerboard of cells, a big ball of extra energy big_energy in the middle, a small
-ball small_energy at that distance along x, moving along y at the Newtonian circular
+start of wrapped cells, a big ball of extra energy big_energy in the middle, a small
+ball small_energy at that distance along x (energy volumes sit at all-odd cell places,
+so the middle cell is one when cells_per_side is 3, 7, 11, ... and the balls land on
+energy volumes when the distances are whole multiples of two cell sides), moving along y at the Newtonian circular
 speed sqrt(G (M + m) / distance) for G = settings.attraction and the two balls' extra
 energies M, m, the big ball moving the other way so the pair's momentum is 0. Empty
 space holds no boxes, so the blobs move through the foam (bible: the space between
@@ -23,7 +25,12 @@ Returns a dict (no verdict):
               sample, mean_radius, min_radius, max_radius,
               turns (angle swept / 2 pi), period (2 pi / |least-squares angular speed|,
               inf when it does not turn), early_period (the same over the first quarter of
-              the samples, at least 2), kepler (period**2 / mean_radius**3)
+              the samples, at least 2), kepler (period**2 / mean_radius**3),
+              angular_momentum per sample (the small blob's about the big centre:
+              small_energy times the z part of offset x velocity, the velocity the
+              offset's time derivative, central differences, one-sided at the ends; a
+              central pull and frictionless flow keep it), angular_momentum_change
+              (last over first, minus 1; NaN when the first is 0)
   kepler      kepler per distance; Kepler's rule holds when these are equal
   newton_kepler   4 pi**2 / (G (M + m)), the value Newton's pull gives every distance
 """
@@ -45,7 +52,7 @@ TRACK_MARGIN = 3.0
 FOAM_A = 1.0
 
 
-def orbit(cells_per_side: int = 12, boxes_per_cell_side: int = 4, distances: tuple[float, ...] = (10.0, 14.0),
+def orbit(cells_per_side: int = 11, boxes_per_cell_side: int = 4, distances: tuple[float, ...] = (8.0, 16.0),
           big_energy: float = 2000.0,
           big_radius: float = 3.0, small_energy: float = 20.0, small_radius: float = 1.5, steps: int = 120,
           settings: Settings | None = None, device: str = "cuda") -> dict:
@@ -100,13 +107,22 @@ def _summary(times: list[float], measured: list[dict]) -> dict:
     early = max(len(times) // 4, 2)
     period = _period(times, angle)
     mean_radius = float(radius.mean())
+    angular = _angular_momentum(times, offsets, [sample["small_energy"] for sample in measured])
     return {"time": list(times), "radius": radius.tolist(), "angle": angle.tolist(),
             "spread": [sample["spread"] for sample in measured],
             "small_energy": [sample["small_energy"] for sample in measured], "mean_radius": mean_radius,
             "min_radius": float(radius.min()), "max_radius": float(radius.max()),
             "turns": float((angle[-1] - angle[0]) / (2.0 * math.pi)), "period": period,
             "early_period": _period(times[:early], angle[:early]),
-            "kepler": period ** 2 / mean_radius ** 3 if mean_radius > 0 else math.inf}
+            "kepler": period ** 2 / mean_radius ** 3 if mean_radius > 0 else math.inf,
+            "angular_momentum": angular.tolist(),
+            "angular_momentum_change": float(angular[-1] / angular[0] - 1.0) if angular[0] != 0 else math.nan}
+
+
+def _angular_momentum(times: list[float], offsets: np.ndarray, energies: list[float]) -> np.ndarray:
+    """The small blob's angular momentum about the big centre along z, per sample."""
+    velocity = np.gradient(offsets, np.asarray(times, dtype=np.float64), axis=0)
+    return np.asarray(energies, dtype=np.float64) * (offsets[:, 0] * velocity[:, 1] - offsets[:, 1] * velocity[:, 0])
 
 
 def _period(times: list[float], angle: np.ndarray) -> float:

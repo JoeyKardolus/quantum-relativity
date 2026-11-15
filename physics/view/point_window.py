@@ -2,15 +2,18 @@
 
 Contract: `PointWindow(stepper)` opens a resizable pyglet window (vsync off) that, on
 every draw, uploads the stepper's newest snapshot (if any) to a `PointCloud` and
-draws it through an `orbit_camera`. Positions are box centres in box units. On the
-first snapshot and after each reset (a new generation) the view is fitted to the
+draws it through an `orbit_camera`, nearest box in front (the start) or as summed
+glow, as the snapshot's look says. Positions are box centres in box units. On the
+first snapshot, after each reset (a new generation), whenever the occupied boxes
+outgrow the last fit (`view_fit`, REFIT_GROWTH) and on F, the view is fitted to the
 occupied boxes (the snapshot's low and high corners): centre at their middle,
-distance so their widest extent fills about half the view (room for space to grow
-into the empty margin); a box is POINT_BOXES across, which only sets how much a
-fixed-size square is dimmed when boxes pile onto one pixel (`point_cloud.py`). Controls: mouse drag
-rotates, wheel zooms, space starts and pauses, 1 shows only energy volumes,
-2 only joints, 3 both, R resets the source (and the view), Esc quits. The title (`title_line`) refreshes 4 times a
-second. Closing the window stops the stepper. `run(interval)` runs the pyglet loop,
+distance so their widest extent fills about half the view; turning is kept. A box
+is POINT_BOXES across, which sets a box's true size in pixels (`point_cloud.py`).
+Controls: mouse drag rotates, wheel zooms, space starts and pauses, 1 shows only
+energy volumes, 2 only joints, 3 both, G switches nearest / glow, S turns the slice
+through the middle on and off (and turns the camera to face it, looking along z),
+up / down arrows move the slice one box layer, F fits the view, R resets the source
+(and the view), Esc quits. The title (`title_line`) refreshes 4 times a second. Closing the window stops the stepper. `run(interval)` runs the pyglet loop,
 drawing every `interval` seconds (0: as fast as it can).
 """
 from __future__ import annotations
@@ -21,10 +24,11 @@ import numpy as np
 import pyglet
 from pyglet.window import key
 
-from physics.view.box_points import SHOW_BOTH, SHOW_ENERGY_VOLUMES, SHOW_JOINTS
+from physics.view.box_points import GLOW, NEAREST, SHOW_BOTH, SHOW_ENERGY_VOLUMES, SHOW_JOINTS
 from physics.view.orbit_camera import orbit_camera
 from physics.view.point_cloud import PointCloud
 from physics.view.title_line import title_line
+from physics.view.view_fit import view_fit
 
 FOV_DEGREES = 45.0
 TURN_PER_PIXEL = 0.01
@@ -45,6 +49,7 @@ class PointWindow(pyglet.window.Window):
         self.snapshot = None
         self.generation = -1
         self.centre, self.distance = np.zeros(3), 1.0
+        self.fitted_extent = None
         self.yaw, self.pitch = 0.6, 0.35
         self._frames, self._frames_since = 0, time.perf_counter()
         self.frames_per_second = 0.0
@@ -56,8 +61,9 @@ class PointWindow(pyglet.window.Window):
         if snapshot is not None:
             self.cloud.upload(snapshot.positions, snapshot.colours)
             if snapshot.generation != self.generation:
-                self._fit(snapshot.low, snapshot.high)
+                self.fitted_extent = None
                 self.generation = snapshot.generation
+            self._fit(snapshot.low, snapshot.high)
             self.snapshot = snapshot
         width, height = self.get_framebuffer_size()
         pyglet.gl.glViewport(0, 0, width, height)
@@ -66,7 +72,8 @@ class PointWindow(pyglet.window.Window):
         camera = orbit_camera(self.centre, self.distance, self.yaw, self.pitch,
                               width / max(height, 1), FOV_DEGREES)
         focal = 1.0 / np.tan(np.radians(FOV_DEGREES) / 2.0)
-        self.cloud.draw(camera, POINT_BOXES * focal * height / 2.0, width, height)
+        nearest = self.snapshot is not None and self.snapshot.look == NEAREST
+        self.cloud.draw(camera, POINT_BOXES * focal * height / 2.0, width, height, nearest)
         self._count_frame()
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers) -> None:
@@ -79,11 +86,23 @@ class PointWindow(pyglet.window.Window):
         self.distance *= ZOOM_PER_NOTCH ** scroll_y
 
     def on_key_press(self, symbol, modifiers) -> None:
-        """Space starts and pauses, 1 / 2 / 3 show energy volumes / joints / both, R resets, Esc quits."""
+        """Space, 1 / 2 / 3, G, S, up / down, F, R and Esc, as the module contract says."""
         if symbol == key.SPACE:
             self.stepper.toggle_pause()
         elif symbol in _SHOWN_BY_KEY:
             self.stepper.show(_SHOWN_BY_KEY[symbol])
+        elif symbol == key.G:
+            self.stepper.draw_as(GLOW if self.stepper.look == NEAREST else NEAREST)
+        elif symbol == key.S:
+            self.stepper.toggle_slice()
+            if self.stepper.slicing:
+                self.yaw, self.pitch = 0.0, 0.0
+        elif symbol in (key.UP, key.DOWN):
+            self.stepper.move_slice(1 if symbol == key.UP else -1)
+        elif symbol == key.F:
+            self.fitted_extent = None
+            if self.snapshot is not None:
+                self._fit(self.snapshot.low, self.snapshot.high)
         elif symbol == key.R:
             self.stepper.reset()
         elif symbol == key.ESCAPE:
@@ -99,9 +118,10 @@ class PointWindow(pyglet.window.Window):
         pyglet.app.run(interval)
 
     def _fit(self, low: np.ndarray, high: np.ndarray) -> None:
-        extent = max(float(np.max(high - low)), 1.0)
-        self.centre = (np.asarray(low, float) + np.asarray(high, float)) / 2.0
-        self.distance = 1.1 * extent / np.sin(np.radians(FOV_DEGREES) / 2.0)
+        """Fit the camera to the occupied bounds when one is due (`view_fit`)."""
+        fit = view_fit(low, high, FOV_DEGREES, self.fitted_extent)
+        if fit is not None:
+            self.centre, self.distance, self.fitted_extent = fit
 
     def _count_frame(self) -> None:
         self._frames += 1

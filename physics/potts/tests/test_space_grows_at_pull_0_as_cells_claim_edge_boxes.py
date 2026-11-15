@@ -12,7 +12,7 @@ from physics.potts.tests._gpu import needs_gpu
 
 @needs_gpu
 def test_the_occupied_region_grows_by_claiming_edge_boxes():
-    universe = new_universe(6, 4, seed=1, unevenness=0.3)
+    universe = new_universe(7, 4, seed=1, unevenness=0.3)
     settings = Settings.all_on(attraction=0.0)
     for _ in range(60):
         step(universe, settings)

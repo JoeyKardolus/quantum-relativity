@@ -9,7 +9,7 @@ constant for both kinds (a joint is a full cell holding energy like a volume, bi
 import numpy as np
 import pytest
 
-from physics.potts import QUANTUM, new_universe, uneven_field
+from physics.potts import new_universe, uneven_field
 from physics.potts.tests._gpu import needs_gpu
 
 
@@ -40,7 +40,7 @@ def test_the_start_is_the_uneven_field_in_the_filled_cube():
     cells, boxes, unevenness = 4, 4, 0.3
     universe = new_universe(cells, boxes, seed=2, unevenness=unevenness)
     owner = universe.owner.numpy()
-    energy = universe.energy.numpy() * QUANTUM
+    energy = (universe.psi.numpy() ** 2).sum(axis=-1)
     filled = cells * boxes
     low = (universe.side - filled) // 2
     inner = (slice(low, low + filled),) * 3

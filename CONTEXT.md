@@ -27,9 +27,6 @@ The core depth/seam vocabulary used by `improve-codebase-architecture`, `tdd`, `
 - **depth**: leverage at the interface. _Avoid_: thickness, size.
 - **deep**: small interface, lots of behaviour behind it.
 - **shallow**: interface nearly as complex as the implementation. _Avoid_: thin, anaemic.
-- **volume split**: an energy volume grown too big tearing apart, the tear becoming a new joint; the mirror of joint collapse and the only way new volumes and joints appear. _Avoid_: division, creation, spawning.
-- **Planck box**: one of the fixed, smallest units of space in the engine's grid; boxes never move or stretch, energy flows through them as a fluid, and every cell (energy volume or joint) is a group of them, its size being how many it holds. _Avoid_: voxel, pixel, cell (a cell is a group of Planck boxes).
-- **seam**: a place where joints meet in the joint web; energy leaks from one energy volume to the next through the joints and along the seams, less the more the joints are squeezed, and not at all past the seal point. _Avoid_: channel, pore, edge, Plateau border.
 - **adapter**: concrete thing satisfying an interface at a seam. _Avoid_: impl, plugin.
 - **port**: interface defined for cross-seam dependencies.
 - **leverage**: what callers get from depth. _Avoid_: reuse.
@@ -45,14 +42,18 @@ The core depth/seam vocabulary used by `improve-codebase-architecture`, `tdd`, `
 
 - **quantum-relativity theory**: the owner's hobby theory that space, matter and forces all come from one woven grid of energy volumes and joints. Rules in `docs/bible.md#physicsquantum-relativity`. _Avoid_: connection theory (its earlier name, which covered only the network), string theory, theory of everything, the model.
 - **joint**: a B in the ABAB structure: a cell of energy that pushes, harder the more it is squeezed below the size its energy wants, and collapses past its limit; joints wrap every energy volume completely and touch each other, forming one connected web. _Avoid_: node, vertex, point, wall, layer, B volume.
-- **connection**: the pull between two neighbouring energy volumes, through the joint between them; it has no volume of its own. _Avoid_: edge, link, string, bond.
+- **connection**: two neighbouring energy volumes and the joints between them, seen as one relation; it has no volume of its own, and the pull does not run along it but spreads through all space. _Avoid_: edge, link, string, bond.
 - **drift**: the growth of energy volumes that lose energy through the leak to harder-pulling neighbours; not a separate rule. _Avoid_: dark energy (that is what drift may explain), inflation, stretch.
 - **ABAB structure**: the owner's foundation: energy volumes (A) each fully wrapped in joints (B), so no energy volume ever touches another, not even at an edge or corner, while the joints form one connected web; the start is an actual grid, made uneven by energy. _Avoid_: lattice, crystal, network, checkerboard.
-- **energy volume**: an A in the ABAB structure: a volume of energy that pulls on nearby energy volumes; its size is set by its energy (more energy, smaller); it touches only joints. _Avoid_: mass, cell, tetrahedron, region, A volume.
-- **joint collapse**: a joint giving way when the squeeze on it passes its limit, so the two energy volumes it separated fall into each other, keeping their energy; the network's version of gravitational collapse. _Avoid_: black hole (what collapse may produce, not the rule), merge, implosion.
+- **energy volume**: an A in the ABAB structure: a volume of energy that pulls on nearby energy volumes; its size is set by its energy (more energy, smaller); it touches only joints. _Avoid_: mass, cell for an energy volume alone (a cell is either kind), tetrahedron, region, A volume.
+- **joint collapse**: a joint giving way when the squeeze on it passes its limit, so the two energy volumes it separated fall into each other, keeping their energy; the grid's version of gravitational collapse. _Avoid_: black hole (what collapse may produce, not the rule), merge, implosion.
 - **energy event**: a particle (electron, proton) seen as a pattern of energy travelling through the grid, not a structure of its own; far bigger than one energy volume. _Avoid_: particle as a thing, ball, structure.
-- **position**: where a volume is in the simulation; the rules move it (pull through joints, joint push, links that bend but never stretch), and the drawing shows it as it is. _Avoid_: map position (the earlier idea that positions decide nothing), layout, coordinate.
-- **reference spacetime**: a network built from points scattered in a flat space or spacetime whose true dimension and proper times are known; used to validate a measurement before it is trusted. _Avoid_: test grid, ground truth, toy universe.
+- **centre**: where a volume's boxes are, on average (its boxes' summed places over its box count); it follows the volume's deforming and never moves on its own. _Avoid_: position (a volume does not travel), map position, layout, coordinate.
+- **reference spacetime**: a known start whose true dimension and proper times are known, used to validate a measurement before it is trusted; the earlier point-scattered ones were removed with the milestone code and must be rebuilt on Planck boxes. _Avoid_: test grid, ground truth, toy universe.
+- **Planck box**: one of the fixed, smallest units of space in the engine's grid; boxes never move or stretch, each holds one complex number of the quantum energy fluid, and every cell (energy volume or joint) is a group of them, its size being how many it holds. _Avoid_: voxel, pixel, cell (a cell is a group of Planck boxes).
+- **seam**: a place where two joints touch in the joint web; energy enters or leaves a joint only there, never through its middle, less the more the joint is squeezed, and not at all past the seal point. Not the architecture seam above. _Avoid_: channel, pore, edge, wall, Plateau border.
+- **volume split**: an energy volume grown too big tearing apart, the tear becoming new joints; the mirror of joint collapse and the only way new volumes and joints appear. _Avoid_: division, creation, spawning.
+- **whirl**: a quantised whirlpool in the energy fluid, turning only in whole steps; the candidate for spin, which is an unbreakable whirl. _Avoid_: vortex, eddy, swirl.
 
 ## Project vocabulary
 

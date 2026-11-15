@@ -2,7 +2,7 @@
 
 Contract: `cell_sums(universe, settings)` rewrites, on the GPU, over the active region,
 for every cell:
-  cell_energy     its boxes' energy (int64 quanta, exact)
+  cell_energy     its boxes' energy, the sum of |psi|**2 (float64)
   cell_boxes      its box count: its size (bible, "How the engine holds the foam")
   cell_place      its boxes' summed indices (int64, cell_count * 3): its centre is
                   cell_place / cell_boxes
@@ -16,8 +16,9 @@ for every cell:
   cell_clock      (s + 1) / (s + q), s = clock_scale, q its energy per box over the
                   start's mean per box (rest): the more packed, the slower (bible: time
                   is local, joints included)
-A dead or empty cell keeps zeros and clock 1. Integer sums are exact; the potential and
-heat sums are float atomics, so their last bits depend on the order threads ran.
+A dead or empty cell keeps zeros and clock 1. The box counts and places are exact
+integers; the energy, potential and heat sums are float atomics, so their last bits
+depend on the order threads ran.
 Returns None.
 """
 from __future__ import annotations
@@ -25,17 +26,17 @@ from __future__ import annotations
 import warp as wp
 
 from physics.potts.settings import Settings
-from physics.potts.universe import QUANTUM, Universe
+from physics.potts.universe import Universe
 
-_QUANTUM = wp.constant(QUANTUM)
+_FLOOR = wp.constant(1.0e-12)
 
 
 @wp.kernel
-def _clear(cell_energy: wp.array(dtype=wp.int64), cell_boxes: wp.array(dtype=wp.int32),
+def _clear(cell_energy: wp.array(dtype=wp.float64), cell_boxes: wp.array(dtype=wp.int32),
            cell_potential: wp.array(dtype=wp.float32), cell_heat: wp.array(dtype=wp.float32),
            cell_place: wp.array(dtype=wp.int64)):
     cell = wp.tid()
-    cell_energy[cell] = wp.int64(0)
+    cell_energy[cell] = wp.float64(0.0)
     cell_boxes[cell] = 0
     cell_potential[cell] = 0.0
     cell_heat[cell] = 0.0
@@ -44,9 +45,9 @@ def _clear(cell_energy: wp.array(dtype=wp.int64), cell_boxes: wp.array(dtype=wp.
 
 
 @wp.kernel
-def _gather(owner: wp.array3d(dtype=wp.int32), energy: wp.array3d(dtype=wp.int64),
-            potential: wp.array3d(dtype=wp.float32), heat: wp.array3d(dtype=wp.float32), low: wp.vec3i,
-            cell_energy: wp.array(dtype=wp.int64), cell_boxes: wp.array(dtype=wp.int32),
+def _gather(owner: wp.array3d(dtype=wp.int32), psi: wp.array3d(dtype=wp.vec2d),
+            potential: wp.array3d(dtype=wp.float32), heat: wp.array3d(dtype=wp.float64), low: wp.vec3i,
+            cell_energy: wp.array(dtype=wp.float64), cell_boxes: wp.array(dtype=wp.int32),
             cell_potential: wp.array(dtype=wp.float32), cell_heat: wp.array(dtype=wp.float32),
             cell_place: wp.array(dtype=wp.int64)):
     ti, tj, tk = wp.tid()
@@ -56,17 +57,17 @@ def _gather(owner: wp.array3d(dtype=wp.int32), energy: wp.array3d(dtype=wp.int64
     cell = owner[i, j, k]
     if cell < 0:
         return
-    wp.atomic_add(cell_energy, cell, energy[i, j, k])
+    wp.atomic_add(cell_energy, cell, wp.dot(psi[i, j, k], psi[i, j, k]))
     wp.atomic_add(cell_boxes, cell, 1)
     wp.atomic_add(cell_potential, cell, potential[i, j, k])
-    wp.atomic_add(cell_heat, cell, heat[i, j, k])
+    wp.atomic_add(cell_heat, cell, float(heat[i, j, k]))
     wp.atomic_add(cell_place, 3 * cell, wp.int64(i))
     wp.atomic_add(cell_place, 3 * cell + 1, wp.int64(j))
     wp.atomic_add(cell_place, 3 * cell + 2, wp.int64(k))
 
 
 @wp.kernel
-def _derive(labels: wp.array(dtype=wp.float32), cell_energy: wp.array(dtype=wp.int64),
+def _derive(labels: wp.array(dtype=wp.float32), cell_energy: wp.array(dtype=wp.float64),
             cell_boxes: wp.array(dtype=wp.int32), cell_potential: wp.array(dtype=wp.float32), cell_rest: float,
             rest: float, base_boxes: float, size_power: float, clock_scale: float,
             cell_want: wp.array(dtype=wp.float32), cell_compression: wp.array(dtype=wp.float32),
@@ -79,7 +80,7 @@ def _derive(labels: wp.array(dtype=wp.float32), cell_energy: wp.array(dtype=wp.i
         cell_clock[cell] = 1.0
         cell_potential_mean[cell] = 0.0
         return
-    held = wp.max(float(cell_energy[cell]) * _QUANTUM, _QUANTUM)
+    held = wp.max(float(cell_energy[cell]), _FLOOR)
     count = wp.max(labels[cell], 1.0e-6)
     want = count * base_boxes * wp.pow(count * cell_rest / held, size_power)
     cell_want[cell] = want
@@ -97,7 +98,7 @@ def cell_sums(universe: Universe, settings: Settings) -> None:
               inputs=[universe.cell_energy, universe.cell_boxes, universe.cell_potential, universe.cell_heat,
                       universe.cell_place])
     wp.launch(_gather, dim=dims, device=device,
-              inputs=[universe.owner, universe.energy, universe.potential, universe.heat, wp.vec3i(*universe.low),
+              inputs=[universe.owner, universe.psi, universe.potential, universe.heat, wp.vec3i(*universe.low),
                       universe.cell_energy, universe.cell_boxes, universe.cell_potential, universe.cell_heat,
                       universe.cell_place])
     wp.launch(_derive, dim=universe.cell_count, device=device,

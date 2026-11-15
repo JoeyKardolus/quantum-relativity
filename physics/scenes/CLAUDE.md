@@ -10,16 +10,19 @@ scene builds a start, runs the cell engine (`physics.potts`) and returns measure
   there is one (Kepler's 4 pi^2 / GM, the Hubble 73.5 / 67.4). No pass/fail, no threshold,
   and never change a default setting, seed or start to make a scene look better; report it.
 - **Only the engine's public face**: `new_universe`, `step`, `stats`, `Settings`,
-  `cell_sums`, `contact_pairs` and `Universe.from_host` for placed blobs (`blob_start.py`);
-  read only the Universe fields its contract lists (owner, energy, kind, labels, cell sums,
-  rest_a). The engine's rules change under these scenes; its kernels must not be reached into.
+  `cell_sums`, `contact_pairs` and `Universe.from_host` (with `phase`) for placed blobs and
+  whirls; read only the Universe fields its contract lists (owner, psi through
+  `wave_field.py`, kind, alive, labels, cell sums, rest_a). Energy per box is |psi|^2 and
+  flow is the phase's gradient (blob_start sets velocity as phase). Measures come from
+  `physics.measure`, validated there. Kernels must not be reached into.
 - **All rules on.** Scenes take `settings` (default `Settings.all_on()`); a rule switched off
   is only for a side-by-side run.
 - **Box units.** Planck boxes are fixed; cells claim or give up boxes, so the occupied box
   count is the size of space and an energy radius says where the energy is.
-- **Placed blobs** (orbit, black hole) break "nothing placed by hand" on purpose: those two
-  test one mechanism. A blob is extra energy in an even checkerboard, never a ball in empty
-  space (empty space has no boxes to flow through). The other scenes start from
+- **Placed starts** (orbit, black hole, isotropy, spin) break "nothing placed by hand" on
+  purpose: each tests one mechanism. A blob is extra energy in an even start, never a ball in empty
+  space (empty space has no boxes to flow through). A blob must cover energy-volume boxes, and
+  those sit only at all-odd cell places (orbit's defaults are chosen for that). The other scenes start from
   `new_universe`'s uneven field only.
 - **Small and quick**: defaults are grids of 56 to 64 boxes a side. Tests run every scene on
   4 or 6 cells of 4 boxes and check only that the numbers are finite.

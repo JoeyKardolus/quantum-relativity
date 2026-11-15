@@ -21,7 +21,7 @@ import math
 
 import numpy as np
 
-from physics.potts import ENERGY_VOLUME, JOINT, QUANTUM, Settings, Universe, cell_sums, contact_pairs
+from physics.potts import ENERGY_VOLUME, JOINT, Settings, Universe, cell_sums, contact_pairs
 
 
 def sealed_region(universe: Universe, settings: Settings) -> dict:
@@ -30,7 +30,7 @@ def sealed_region(universe: Universe, settings: Settings) -> dict:
     owner = universe.owner.numpy()
     kind = universe.kind.numpy()
     boxes = universe.cell_boxes.numpy()
-    held = universe.cell_energy.numpy() * QUANTUM
+    held = universe.cell_energy.numpy().astype(np.float64)
     volumes = (universe.alive.numpy() == 1) & (boxes > 0) & (kind == ENERGY_VOLUME)
     core = int(np.argmax(np.where(volumes, held / np.maximum(boxes, 1), -1.0)))
     low, high, _ = contact_pairs(owner)
