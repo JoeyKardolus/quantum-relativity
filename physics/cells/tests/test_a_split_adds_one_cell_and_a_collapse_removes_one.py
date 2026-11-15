@@ -7,7 +7,7 @@ from dataclasses import replace
 
 import numpy as np
 
-from physics.cells import (EngineSettings, cell_volumes, engine_stats, joint_rest, new_engine,
+from physics.cells import (EngineSettings, cell_volumes, engine_stats, joint_push, joint_rest, new_engine,
                            step)
 
 
@@ -35,6 +35,7 @@ def test_one_thin_cell_splits_into_two_with_a_new_joint_at_rest_between_them():
 
 
 def test_one_joint_below_its_limit_collapses_its_two_cells_into_one():
+    """The joint is held at a tenth of rest, its rate cancelling the steep push back for one step."""
     engine = new_engine(200, 6, 0.5)
     grid = engine.grid
     settings = EngineSettings.all_on(leak=0.0, split_threshold=0.0)
@@ -42,9 +43,12 @@ def test_one_joint_below_its_limit_collapses_its_two_cells_into_one():
     chosen = int(np.argmax(grid.thickness / rest))
     thickness = grid.thickness.copy()
     thickness[chosen] = 0.1 * rest[chosen]
+    rate = grid.rate.copy()
+    rate[chosen] = -joint_push(thickness[[chosen]], rest[[chosen]], settings.joint_push,
+                               settings.push_power)[0]
     first, second = grid.joints[chosen]
     common = (_neighbours(grid.joints, first) & _neighbours(grid.joints, second))
-    after = step(replace(engine, grid=replace(grid, thickness=thickness)), settings)
+    after = step(replace(engine, grid=replace(grid, thickness=thickness, rate=rate)), settings)
     assert after.collapses == 1 and after.grid.cell_count == grid.cell_count - 1
     assert len(after.grid.joints) == len(grid.joints) - 1 - len(common)
     assert np.isclose(after.grid.energy.max(), max(after.grid.energy.max(),

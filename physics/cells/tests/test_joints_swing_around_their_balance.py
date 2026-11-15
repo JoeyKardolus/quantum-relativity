@@ -1,19 +1,20 @@
 """Joints oscillate: no damping, so they overshoot and keep swinging around their balance (rule 5)."""
 import numpy as np
+import pytest
 
 from physics.cells import EngineSettings, joint_balance, new_engine, step, swing_joints
 
 
-def test_a_steady_joint_spring_keeps_its_swing_for_a_thousand_steps():
+@pytest.mark.parametrize("power", [-1.0, 3.0])
+def test_a_steady_joint_spring_keeps_its_swing_for_a_thousand_steps(power):
     thickness, rate = np.array([1.2]), np.array([0.0])
     rest, squeeze = np.array([1.5]), np.array([0.05])
-    balance = 0.1 * 1.5 / (0.1 + 0.05)
     seen = []
     for _ in range(1000):
-        thickness, rate = swing_joints(thickness, rate, rest, squeeze, 0.1)
-        seen.append(thickness[0] - balance)
-    late = np.abs(seen[-100:]).max()
-    early = np.abs(seen[:100]).max()
+        thickness, rate = swing_joints(thickness, rate, rest, squeeze, 0.1, power)
+        seen.append(thickness[0])
+    late = np.ptp(seen[-100:])
+    early = np.ptp(seen[:100])
     assert 0.9 < late / early < 1.1
 
 

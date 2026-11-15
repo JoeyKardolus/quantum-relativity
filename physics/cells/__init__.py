@@ -20,6 +20,7 @@ Module map:
                         thickness, rate, squeeze; seams; no shapes, no coordinates
   rest_volume.py        rest_volume: the energy-volume rule, volume = (VOLUME_SCALE / E) ** 3
   joint_rest.py         joint_rest: a joint's rest thickness, a share of its volumes' length
+  joint_push.py         joint_push: a joint's push toward rest, steep as it thins
   joint_balance.py      joint_balance: the thickness where push cancels squeeze
   joint_squeeze.py      joint_squeeze: 0..1 how close each joint is to its limit (its push)
   swing_joints.py       swing_joints: one undamped spring step of every joint
@@ -45,6 +46,7 @@ from physics.cells.rest_volume import VOLUME_SCALE, rest_volume
 from physics.cells.joint_rest import joint_rest
 from physics.cells.engine_settings import EngineSettings
 from physics.cells.pull_potential import pull_potential
+from physics.cells.joint_push import joint_push
 from physics.cells.joint_balance import joint_balance
 from physics.cells.joint_squeeze import joint_squeeze
 from physics.cells.swing_joints import swing_joints
@@ -72,7 +74,7 @@ from physics.cells.mesh_message import mesh_message
 from physics.cells.frame_arrays import frame_arrays
 
 __all__ = ["Grid", "VOLUME_SCALE", "rest_volume", "joint_rest", "EngineSettings", "pull_potential",
-           "joint_balance", "joint_squeeze", "swing_joints", "seam_joints", "seam_openness", "leak",
+           "joint_push", "joint_balance", "joint_squeeze", "swing_joints", "seam_joints", "seam_openness", "leak",
            "Fan", "build_fan", "cell_volumes", "face_areas", "cell_targets", "relax_corners",
            "first_mesh", "face_joints", "mesh_seams", "collapse_cells", "split_cell",
            "drop_loose_corners", "Engine", "new_engine", "step", "lumps", "engine_stats",

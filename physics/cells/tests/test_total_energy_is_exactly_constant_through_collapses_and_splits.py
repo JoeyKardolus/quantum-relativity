@@ -5,8 +5,10 @@ from physics.cells import EngineSettings, new_engine, step
 
 
 def test_total_energy_stays_constant_over_200_steps_with_collapses_and_splits():
+    """Pull at three times its default: at the default this start splits drained volumes until the
+    pull potential fails (step 28) before any collapse."""
     engine = new_engine(200, 3, 0.5)
-    settings = EngineSettings.all_on(split_threshold=0.3)
+    settings = EngineSettings.all_on(split_threshold=0.3, attraction=0.015)
     start = engine.grid.total_energy()
     for _ in range(200):
         engine = step(engine, settings)

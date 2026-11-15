@@ -5,6 +5,7 @@ old one as it was. Deterministic: the same engine and settings give the same res
   1. pull      p = pull_potential(grid); each energy volume exerts attraction * p / 2
                (Grid.pull); joint (a, b) feels squeeze s = pull_a + pull_b (rule 7)
   2. swing     every joint swings one step under push and squeeze (swing_joints.py,
+               the push steep as a joint thins, joint_push.py;
                rest thickness from the cells' measured volumes at the start); no
                damping (rule 5)
   3. leak      energy leaks along seams as open as the joints at the start of the step
@@ -77,7 +78,7 @@ def step(engine: Engine, settings: EngineSettings) -> Engine:
     heads, tails = grid.joints[:, 0], grid.joints[:, 1]
     rest = joint_rest(grid.volume, grid.joints, settings.joint_rest)
     thickness, rate = swing_joints(grid.thickness, grid.rate, rest, exerted[heads] + exerted[tails],
-                                   settings.joint_push)
+                                   settings.joint_push, settings.push_power)
     energy = leak(grid.joints, grid.seams, grid.energy, exerted,
                   seam_openness(grid, settings), settings.leak)
     mesh = _Mesh(corners=engine.corners, faces=list(engine.faces), face_cells=engine.face_cells,
