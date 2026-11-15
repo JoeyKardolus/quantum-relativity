@@ -490,8 +490,8 @@ function redraw() {
   writeJointTable(mesh.wallTable, scene3d.walls.geometry);
   writeJointTable(mesh.jointEdgeTable, scene3d.jointLines.geometry);
   if (view.fill) writeFill();
-  scene3d.cellLines.visible = scene3d.jointLines.visible = scene3d.walls.visible = true;
-  scene3d.cells.visible = view.fill;
+  scene3d.cellLines.visible = scene3d.jointLines.visible = true;
+  scene3d.cells.visible = scene3d.walls.visible = view.fill;   // owner: wireframe only unless "fill cells" is on
   const reach = 0.5 * Math.hypot(box[1][0] - box[0][0], box[1][1] - box[0][1], box[1][2] - box[0][2]);
   if (orbit.follow) orbit.centre = [0, 1, 2].map((axis) => (box[0][axis] + box[1][axis]) / 2);
   orbit.reach = Math.max(reach, 1e-6);
