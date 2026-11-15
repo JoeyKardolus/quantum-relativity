@@ -1,4 +1,8 @@
-"""The pull potential of a single blob of A falls like -G M / r outside it, within 5%."""
+"""The pull potential of a single blob of A falls like -G M / r outside it, within 5%.
+
+The active region is widened to the whole grid first, so the solve covers the empty
+space the test measures in (a step solves only round the occupied boxes, pull.py).
+"""
 import numpy as np
 
 from physics.potts import ENERGY_VOLUME, QUANTUM, Settings, Universe, cell_sums, pull
@@ -13,6 +17,7 @@ def test_the_potential_outside_a_blob_is_minus_g_m_over_r():
     inside = distance <= radius
     owner = np.where(inside, 0, -1)
     universe = Universe.from_host(owner, np.where(inside, 1.0, 0.0), np.array([ENERGY_VOLUME]), 2, seed=1)
+    universe.low, universe.high = (0, 0, 0), (side, side, side)
     settings = Settings.all_on(potential_cycles=12)
     cell_sums(universe, settings)
     pull(universe, settings)

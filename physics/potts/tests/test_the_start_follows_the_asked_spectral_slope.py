@@ -2,14 +2,14 @@
 
 The uneven field's shell-averaged power spectrum, fitted as a power law over every
 wavenumber from 1 to side / 2 (each shell weighted by its mode count), has the asked
-slope within 10%; new_universe's log energy over the filled cube is that field plus a
-constant per kind, with the mean A box at 1 and a B box JOINT_SHARE times its field.
+slope within 10%; new_universe's log energy over the filled cube is that field plus one
+constant for both kinds (a joint is a full cell holding energy like a volume, bible rule
+8), with the mean box at 1.
 """
 import numpy as np
 import pytest
 
-from physics.potts import JOINT, QUANTUM, new_universe, uneven_field
-from physics.potts.new_universe import JOINT_SHARE
+from physics.potts import QUANTUM, new_universe, uneven_field
 from physics.potts.tests._gpu import needs_gpu
 
 
@@ -45,8 +45,6 @@ def test_the_start_is_the_uneven_field_in_the_filled_cube():
     low = (universe.side - filled) // 2
     inner = (slice(low, low + filled),) * 3
     assert np.all(owner[inner] >= 0) and energy.sum() == pytest.approx(energy[inner].sum())
-    joint = universe.kind.numpy()[owner[inner]] == JOINT
     field = uneven_field(filled, 2, -3.0, unevenness)
-    log_energy = np.log(np.where(joint, energy[inner] / JOINT_SHARE, energy[inner]))
-    assert (log_energy - field).std() < 1e-6
-    assert energy[inner][~joint].mean() == pytest.approx(1.0, rel=1e-6)
+    assert (np.log(energy[inner]) - field).std() < 1e-6
+    assert energy[inner].mean() == pytest.approx(1.0, rel=1e-6)

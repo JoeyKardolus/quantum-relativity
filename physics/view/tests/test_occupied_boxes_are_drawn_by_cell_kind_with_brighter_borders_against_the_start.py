@@ -71,7 +71,7 @@ class _PackingSource:
 
 def test_each_occupied_box_is_drawn_at_its_centre_in_its_cell_kind_colour():
     gathered = BoxPoints().boxes(_view([[1.5, 2.5, 3.5], [4.5, 0.5, 5.5]], [4.0, 4.0],
-                                       [ENERGY_VOLUME, JOINT], [0, 0]), np.array([1.0, 2.0]))
+                                       [ENERGY_VOLUME, JOINT], [0, 0]), np.array([1.0, 1.0, 2.0]))
     found = {tuple(position): tuple(colour[:3]) for position, colour
              in zip(gathered.positions.tolist(), gathered.colours.tolist())}
     assert found == {(1.5, 2.5, 3.5): RED, (4.5, 0.5, 5.5): BLUE}
@@ -82,7 +82,7 @@ def test_three_vector_positions_are_read_like_rows():
     rows = _view([[1.5, 2.5, 3.5]], [2.0], [JOINT], [1])
     vectors = SimpleNamespace(**{**vars(rows), "positions": wp.array([wp.vec3(1.5, 2.5, 3.5)],
                                                                      dtype=wp.vec3, device="cpu")})
-    first, second = (BoxPoints().boxes(view, np.array([1.0, 1.0])) for view in (rows, vectors))
+    first, second = (BoxPoints().boxes(view, np.array([1.0, 1.0, 1.0])) for view in (rows, vectors))
     assert np.array_equal(first.positions, second.positions)
     assert np.array_equal(first.colours, second.colours)
 
@@ -90,8 +90,8 @@ def test_three_vector_positions_are_read_like_rows():
 def test_an_even_universe_sums_to_the_average_glow_along_a_line_of_sight():
     side = 20
     view = _cube(side, density=0.5)
-    reference = start_reference(view.density)
-    assert np.allclose(reference, [0.5, side])
+    reference = start_reference(view.density, view.kind)
+    assert np.allclose(reference, [0.5, 1.0, side])
     gathered = BoxPoints().boxes(view, reference)
     assert len(gathered.positions) == side ** 3
     assert abs(_light(gathered.colours).sum() / side ** 2 / AVERAGE_GLOW - 1.0) < 0.05
@@ -99,23 +99,23 @@ def test_an_even_universe_sums_to_the_average_glow_along_a_line_of_sight():
 
 def test_a_border_box_is_brighter_by_the_border_gain_on_the_same_scale():
     view = _view([[0.5, 0.5, 0.5], [1.5, 0.5, 0.5]], [3.0, 3.0], [JOINT, JOINT], [0, 1])
-    inner, border = _light(BoxPoints().boxes(view, np.array([1.0, 8.0])).colours)
+    inner, border = _light(BoxPoints().boxes(view, np.array([1.0, 1.0, 8.0])).colours)
     assert abs(inner / _expected(3.0, 8.0) - 1.0) < 0.05
     assert abs(border / inner / BORDER_GAIN - 1.0) < 0.1
 
 
 def test_past_the_cap_boxes_are_thinned_fairly(monkeypatch):
     view = _cube(20, density=4.0)
-    full = _light(BoxPoints().boxes(view, np.array([1.0, 20.0])).colours).sum()
+    full = _light(BoxPoints().boxes(view, np.array([1.0, 1.0, 20.0])).colours).sum()
     monkeypatch.setattr(box_points, "MOST_POINTS", 1000)
-    thinned = BoxPoints().boxes(view, np.array([1.0, 20.0]))
+    thinned = BoxPoints().boxes(view, np.array([1.0, 1.0, 20.0]))
     assert 850 < len(thinned.positions) <= 1000
     assert abs(_light(thinned.colours).sum() / full - 1.0) < 0.15
 
 
 def test_negative_density_is_counted_and_drawn_dark():
     gathered = BoxPoints().boxes(_view([[0.5, 0.5, 0.5]], [-1.0], [ENERGY_VOLUME], [0]),
-                                 np.array([1.0, 1.0]))
+                                 np.array([1.0, 1.0, 1.0]))
     assert gathered.negative == 1 and len(gathered.positions) == 0
 
 
@@ -125,13 +125,13 @@ def test_negative_density_is_counted_and_drawn_dark():
 def test_a_broken_box_stops_the_frame(change, message):
     fields = {"positions": [[0.5, 0.5, 0.5]], "density": [1.0], "kind": [JOINT], "border": [0]}
     with pytest.raises(ValueError, match=message):
-        BoxPoints().boxes(_view(**{**fields, **change}), np.array([1.0, 1.0]))
+        BoxPoints().boxes(_view(**{**fields, **change}), np.array([1.0, 1.0, 1.0]))
 
 
 def test_arrays_of_different_lengths_are_refused():
     view = _view([[0.5, 0.5, 0.5]], [1.0, 2.0], [JOINT, JOINT], [0, 0])
     with pytest.raises(ValueError, match="positions"):
-        BoxPoints().boxes(view, np.array([1.0, 1.0]))
+        BoxPoints().boxes(view, np.array([1.0, 1.0, 1.0]))
 
 
 def test_a_packing_box_lights_up_against_a_reference_that_never_moves():

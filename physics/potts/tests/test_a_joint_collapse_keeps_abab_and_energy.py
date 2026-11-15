@@ -4,14 +4,15 @@ In an even checkerboard one inner joint keeps a thousandth of its energy (the re
 moved, exactly, into a neighbouring energy volume's box), so it wants a billion times
 its boxes: squeezed far past the collapse limit. The collapse is run directly, after
 the cell sums: the joint is gone, its six energy volumes are one, nothing like touches
-like, every cell is one piece, and not one quantum was lost; 5 steps later ABAB and
+like, every cell is one piece, the contact table (worked out from the old one) equals
+a recount from the boxes, and not one quantum was lost; 5 steps later ABAB and
 the energy still hold.
 """
 import numpy as np
 
 from physics.potts import Settings, cell_sums, contact_pairs, joint_collapse, stats, step
 from physics.potts.tests._gpu import needs_gpu
-from physics.potts.tests._start import cell_id, connected_everywhere, even_universe
+from physics.potts.tests._start import cell_id, connected_everywhere, even_universe, table_matches_boxes
 
 
 @needs_gpu
@@ -45,6 +46,7 @@ def test_a_collapsed_joint_leaves_one_energy_volume_and_abab():
     kinds = universe.kind.numpy()
     assert np.all(kinds[low] != kinds[high])
     assert connected_everywhere(owner, np.flatnonzero(alive == 1))
+    assert table_matches_boxes(universe)
     for _ in range(5):
         step(universe, settings)
     later = stats(universe, settings)

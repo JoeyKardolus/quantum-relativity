@@ -1,21 +1,20 @@
 # physics/view/
 
-The only viewer: a pyglet GPU window of the Planck-box engine (`physics.potts`) as soft
-additive points. Module map in `__init__.py`.
+The only viewer: a pyglet GPU window of the Planck-box engine (`physics.potts`) as small
+additive squares. Module map in `__init__.py`.
 
 ## Must not get wrong
 
-- **Draw the simulation as it is.** A point per occupied Planck box at its centre in box units;
-  empty boxes are never drawn. Red = the box's cell is an energy volume (A), blue = a joint (B);
-  border boxes (touching another cell) get `BORDER_GAIN` (2x) light so the checkerboard of
-  cells shows. Past `MOST_POINTS` (3M) one uniform share is kept (light / share), never by
-  order or rank. No layout, no link lines (`box_points.py`).
-- **Light is a fixed contrast scale** (`opacity.py`, a Warp function, the only copy): log-linear
-  in a box's density over the start's mean density (`start_reference.py`, taken at start and on
-  reset, then held, with boxes deep = cube root of the start's occupied boxes), 1 at 16x, and
-  at 1x only `AVERAGE_GLOW` / boxes deep, so a line of sight of
-  average boxes sums to 0.02: an even universe is black, thinner than average is nothing. Never
-  rank-based or re-normalised per frame, or growth of structure would never show. Tests pin it.
+- **Draw the simulation as it is.** A hard square of `SQUARE_PIXELS` (3) per occupied Planck
+  box at its centre, the same size at every zoom (owner: never round blurred dots); empty boxes
+  never drawn. Red = energy volume (A), blue = joint (B); border boxes get `BORDER_GAIN` (2x)
+  so cells read as cells. Keys 1 / 2 / 3: energy volumes / joints / both. Past `MOST_POINTS`
+  (3M) shown boxes one uniform share is kept (light / share). No link lines (`box_points.py`).
+- **Light is a fixed contrast scale per kind** (`opacity.py`, the only copy): log-linear in a
+  box's density over its own kind's start mean (`start_reference.py`, held from start or reset;
+  boxes deep = cube root of the start's occupied boxes), 1 at 16x, `AVERAGE_GLOW` / boxes deep
+  at 1x: an even universe is black, red and blue alike. Never rank-based or re-normalised per
+  frame, or growth of structure would never show. Tests pin it.
 - **Light is summed in a half-float buffer, shown through 1 - exp(-sum)** (`point_cloud.py`).
   An 8-bit screen rounds 1e-4 light to 0; the uint8 alpha carries light as a log byte
   (`light_code.py`). Additive, depth write off: order-free.
@@ -45,4 +44,4 @@ codes to 0 are not drawn.
 PYTHONPATH=. .venv/bin/python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame F]
 PYTHONPATH=. .venv/bin/pytest -q physics/view
 ```
-Starts paused: space starts and pauses, drag rotates, wheel zooms, R resets, Esc quits.
+Starts paused: space starts and pauses, 1 / 2 / 3 show A / B / both, drag rotates, wheel zooms, R resets, Esc quits.

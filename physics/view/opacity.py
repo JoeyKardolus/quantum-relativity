@@ -3,7 +3,7 @@
 Contract: `opacity(contrast, boxes_deep)` is a Warp function (callable inside a Warp
 kernel, on any device) returning a float32 in [0, 1], the light one box adds to
 the pixels its dot covers (drawn additively, so light from boxes behind each other
-sums). contrast is a box's energy density over the start's mean density
+sums). contrast is a box's energy density over the start's mean density of its own kind
 (`start_reference.py`; Planck boxes are all one size, so this is a ratio of
 energies); boxes_deep is the expected number of boxes along one line of sight
 (the cube root of the start's occupied box count). The scale is fixed and log-linear: the log of the opacity is linear in

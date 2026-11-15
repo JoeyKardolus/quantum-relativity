@@ -1,11 +1,13 @@
-"""The viewer: the Planck-box engine in a GPU window, drawn as soft additive points (the only viewer).
+"""The viewer: the Planck-box engine in a GPU window, drawn as small additive squares (the only viewer).
 
 `python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame F]`.
-Every occupied Planck box is a soft point of light at its centre: red in an
-energy volume (A), blue in a joint (B), a cell's border boxes brighter so the
-checkerboard of cells shows; empty boxes are not drawn. The light reads the box's
-density over the start's mean on a fixed log scale normalised by the line of
-sight, so an even universe is nearly black and only denser zones glow; light is
+Every occupied Planck box is a small square of light at its centre (a fixed few
+pixels at every zoom): red in an energy volume (A), blue in a joint (B), a cell's
+border boxes brighter so cells read as cells; empty boxes are not drawn; keys 1, 2
+and 3 show energy volumes, joints or both. The light reads the box's density over
+the start's mean of its own kind on a fixed log scale normalised by the line of
+sight, so an even universe is nearly black, red and blue alike, and only denser
+zones glow; light is
 summed in a float buffer. No link lines. A source is anything with reset(),
 step(), steps, view() and stats() (`cells_source.py` has the contract). The shown
 boxes are gathered on the GPU and copied to the host once per frame (CUDA-GL
@@ -14,7 +16,7 @@ sharing fails under WSL2 with error 304), then uploaded to GL.
 Module map:
   opacity.py           the light a box adds from its density contrast: fixed log scale (Warp)
   light_code.py        a point's light as one log byte, decoded by the window (Warp)
-  start_reference.py   the start's mean density per occupied box and boxes deep, the fixed unit
+  start_reference.py   the start's mean density of each kind and boxes deep, the fixed unit
   box_points.py        BoxPoints: selects and gathers drawn boxes on the GPU
   orbit_camera.py      view-projection matrix of a camera circling a centre
   title_line.py        the window title from a snapshot's stats

@@ -20,3 +20,11 @@ def connected_everywhere(owner: np.ndarray, cells: np.ndarray) -> bool:
     """Whether every listed cell's boxes form one face-connected piece."""
     from scipy import ndimage
     return all(ndimage.label(owner == cell)[1] == 1 for cell in cells)
+
+
+def table_matches_boxes(universe) -> bool:
+    """Whether the GPU contact table holds exactly the pairs and face counts recounted from the boxes."""
+    from physics.potts import contact_pairs, table_pairs
+    recount = contact_pairs(universe.owner.numpy())
+    held = table_pairs(universe)
+    return all(np.array_equal(first, second) for first, second in zip(recount, held))

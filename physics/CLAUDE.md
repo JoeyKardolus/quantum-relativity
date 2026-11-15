@@ -18,7 +18,8 @@ the earlier ABAB engine (`abab/`), the browser app and the milestone code were r
 - **The rules are the bible's**: A pulls through joints, fading with distance; B pushes,
   steeply when squeezed, and collapses past the limit (the joint vanishes, its energy volumes
   fall together); energy sets size; flow frictionless inside a cell, friction only crossing
-  into a joint, nothing past the seal; ABAB and neighbours fixed except by collapse. Total
+  into a joint (at its seams), nothing past the seal; a joint is a full cell (rule 8); ABAB
+  and neighbours fixed except by collapse or volume split. Total
   energy exact (whole quanta, drift 0). `potts/CLAUDE.md` says how.
 - **Open space**: the start is a checkerboard of uneven energy (ripples at every size,
   `potts/uneven_field.py`) inside an empty margin; space grows as cells claim empty boxes.
@@ -26,8 +27,8 @@ the earlier ABAB engine (`abab/`), the browser app and the milestone code were r
   no longer open space. Report it.
 - **Honesty.** Never tune a setting, seed or threshold until a result passes; report every
   number, seed, settings and miss.
-- **Expansion check before any fit** (8^3 cells of 6^3 boxes, seed 1, 300 steps): the table
-  is in `potts/CLAUDE.md`. Space grows at every pull until the cells reach the grid's edge.
+- **Expansion check before any fit** (seed 1, defaults): the numbers are in
+  `potts/CLAUDE.md`. The margin is as wide as the filled cube, so walls come late.
 - **GPU**: RTX 5080 under WSL2. CUDA-OpenGL sharing does not work on WSL: copy GPU to host
   once per frame. Tests that need CUDA skip cleanly without it.
 - **A machine keeps no datasets**: long runs and their results go to object storage or tmp,

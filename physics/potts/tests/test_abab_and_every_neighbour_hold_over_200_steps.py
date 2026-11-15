@@ -1,7 +1,7 @@
 """ABAB holds and neighbours never change: 200 steps of the uneven start with every rule on.
 
 No two energy volumes ever touch, nor two joints; the set of touching cell pairs is the
-start's (no joint collapsed in this run, which the test checks); every cell stays one
+start's (no joint collapsed and no volume tore in this run, which the test checks); every cell stays one
 connected piece; and the GPU's contact table equals one recounted from the boxes.
 """
 import numpy as np
@@ -26,6 +26,7 @@ def test_no_like_cells_touch_and_the_neighbours_stay_the_same_for_200_steps():
     low, high, _ = contact_pairs(owner)
     assert end["abab_breaks"] == 0
     assert end["collapses"] == 0
+    assert end["splits"] == 0
     assert set(zip(low.tolist(), high.tolist())) == start_pairs
     assert connected_everywhere(owner, np.flatnonzero(universe.alive.numpy() == 1))
     neighbour, faces, slots = contact_table(owner, universe.cell_count, universe.slots)

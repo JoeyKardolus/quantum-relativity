@@ -10,8 +10,11 @@ occupied boxes' bounding corners low and high, the latest stats (refreshed at mo
 every reset or pause), steps per second, paused, error and generation (bumped on
 each reset, so the window can re-fit). The light reference (`start_reference`)
 is taken at the start and on each reset, then held fixed. `latest()` returns the
-newest Snapshot, or None when none is new since the last call. `toggle_pause()`,
-`reset()` and `stop()` are safe from any thread. All GPU work (steps, gathers)
+newest Snapshot, or None when none is new since the last call. `show(kinds)`
+picks which kinds are drawn (`box_points` SHOW_ENERGY_VOLUMES, SHOW_JOINTS or
+SHOW_BOTH, the start; a snapshot is published again even while paused; any other
+value raises ValueError). `toggle_pause()`, `show()`, `reset()` and `stop()` are
+safe from any thread. All GPU work (steps, gathers)
 runs on the stepping thread. When the source or the gather raises, stepping stops
 and the error is in the snapshot (its traceback printed); nothing is swallowed.
 """
@@ -24,7 +27,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from physics.view.box_points import BoxPoints
+from physics.view.box_points import SHOW_BOTH, SHOW_ENERGY_VOLUMES, SHOW_JOINTS, BoxPoints
 from physics.view.start_reference import start_reference
 
 STATS_EVERY = 0.5
@@ -54,6 +57,7 @@ class Stepper:
         self.source = source
         self.steps_per_frame = max(1, int(steps_per_frame))
         self.paused = paused
+        self.shown = SHOW_BOTH
         self.error = ""
         self.generation = 0
         self._reset_wanted = threading.Event()
@@ -78,6 +82,13 @@ class Stepper:
     def toggle_pause(self) -> None:
         """Pause or resume stepping."""
         self.paused = not self.paused
+        self._stats_at = 0.0
+
+    def show(self, kinds: int) -> None:
+        """Draw only energy volumes, only joints, or both, from the next snapshot on."""
+        if kinds not in (SHOW_ENERGY_VOLUMES, SHOW_JOINTS, SHOW_BOTH):
+            raise ValueError(f"kinds: {kinds}, expected {SHOW_ENERGY_VOLUMES}, {SHOW_JOINTS} or {SHOW_BOTH}")
+        self.shown = kinds
         self._stats_at = 0.0
 
     def reset(self) -> None:
@@ -132,8 +143,8 @@ class Stepper:
     def _publish(self) -> None:
         view = self.source.view()
         if self._reference is None:
-            self._reference = start_reference(view.density)
-        gathered = self._points.boxes(view, self._reference)
+            self._reference = start_reference(view.density, view.kind)
+        gathered = self._points.boxes(view, self._reference, self.shown)
         now = time.perf_counter()
         if now - self._stats_at >= STATS_EVERY:
             self._stats, self._stats_at = self.source.stats(), now

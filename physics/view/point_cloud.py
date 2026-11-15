@@ -1,16 +1,17 @@
-"""Point cloud: GL points of light, round, summed in a float buffer, then shown on a fixed curve.
+"""Point cloud: GL points of light, small fixed squares, summed in a float buffer, then shown on a fixed curve.
 
 Contract: `PointCloud()` needs a current OpenGL 3.3 core context (a pyglet window).
 `upload(positions, colours)` copies (n, 3) float32 positions and (n, 4) uint8
 colours (RGB, and the point's light as a log byte, `light_code.py`) into two GPU
 buffers (orphaned each time, GL_STREAM_DRAW); n may change. `draw(view_projection,
-point_scale, width, height)` draws every point as a round dot whose diameter in
-pixels is point_scale / (clip w), clamped to [MIN_PIXELS, MAX_PIXELS], fading at
-its rim, adding RGB x light into a half-float buffer the window's size (additive,
-depth test and depth write off, so draw order never matters and millions of
-faint dots sum without being rounded away as an 8-bit screen would). A dot held
-up at MIN_PIXELS is dimmed by (true size / MIN_PIXELS)^2, so zooming out does not
-brighten a cloud by piling more dots on each pixel. Then the sum is shown on the
+point_scale, width, height)` draws every point as a hard-edged square
+SQUARE_PIXELS across, the same at every zoom (no round dot, no soft rim), adding
+RGB x light into a half-float buffer the window's size (additive, depth test and
+depth write off, so draw order never matters and millions of faint squares sum
+without being rounded away as an 8-bit screen would). point_scale / (clip w) is
+a box's true size in pixels; where it is smaller than the square, the square is
+dimmed by (true size / SQUARE_PIXELS)^2, so zooming out does not brighten a cloud
+by piling more squares on each pixel. Then the sum is shown on the
 framebuffer that was bound, through 1 - exp(-sum) per channel: a fixed curve,
 never scaled by the frame's own brightest pixel. view_projection is a (4, 4)
 row-major world-to-clip matrix (`orbit_camera`). No link lines.
@@ -25,8 +26,7 @@ from pyglet.graphics.shader import Shader, ShaderProgram
 
 from physics.view.light_code import LOG_DIMMEST, LOG_SPAN
 
-MIN_PIXELS = 1.5
-MAX_PIXELS = 32.0
+SQUARE_PIXELS = 3.0
 
 _VERTEX = f"""#version 330 core
 layout(location = 0) in vec3 position;
@@ -39,7 +39,7 @@ void main() {{
     vec4 clip = view_projection * vec4(position, 1.0);
     gl_Position = clip;
     float size = point_scale / max(clip.w, 1e-6);
-    float held = clamp(size, {MIN_PIXELS}, {MAX_PIXELS});
+    float held = {SQUARE_PIXELS!r};
     gl_PointSize = held;
     float code = floor(colour.a * 255.0 + 0.5);
     float light = code < 0.5 ? 0.0 : exp({LOG_DIMMEST!r} + {LOG_SPAN!r} * (code - 1.0) / 254.0);
@@ -53,10 +53,7 @@ in vec3 dot_colour;
 in float dot_light;
 out vec4 out_colour;
 void main() {
-    vec2 offset = gl_PointCoord * 2.0 - 1.0;
-    float reach = dot(offset, offset);
-    if (reach > 1.0) discard;
-    out_colour = vec4(dot_colour * dot_light * (1.0 - smoothstep(0.5, 1.0, reach)), 1.0);
+    out_colour = vec4(dot_colour * dot_light, 1.0);
 }
 """
 

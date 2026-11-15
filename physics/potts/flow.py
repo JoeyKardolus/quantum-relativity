@@ -1,17 +1,21 @@
-"""Flow: energy and momentum move between neighbouring Planck boxes by the flow (donor cell, exact).
+"""Flow: energy, momentum and heat move between neighbouring Planck boxes by the flow (donor cell, exact).
 
-Contract: `flow(universe, settings, dt)` moves energy across every box face for each
-sending box's own time clock * dt and returns None. A box sends across a face only to
-an occupied box, only when its flow velocity u = momentum / energy points through
-that face, and sends floor(E * min(u * clock * dt, 1/6) * openness) quanta of its E,
-openness from border_openness.py (1 inside a cell; through a joint less the more it
-is squeezed, nothing past the seal). Both boxes compute that same integer, one takes
-it and the other gives it, so total energy is exact; a box can never send more than
-it holds. Momentum goes with the energy in proportion; crossing an A-B border keeps
-1 / (1 + friction * c) of it, c the joint's compression (the only friction: directed
-flow turned into undirected jiggling, heat, which is not tracked; energy is untouched).
-Energy and momentum are computed into universe.energy_next / momentum_next and the
-pairs are then swapped. Nothing moves into or out of an empty box.
+Contract: `flow(universe, settings, threshold)` moves energy across the box faces of the
+boxes due this substep: a box sends only when its time level is at least `threshold`
+(time_levels.py), for its own substep dt = step_time / 2**level times its cell's clock,
+and every box with a due face neighbour takes in what is sent to it (the first
+universe.scratch["flow_prefix"][threshold] boxes of "flow_order"). A box sends across
+a face only to an occupied box, only when its flow velocity u = momentum / energy
+points through that face, and sends floor(E * min(u * clock * dt, 1/6) * openness)
+quanta of its E, openness from border_openness.py (1 inside a cell; through a joint
+only at its seams, less the more it is squeezed, nothing past the seal). Both boxes
+compute that same integer, one takes it and the other gives it, so total energy is
+exact; a box can never send more than it holds. Momentum and heat go with the energy in
+proportion; crossing an A-B border keeps 1 / (1 + friction * c) of the momentum, c the
+joint's compression (the only friction), and the kinetic energy it loses, p**2 / 2e of
+the crossing energy times (1 - kept**2), is booked as heat in the receiving box
+(bible: friction turns directed flow into jiggling, heat; energy is untouched). Results
+are written to the *_next buffers for the listed boxes and then copied back. Returns None.
 """
 from __future__ import annotations
 
@@ -29,17 +33,18 @@ _QUANTUM = wp.constant(QUANTUM)
 @wp.func
 def _sent(owner: wp.array3d(dtype=wp.int32), energy: wp.array3d(dtype=wp.int64),
           momentum: wp.array3d(dtype=wp.vec3), kind: wp.array(dtype=wp.int32),
-          compression: wp.array(dtype=wp.float32), clock: wp.array(dtype=wp.float32), dt: float, seal: float,
+          compression: wp.array(dtype=wp.float32), seam: wp.array3d(dtype=wp.int32), clock: wp.array(dtype=wp.float32),
+          box_level: wp.array3d(dtype=wp.int32), threshold: int, step_time: float, seal: float,
           here: wp.vec3i, face: int, side: int) -> wp.int64:
-    """Quanta box `here` sends through `face`; the same number both sides compute."""
-    if here[0] < 0 or here[1] < 0 or here[2] < 0 or here[0] >= side or here[1] >= side or here[2] >= side:
-        return wp.int64(0)
-    sender = owner[here[0], here[1], here[2]]
+    """Quanta box `here` sends through `face` this substep; the same number both sides compute."""
+    sender = box_owner(owner, here[0], here[1], here[2], side)
     if sender < 0:
         return wp.int64(0)
+    level = box_level[here[0], here[1], here[2]]
+    if level < threshold:
+        return wp.int64(0)
     there = here + direction(face)
-    receiver = box_owner(owner, there[0], there[1], there[2], side)
-    if receiver < 0:
+    if box_owner(owner, there[0], there[1], there[2], side) < 0:
         return wp.int64(0)
     held = energy[here[0], here[1], here[2]]
     if held <= wp.int64(0):
@@ -47,7 +52,9 @@ def _sent(owner: wp.array3d(dtype=wp.int32), energy: wp.array3d(dtype=wp.int64),
     speed = momentum[here[0], here[1], here[2]][face // 2] * float(1 - 2 * (face % 2)) / (float(held) * _QUANTUM)
     if speed <= 0.0:
         return wp.int64(0)
-    share = wp.min(speed * clock[sender] * dt, 1.0 / 6.0) * border_openness(kind, compression, sender, receiver, seal)
+    dt = step_time / wp.pow(2.0, float(level))
+    share = wp.min(speed * clock[sender] * dt, 1.0 / 6.0) * border_openness(owner, kind, compression, seam, here, there,
+                                                                             seal, side)
     return wp.int64(wp.float64(held) * wp.float64(share))
 
 
@@ -64,44 +71,77 @@ def _kept(kind: wp.array(dtype=wp.int32), compression: wp.array(dtype=wp.float32
 
 
 @wp.kernel
-def _flow(owner: wp.array3d(dtype=wp.int32), energy: wp.array3d(dtype=wp.int64),
-          momentum: wp.array3d(dtype=wp.vec3), kind: wp.array(dtype=wp.int32),
-          compression: wp.array(dtype=wp.float32), clock: wp.array(dtype=wp.float32), dt: float, seal: float,
-          friction: float, side: int, energy_next: wp.array3d(dtype=wp.int64),
-          momentum_next: wp.array3d(dtype=wp.vec3)):
-    i, j, k = wp.tid()
+def _flow(order: wp.array(dtype=wp.int32), owner: wp.array3d(dtype=wp.int32), energy: wp.array3d(dtype=wp.int64),
+          momentum: wp.array3d(dtype=wp.vec3), heat: wp.array3d(dtype=wp.float32), kind: wp.array(dtype=wp.int32),
+          compression: wp.array(dtype=wp.float32), seam: wp.array3d(dtype=wp.int32), clock: wp.array(dtype=wp.float32),
+          box_level: wp.array3d(dtype=wp.int32), threshold: int, step_time: float, seal: float, friction: float,
+          side: int, energy_next: wp.array3d(dtype=wp.int64), momentum_next: wp.array3d(dtype=wp.vec3),
+          heat_next: wp.array3d(dtype=wp.float32)):
+    index = order[wp.tid()]
+    i = index // (side * side)
+    j = (index // side) % side
+    k = index % side
     held = energy[i, j, k]
     carried = momentum[i, j, k]
+    warmth = heat[i, j, k]
     cell = owner[i, j, k]
-    if cell < 0:
-        energy_next[i, j, k] = held
-        momentum_next[i, j, k] = carried
-        return
     here = wp.vec3i(i, j, k)
     kept = held
     new_momentum = carried
+    new_heat = warmth
     for face in range(6):
-        out = _sent(owner, energy, momentum, kind, compression, clock, dt, seal, here, face, side)
+        out = _sent(owner, energy, momentum, kind, compression, seam, clock, box_level, threshold, step_time, seal,
+                    here, face, side)
         if out > wp.int64(0):
+            fraction = float(wp.float64(out) / wp.float64(held))
             kept -= out
-            new_momentum = new_momentum - carried * float(wp.float64(out) / wp.float64(held))
+            new_momentum = new_momentum - carried * fraction
+            new_heat = new_heat - warmth * fraction
         there = here + direction(face)
-        incoming = _sent(owner, energy, momentum, kind, compression, clock, dt, seal, there, face ^ 1, side)
+        incoming = _sent(owner, energy, momentum, kind, compression, seam, clock, box_level, threshold, step_time, seal,
+                         there, face ^ 1, side)
         if incoming > wp.int64(0):
             source = owner[there[0], there[1], there[2]]
             share = float(wp.float64(incoming) / wp.float64(energy[there[0], there[1], there[2]]))
-            new_momentum = new_momentum + momentum[there[0], there[1], there[2]] * (
-                share * _kept(kind, compression, source, cell, friction))
+            arriving = momentum[there[0], there[1], there[2]] * share
+            survives = _kept(kind, compression, source, cell, friction)
+            new_momentum = new_momentum + arriving * survives
+            new_heat = new_heat + heat[there[0], there[1], there[2]] * share
+            if survives < 1.0:
+                new_heat = new_heat + 0.5 * wp.dot(arriving, arriving) / (float(incoming) * _QUANTUM) * (
+                    1.0 - survives * survives)
             kept += incoming
     energy_next[i, j, k] = kept
     momentum_next[i, j, k] = new_momentum
+    heat_next[i, j, k] = new_heat
 
 
-def flow(universe: Universe, settings: Settings, dt: float) -> None:
-    """Move energy and momentum across every box face by the flow, exactly, then swap buffers."""
-    wp.launch(_flow, dim=(universe.side,) * 3, device=universe.owner.device,
-              inputs=[universe.owner, universe.energy, universe.momentum, universe.kind, universe.cell_compression,
-                      universe.cell_clock, float(dt), settings.seal_compression, settings.friction, universe.side,
-                      universe.energy_next, universe.momentum_next])
-    universe.energy, universe.energy_next = universe.energy_next, universe.energy
-    universe.momentum, universe.momentum_next = universe.momentum_next, universe.momentum
+@wp.kernel
+def _copy_back(order: wp.array(dtype=wp.int32), side: int, energy_next: wp.array3d(dtype=wp.int64),
+               momentum_next: wp.array3d(dtype=wp.vec3), heat_next: wp.array3d(dtype=wp.float32),
+               energy: wp.array3d(dtype=wp.int64), momentum: wp.array3d(dtype=wp.vec3),
+               heat: wp.array3d(dtype=wp.float32)):
+    index = order[wp.tid()]
+    i = index // (side * side)
+    j = (index // side) % side
+    k = index % side
+    energy[i, j, k] = energy_next[i, j, k]
+    momentum[i, j, k] = momentum_next[i, j, k]
+    heat[i, j, k] = heat_next[i, j, k]
+
+
+def flow(universe: Universe, settings: Settings, threshold: int) -> None:
+    """Move energy, momentum and heat across the faces of the due boxes, exactly."""
+    count = universe.scratch["flow_prefix"][threshold]
+    if count == 0:
+        return
+    device = universe.owner.device
+    order = universe.scratch["flow_order"]
+    wp.launch(_flow, dim=count, device=device,
+              inputs=[order, universe.owner, universe.energy, universe.momentum, universe.heat, universe.kind,
+                      universe.cell_compression, universe.seam, universe.cell_clock, universe.box_level, int(threshold),
+                      settings.step_time, settings.seal_compression, settings.friction, universe.side,
+                      universe.energy_next, universe.momentum_next, universe.heat_next])
+    wp.launch(_copy_back, dim=count, device=device,
+              inputs=[order, universe.side, universe.energy_next, universe.momentum_next, universe.heat_next,
+                      universe.energy, universe.momentum, universe.heat])

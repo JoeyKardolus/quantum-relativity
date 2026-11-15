@@ -6,10 +6,10 @@ draws it through an `orbit_camera`. Positions are box centres in box units. On t
 first snapshot and after each reset (a new generation) the view is fitted to the
 occupied boxes (the snapshot's low and high corners): centre at their middle,
 distance so their widest extent fills about half the view (room for space to grow
-into the empty margin), a dot POINT_BOXES boxes
-across so neighbouring soft dots overlap into a cloud. Controls: mouse drag
-rotates, wheel zooms, space starts and pauses, R resets the source (and the
-view), Esc quits. The title (`title_line`) refreshes 4 times a
+into the empty margin); a box is POINT_BOXES across, which only sets how much a
+fixed-size square is dimmed when boxes pile onto one pixel (`point_cloud.py`). Controls: mouse drag
+rotates, wheel zooms, space starts and pauses, 1 shows only energy volumes,
+2 only joints, 3 both, R resets the source (and the view), Esc quits. The title (`title_line`) refreshes 4 times a
 second. Closing the window stops the stepper. `run(interval)` runs the pyglet loop,
 drawing every `interval` seconds (0: as fast as it can).
 """
@@ -21,6 +21,7 @@ import numpy as np
 import pyglet
 from pyglet.window import key
 
+from physics.view.box_points import SHOW_BOTH, SHOW_ENERGY_VOLUMES, SHOW_JOINTS
 from physics.view.orbit_camera import orbit_camera
 from physics.view.point_cloud import PointCloud
 from physics.view.title_line import title_line
@@ -28,7 +29,9 @@ from physics.view.title_line import title_line
 FOV_DEGREES = 45.0
 TURN_PER_PIXEL = 0.01
 ZOOM_PER_NOTCH = 0.9
-POINT_BOXES = 1.5
+POINT_BOXES = 1.0
+_SHOWN_BY_KEY = {key._1: SHOW_ENERGY_VOLUMES, key._2: SHOW_JOINTS, key._3: SHOW_BOTH,
+                 key.NUM_1: SHOW_ENERGY_VOLUMES, key.NUM_2: SHOW_JOINTS, key.NUM_3: SHOW_BOTH}
 
 
 class PointWindow(pyglet.window.Window):
@@ -76,9 +79,11 @@ class PointWindow(pyglet.window.Window):
         self.distance *= ZOOM_PER_NOTCH ** scroll_y
 
     def on_key_press(self, symbol, modifiers) -> None:
-        """Space starts and pauses, R resets, Esc quits."""
+        """Space starts and pauses, 1 / 2 / 3 show energy volumes / joints / both, R resets, Esc quits."""
         if symbol == key.SPACE:
             self.stepper.toggle_pause()
+        elif symbol in _SHOWN_BY_KEY:
+            self.stepper.show(_SHOWN_BY_KEY[symbol])
         elif symbol == key.R:
             self.stepper.reset()
         elif symbol == key.ESCAPE:

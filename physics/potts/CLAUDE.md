@@ -7,44 +7,39 @@ Planck boxes on the GPU (Warp), each owned by one cell or empty; energy volumes 
 
 ## Must not get wrong
 
-- **Energy is whole quanta** (int64, `universe.QUANTUM`). Flow fluxes are one integer
-  both boxes compute (`flow.py`); a box move hands its energy on with int64 atomics
-  (`box_moves.py`); a collapse only relabels boxes. `stats()["energy_drift"]` is 0.
-- **ABAB and neighbours never change** except by joint collapse: a move may not make a new
-  contact or end one (contact table, counts changed atomically, undone whole on failure), nor touch like with like, nor split its
-  cell (3x3x3 local test). Rebuild the table from boxes (`contact_table.py`) after any relabel.
-- **Eight parity phases of moves**: movers sit two boxes apart; at most two share a face
-  neighbour, so a claimed box takes a *third* of its claimer's energy, never a half.
-- **Kind follows owner.** Pressure is each kind's energy against its own rest (`kick.py`); raw
-  energy pressure flooded the joints (measured).
-- **Closed faces stop flow** (`kick.py`): momentum into an empty box, the outside or a sealed
-  joint border is zeroed; without it momentum piled up at walls (measured).
-- **Friction only at A-B crossings** (`flow.py`, keep 1 / (1 + friction c)); none inside a cell.
-- **Pull** (`pull.py`, `multigrid.py`) and the start's ripples (`uneven_field.py`) came from the
-  removed fluid engine unchanged; the 1/r and slope tests came with them.
-- **Wanted size** is `labels * k**3 * (labels * rest / E)**size_power`; labels add on collapse.
-- **Not bit-repeatable** (move races, float atomics). **Not built**: volume split, heat field.
-- **Honesty.** Never tune for a result; report misses.
+- **Energy is whole quanta** (int64, `universe.QUANTUM`). Flow fluxes are one integer both
+  boxes compute (`flow.py`); plate moves hand energy on inside their own block; collapse and
+  split only relabel. `stats()["energy_drift"]` is 0. Heat is bookkeeping, not energy.
+- **A joint is a full cell** (rule 8): same energy per box at the start, one size law and one
+  `cell_rest` for both kinds, one sound speed. No thin-wall share anywhere.
+- **ABAB and neighbours never change** except by collapse or split. Plate moves (`box_moves.py`)
+  check every face of every changed box, net face counts per pair atomically (undone whole),
+  and connectivity in the 4x4x3 block. One-box moves froze edges and corners; never go back.
+- **64 phases, blocks 4 apart**: a site's plate, ring, deposit and source box stay in its own
+  4x4x4 block, so a claimed box may take *half* its neighbour's energy. Moves claim only
+  inside the active region.
+- **Box kernels run on the active region** (`active_region.py`, PAD 4); pull solves on a cube
+  round it. The whole grid at 24^3 cells is 80M boxes.
+- **Local clocks** (`time_levels.py`): each cell its own level; boxes ordered by level so the
+  due ones are a prefix. Flow takes in from finer neighbours via the flow order.
+- **Pressure in ln e** (`kick.py`); closed and half-open faces stop the flow reaching them
+  (heat) and push back on the force; grad P flung few-quanta boxes at 1e9 boxes/time.
+- **Size energy is ln(n / aim)^2**, plus the Potts border term (`surface`): without it cells
+  grew into sponges and tears failed.
+- **Seams**: energy enters or leaves a joint only at seam boxes (`seam_flags.py`).
+- **Not bit-repeatable** (move races, float atomics). Never tune for a result.
 
-## Measured (2026-11-15, RTX 5080)
+## Measured (2026-11-15, RTX 5080, seed 1, k = 6, defaults)
 
-20^3 cells of 6^3: 1.4 ms per substep; 81 to 366 substeps per step early, 2,000 to 8,000
-from step 11 as the pull drives the fluid in. `max_substeps` is 1e6, a runaway guard (2000 stopped default runs). 10^3 cells, 300 steps:
-occupied x1.55, flat at the grid's edge.
-Expansion check, 8^3 cells of 6^3 (grid 64, start radius 24.0), seed 1, 300 steps, occupied
-boxes over the start:
-
-| pull | step 50 | 300 | edge share |
-|---|---|---|---|
-| 0.005 | 1.53 | 1.57 | 0.012 |
-| 0.002 | 1.21 | 1.27 | 0.004 |
-| 0.001 | 1.19 | 1.26 | 0.007 |
-| 0.0005 | 1.17 | 1.24 | 0.010 |
-| 0.0002 | 1.17 | 1.28 | 0.020 |
-| 0 | 1.17 | 1.28 | 0.024 |
-
-Space grows at every pull, fastest at the default, slowing as the cells near the walls
-(margin 8 boxes); no collapse, no lump, drift 0, ABAB breaks 0 in every run.
+Old substep climb: momentum piled up against nearly sealed seams in thin boxes; one global
+substep served the fastest box.
+Speed, 30 steps after the first: 8^3 cells 49 steps/s; 16^3 4.4 (2.6 by step 31, space
+x3.3); 24^3 1.7 (1.1 by step 31). Mostly 32 finest substeps per step.
+Run, 16^3 cells, 300 steps (525 s): occupied x1.25 (correction), x2.47 at 25, x8.4 at 50,
+x24.8 at 300; the region reached the grid's walls by step 55 (edge share 1e-4 after).
+5,019 splits, 4,991 collapses (new tears drain and collapse), 2,069 tears refused; lumps
+144 -> 244 (step 25) -> 6; sealed lumps 0; drift 0, ABAB breaks 0 throughout.
+Pull 0 (8^3, 30 steps): x1.40, pull on x2.24: growth comes from lumps.
 
 ## Run
 
