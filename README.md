@@ -1,88 +1,59 @@
-# babon-harness
+# quantum-relativity
 
-The setup Babon Innovations runs its company on: a Claude Code harness, and an optional self-hosted stack on one server. MIT.
+A hobby simulation of one person's theory of how space, matter and forces could come from a single
+kind of stuff: energy. The goal is not to replace quantum physics or relativity, but to see whether
+these rules, run on a computer, produce things we know from nature: gravity, expansion, black holes,
+orbits.
 
-You make the decisions. The agent plans with you before it builds, hooks stop its known mistakes, and an index answers its questions.
+## The idea in short
 
-<a href="https://babon-innovations-b-v.github.io/babon-harness/diagrams/stack/loop.html">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/images/loop-dark.png">
-    <img alt="The loop: a request is checked against the repository, decided, written down as an issue, built, tested, shipped and watched" src="docs/diagrams/images/loop-light.png">
-  </picture>
-</a>
+- **Space is a foam of two kinds of energy volume**, alternating like a 3D checkerboard: volumes that
+  **pull** (A) and **joints** that **push** (B). Every A touches only B's, and every B only A's.
+- **Energy sets size**: the more energy packed into a region, the smaller and denser it is.
+- **A pulls** on other A's through the joints between them, fading with distance, like gravity.
+  **A joint pushes back**, harder the more it is squeezed, until it gives way past a limit and the
+  region collapses, like a star becoming a black hole.
+- **Energy behaves like a fluid**: frictionless inside a volume, with friction only in passing a joint.
+  Squeezed joints let less through and past a seal point nothing, so packed lumps seal themselves.
+- **Time is local**: where energy is more packed, everything happens more slowly.
 
-**[Open the full interactive loop](https://babon-innovations-b-v.github.io/babon-harness/diagrams/stack/loop.html)**: step through it with the arrow keys; click a box for what it does and the bible section that explains it.
+The full rules, open problems and milestones are in the bible chapter
+[`physics/quantum-relativity`](docs/bible.md#physicsquantum-relativity); the words used are defined in
+[`CONTEXT.md`](CONTEXT.md).
 
-## Contents
+## Status
+
+Early. The engine holds total energy exactly and draws live on the GPU, but it does not yet behave like
+a universe: with untuned settings everything falls into a few sealed cores and nothing expands. Next:
+check every rule is built in, then fit the few settings against a scorecard of scenes (expansion
+history, structure), and test, unfitted, on others (orbits, bound lumps, black hole size, the Hubble
+tension). Progress is tracked on [issue #1](https://github.com/JoeyKardolus/quantum-relativity/issues/1).
+Misses are reported as misses; nothing is tuned to look good.
+
+## Run it
+
+```bash
+uv sync --all-packages --all-extras --all-groups
+PYTHONPATH=. .venv/bin/python -m physics.view      # opens a window; Space starts, R resets, Esc quits
+PYTHONPATH=. .venv/bin/pytest -q physics           # the tests
+```
+
+Needs Linux or WSL2, Python 3.12+, [`uv`](https://docs.astral.sh/uv/) and an NVIDIA GPU (the engine
+runs on [NVIDIA Warp](https://github.com/NVIDIA/warp)). On WSL2 the viewer switches the window's drawing
+to the GPU by itself.
 
 | Path | What it is |
 |---|---|
-| `.claude/skills/` | 29 skills, run as `/<name>`. A task goes `/grill` (agree the plan), `/to-prd` (write it as an issue), build, `/close` (ship it). |
-| `.claude/hooks/` | 15 hooks. They block torn commits, force pushes, tests that cannot fail, and new markdown files you did not approve. |
-| `.claude/index/` | A code index ([codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp)). Built on first use; nothing keeps running. |
-| `docs/` | How it all works: one bible chapter and one interactive diagram per part. |
-| `apps/`, `infra/` | The optional stack: website, Nextcloud sign-in, meeting minutes, a Signal assistant that keeps the agenda, recorded video calls, monitoring, and deploys that run the tests first. |
+| `physics/fluid/` | the engine: energy as a fluid on a fine grid of boxes on the GPU |
+| `physics/view/` | the GPU window that shows it |
+| `docs/bible.md` | how everything works; the theory is the chapter `physics/quantum-relativity` |
 
-<a href="https://babon-innovations-b-v.github.io/babon-harness/diagrams/stack.html">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/images/stack-dark.png">
-    <img alt="The stack: your system, Claude Code with the harness, reaches one server through Caddy and talks with the assistant over Signal both ways; the server runs Nextcloud, the website, notulen, the assistant, Talk, Prometheus and auto-deploy; a media box, object storage, the vault and an optional GPU tier beside it" src="docs/diagrams/images/stack-light.png">
-  </picture>
-</a>
+## Built with
 
-**[Open the full interactive stack](https://babon-innovations-b-v.github.io/babon-harness/diagrams/stack.html)**: every part, with its explanation.
-
-## Requirements
-
-- Linux or macOS (Windows through WSL2), `git`, `python3` 3.12+, [`uv`](https://docs.astral.sh/uv/), the GitHub CLI
-- Claude Code and a GitHub account
-- For the stack: a Scaleway account, a domain, an Anthropic API key, a Signal number
-
-Costs and details: [setup/reference](docs/bible.md#setupreference).
-
-## Quick start
-
-```bash
-git clone https://github.com/Babon-Innovations-b-v/babon-harness.git my-company
-cd my-company
-bash .claude/scripts/bootstrap.sh                 # git hooks, index, gh check
-python3 .claude/scripts/setup-github.py --board   # labels, board, .claude/project.json
-claude
-```
-
-Then describe your first piece of work. For the whole stack, say `set up my harness`.
-
-The workflow is built for `claude --dangerously-skip-permissions`, which gives the agent your shell. Read [Permissions](docs/bible.md#setupreference) first.
-
-## Providers
-
-Built on Claude Code and Scaleway. Skills are markdown, hooks and the index are Python, and the stack is Docker Compose, so moving to another agent or cloud is a port, not a rewrite.
-
-## Docs
-
-- How a task runs: [workflow/loop](docs/bible.md#workflowloop)
-- What a module looks like: [workflow/module-standard](docs/bible.md#workflowmodule-standard)
-- The stack, part by part: [docs/bible.md](docs/bible.md)
-- Keeping several repositories on one harness, configuration, costs: [setup/reference](docs/bible.md#setupreference)
-
-## Support
-
-None promised. Issues are welcome. Questions: support@babon.eu. Security problems: see [SECURITY.md](SECURITY.md), never a public issue.
-
-## Credits
-
-| Work | Licence | Used for |
-|---|---|---|
-| [Matt Pocock's skills](https://github.com/mattpocock/skills) | MIT | `grill`, `triage`, `diagnose`, `tdd`, `prototype`, `improve-codebase-architecture`, `codebase-design`, `write-a-skill`, `zoom-out`, `retro`, parts of `handoff` and `wayfinder` |
-| [caveman](https://github.com/JuliusBrussee/caveman) by Julius Brussee | MIT | the `caveman` skill |
-| [ponytail](https://github.com/DietrichGebert/ponytail) | MIT | the lean-code rules in `CLAUDE.md` |
-| [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | MIT | the code index |
-| [archify](https://github.com/tt-a1i/archify) | MIT | the diagram renderer |
-| [OpenClaw](https://github.com/openclaw/openclaw) | MIT | the assistant's gateway |
-| Signal, transcription and stack components | see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) | |
-
-Claude Code is Anthropic's software and is not part of this repository. This project is not affiliated with Anthropic.
+Written with Claude Code on [babon-harness](https://github.com/Babon-Innovations-b-v/babon-harness), a
+Claude Code setup whose skills, hooks and code index live in `.claude/`. The other folders (`apps/`,
+`infra/`, `business/` and so on) come from that harness template and are not part of the simulation.
 
 ## Licence
 
-MIT, Copyright (c) 2026 Babon Innovations B.V.
+MIT. See [`LICENSE`](LICENSE).
