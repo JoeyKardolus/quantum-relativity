@@ -26,14 +26,14 @@ one joint between its two volumes, an outer triangle borders nothing.
 - **Size follows density** (`rest_volume.py`): `q (q / E)^3`, `q` quanta (the leak never moves them).
 - **Honesty.** Never tune a setting, seed or fit window until a result passes; report every number,
   seed, settings and miss. Today (seed 1, 968 volumes, unevenness 0.5, defaults): finite to 300,
-  1364 volumes, 137 collapses, 297 splits, size 1.33, 92 lumps.
+  1364 volumes, 137 collapses, 297 splits, size 1.33, 92 lumps; the app 11.5 steps/s, 7.4 frames/s.
 - **Split by size** (rule 8): past `split_size` (4) x `start_mean_volume`; never by density
-  (a split keeps it, so that splits for ever).
+  (a split keeps it: endless splits).
 - **Page data stays light.** A JSON "mesh" only on start, collapse or split; every
   frame binary (`page_frame.py`: 32-byte header, float32 corners, uint8 pull and push), 6 kB at 968
   tetrahedra (mesh 57 kB), at most 10/s. Drawing: red volume outlines inset 8%; each shared face is one blue
   joint layer filling the gap (red | blue | red); outer faces have no joint, bare red (split with drift).
-- **Speed.** A step is about 50 ms at 1000 tetrahedra; `new_engine` 1.5 s at 1000.
+- **Speed.** A step about 50 ms at 1000 tetrahedra; `new_engine` 1.5 s.
 - **Layout.** One public function (or type) per file, helpers `_prefixed`, each subpackage
   `__init__.py` holds the module map and `__all__`.
 - **Port 8765** is the owner's app; test on `--port 8766`.
