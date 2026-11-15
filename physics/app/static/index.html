@@ -14,11 +14,11 @@
     --muted: #8593a6;
     --accent: #5b8cff;
     --warn: #ff7a45;
-    --volume-clear: #ff8a8a;
-    --volume-solid: #a10a14;
-    --joint-clear: #b4c4dc;
-    --joint-solid: #8fb3e6;
-    --sealed: #e6b422;
+    --volume-light: #ff9e99;
+    --volume-dark: #6b0510;
+    --joint-dim: #1a2e73;
+    --joint-bright: #8cd9ff;
+    --cube: #8593a6;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
@@ -33,13 +33,10 @@
     background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px;
     width: fit-content; max-width: 100%; }
   #legend > span { display: inline-flex; align-items: center; gap: 6px; }
-  #legend small { color: var(--muted); }
   .key { display: inline-block; flex: none; width: 28px; height: 12px; border-radius: 2px; }
-  .key.volume { background: linear-gradient(90deg, color-mix(in srgb, var(--volume-clear) 12%, transparent), var(--volume-solid));
-    border: 1px solid color-mix(in srgb, var(--volume-clear) 45%, transparent); }
-  .key.sealed { height: 0; border-top: 2px solid var(--sealed); border-radius: 0; }
-  .key.joint { height: 3px; background: linear-gradient(90deg, color-mix(in srgb, var(--joint-clear) 5%, transparent),
-    color-mix(in srgb, var(--joint-solid) 50%, transparent)); }
+  .key.volume { background: linear-gradient(90deg, var(--volume-light), var(--volume-dark)); }
+  .key.joint { height: 6px; background: linear-gradient(90deg, var(--joint-dim), var(--joint-bright)); }
+  .key.cube { height: 0; border-top: 1px dashed var(--cube); border-radius: 0; }
   #panel { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px;
     bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: 310px; max-width: calc(100vw - 24px);
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
@@ -81,7 +78,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-<canvas id="scene" aria-label="Energy volumes as red glass cells and joints as blue glass slabs between them, drawn from the engine's own shapes"></canvas>
+<canvas id="scene" aria-label="Energy volumes as solid red cells with a gap between neighbours, joints as solid blue walls filling that gap"></canvas>
 
 <div id="below">
   <div id="hint">
@@ -89,10 +86,9 @@
     <span>drag to rotate, wheel or pinch to zoom</span>
   </div>
   <div id="legend">
-    <span><i class="key volume"></i>red glass = energy volume (pulls)</span>
-    <span><i class="key joint"></i>pale blue = joint (pushes; faint at rest)</span>
-    <span><i class="key sealed"></i>gold edge = wall of a sealed lump</span>
-    <small>more solid = stronger</small>
+    <span><i class="key volume"></i>red cell = energy volume (darker = pulls harder)</span>
+    <span><i class="key joint"></i>blue wall = joint (brighter = pushes harder)</span>
+    <span><i class="key cube"></i>the starting cube</span>
   </div>
 </div>
 
@@ -115,22 +111,17 @@
 
   <h2>View</h2>
   <div class="row">
-    <span class="label">show</span>
-    <button type="button" class="show" data-show="volumes" aria-pressed="true">energy volumes</button>
-    <button type="button" class="show" data-show="joints" aria-pressed="true">joints</button>
-  </div>
-  <div class="row" style="margin-top:8px">
-    <span class="label">joints as</span>
-    <button type="button" class="jointStyle" data-style="slabs" aria-pressed="true">thin slabs</button>
-    <button type="button" class="jointStyle" data-style="lines" aria-pressed="false">edge lines</button>
+    <span class="label">cut across</span>
+    <button type="button" class="cutAxis" data-axis="0" aria-pressed="true">x</button>
+    <button type="button" class="cutAxis" data-axis="1" aria-pressed="false">y</button>
+    <button type="button" class="cutAxis" data-axis="2" aria-pressed="false">z</button>
   </div>
   <div id="viewSettings"></div>
-  <div class="caption">Every shape is the engine's own: each red cell is an energy volume, more solid the harder it pulls.
-    Each pale blue slab is a joint, a volume of its own on the face two energy volumes share, drawn at its real thickness:
-    nearly invisible at rest, clearer the closer it is squeezed to its push limit.
-    The drawn energy volumes are picked once (on reset or when the slider moves) and then followed step by step,
-    through joint collapse too; the camera stays put until you move it or press fit.
-    A gold edge marks a joint on the outside of a sealed lump: every seam around the lump is closed, so no energy leaks in or out.</div>
+  <div class="caption">Each solid red cell is an energy volume, its corners shared with its neighbours and moved by the
+    engine every step; darker red pulls harder. Every cell is drawn a little smaller than it is, and the blue wall in the
+    gap between two cells is the joint between them; brighter blue pushes harder. The gap is a drawing aid, the same share
+    of every cell, not the joint's real thickness. The faint box is the cube the grid started in: edge cells stretch out
+    past it and split, so the grid grows at its edge. Move the cut slider to hide the cells past a plane and look inside.</div>
 
   <h2>Run</h2>
   <div id="runSettings"></div>
@@ -153,382 +144,254 @@ const LABELS = {
   attraction: "pull between energy volumes",
   joint_push: "joint push (swells a joint back toward rest)",
   push_limit: "push limit (below it, joint collapse)",
-  joint_rest: "joint rest volume",
+  joint_rest: "joint rest thickness",
   leak: "leak (energy flowing to harder-pulling neighbours)",
   seal_point: "seal point (seams close, lump holds)",
+  split_threshold: "split threshold (energy per volume below it, the volume splits)",
 };
 const RUN_SETTINGS = new Set(["speed", "unevenness"]);
-const SHRINK = 0.95;            // each cell's faces drawn this far toward its centre, so they clear the joints
-const DEFAULT_DRAWN = 400;
-
-/** Clamp a value to 0..1, anything not finite to 0. */
-function unit(value) {
-  return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
-}
-
-/** The typical joint push in the latest shapes message: every joint rests well above 0, so
- *  drawing push as it is turns all joints solid. Joints are drawn by how far above this they push. */
-let typicalPush = 0;
-
-/** Median push over a message's joints. */
-function medianPush(joints) {
-  if (!joints.length) return 0;
-  const values = joints.map((joint) => joint.push).sort((low, high) => low - high);
-  return values[Math.floor(values.length / 2)];
-}
-
-/** How much harder than typical a joint pushes: 0 at or below typical, 1 at the push limit. */
-function pushAboveTypical(push) {
-  return unit((push - typicalPush) / Math.max(1 - typicalPush, 1e-6));
-}
-
-/** Parse a #rrggbb CSS colour into a three.js colour. */
-function cssColour(name) {
-  const clean = getComputedStyle(document.documentElement).getPropertyValue(name).trim().replace("#", "");
-  const [red, green, blue] = [0, 2, 4].map((start) => (parseInt(clean.slice(start, start + 2), 16) || 0) / 255);
-  return new THREE.Color(red, green, blue);
-}
+const GAP = 0.1;                 // each cell drawn this share smaller about its centre; the joint walls fill the gap
+const FRAME_MAGIC = 0x31465251;  // "QRF1", the binary frame's first word (physics/app/page_frame.py)
+const HEADER_BYTES = 32;         // 8 uint32 words
+const VOLUME_LIGHT = [1.0, 0.62, 0.6], VOLUME_DARK = [0.42, 0.02, 0.06];
+const JOINT_DIM = [0.1, 0.18, 0.45], JOINT_BRIGHT = [0.55, 0.85, 1.0];
 
 /* ---------- the 3D scene ---------- */
 const canvas = document.getElementById("scene");
 const THREE_READY = typeof window.THREE === "object" && window.THREE !== null;
-
-const GLASS_VERTEX = `
-  attribute vec3 faceNormal;
-  attribute float strength;
-  varying float vStrength;
-  varying float vFacing;
-  void main() {
-    vec4 place = modelViewMatrix * vec4(position, 1.0);
-    vFacing = abs(dot(normalize(normalMatrix * faceNormal), normalize(-place.xyz)));
-    vStrength = strength;
-    gl_Position = projectionMatrix * place;
-  }`;
-const GLASS_FRAGMENT = `
-  uniform vec3 clear;
-  uniform vec3 solid;
-  varying float vStrength;
-  varying float vFacing;
-  void main() {
-    float strong = clamp(vStrength, 0.0, 1.0);
-    float edge = pow(1.0 - vFacing, 2.0) * (1.0 - strong);
-    float alpha = mix(0.025, 0.93, strong) + 0.12 * edge;
-    gl_FragColor = vec4(mix(clear, solid, smoothstep(0.0, 1.0, strong)), clamp(alpha, 0.0, 0.95));
-  }`;
-/* Joints: near invisible at rest (alpha ~0.03), clear only as the squeeze nears the push limit (up to 0.5). */
-const JOINT_FRAGMENT = `
-  uniform vec3 clear;
-  uniform vec3 solid;
-  uniform float rest;
-  uniform float limit;
-  varying float vStrength;
-  varying float vFacing;
-  void main() {
-    float strong = clamp(vStrength, 0.0, 1.0);
-    gl_FragColor = vec4(mix(clear, solid, strong), mix(rest, limit, strong * strong));
-  }`;
-const LINE_VERTEX = `
-  attribute float strength;
-  varying float vStrength;
-  varying float vFacing;
-  void main() {
-    vStrength = strength;
-    vFacing = 1.0;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }`;
-
-const scene3d = { renderer: null, scene: null, camera: null, volumeMaterial: null, jointMaterial: null,
-  jointLineMaterial: null, sealMaterial: null, volumes: null, joints: null, seals: null,
-  show: { volumes: true, joints: true }, jointStyle: "slabs", drawnCells: 0, drawnJoints: 0 };
+const scene3d = { renderer: null, scene: null, camera: null, cells: null, walls: null, cube: null, drawnCells: 0 };
 const orbit = { theta: 0.7, phi: 1.15, distance: 10, follow: true, centre: [0, 0, 0], reach: 1 };
-let latest = null;            // the latest shapes message, checked, with each cell's centre and the box side
-let drawLimit = DEFAULT_DRAWN;
-let tracked = new Map();      // id of each drawn energy volume -> its centre as drawn (unwrapped out of the periodic box)
-let reselect = true;          // pick the drawn energy volumes afresh on the next shapes message
+const cut = { axis: 0, share: 1 };   // share 1 = no cut; below 1, cells whose centre is past the plane are hidden
+let mesh = null;      // the latest mesh message, with the vertex tables built from it
+let frame = null;     // the latest frame on that mesh: {step, corners, pull, push}
+let latestStats = null, running = false;
 
-/** Make the renderer, scene, camera and the two glass materials (once, when three.js loaded). */
+/** Build the renderer, camera, lights and the two solid materials. */
 function createScene() {
   if (!THREE_READY) return;
-  scene3d.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  scene3d.renderer.setClearColor(cssColour("--bg"));
-  scene3d.scene = new THREE.Scene();
-  scene3d.camera = new THREE.PerspectiveCamera(40, 1, 0.01, 1000);
-  const glass = (clear, solid) => new THREE.ShaderMaterial({ vertexShader: GLASS_VERTEX,
-    fragmentShader: GLASS_FRAGMENT, transparent: true, depthWrite: false, side: THREE.DoubleSide,
-    uniforms: { clear: { value: cssColour(clear) }, solid: { value: cssColour(solid) } } });
-  scene3d.volumeMaterial = glass("--volume-clear", "--volume-solid");
-  const faint = (vertexShader, rest, limit) => new THREE.ShaderMaterial({ vertexShader,
-    fragmentShader: JOINT_FRAGMENT, transparent: true, depthWrite: false, side: THREE.DoubleSide,
-    uniforms: { clear: { value: cssColour("--joint-clear") }, solid: { value: cssColour("--joint-solid") },
-      rest: { value: rest }, limit: { value: limit } } });
-  scene3d.jointMaterial = faint(GLASS_VERTEX, 0.0, 0.5);
-  scene3d.jointLineMaterial = faint(LINE_VERTEX, 0.0, 0.6);
-  scene3d.sealMaterial = new THREE.LineBasicMaterial({ color: cssColour("--sealed"), transparent: true, opacity: 0.95 });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setClearColor(0x07090d, 1);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 1000);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+  const light = new THREE.DirectionalLight(0xffffff, 0.8);
+  light.position.set(0.4, 0.8, 1);
+  camera.add(light);
+  scene.add(camera);
+  Object.assign(scene3d, { renderer, scene, camera });
 }
 
-/** A flat list of at least three finite xyz corners. */
-function goodPolygon(points) {
-  return Array.isArray(points) && points.length >= 9 && points.length % 3 === 0 && points.every(Number.isFinite);
+/** A solid, lit, flat-shaded material coloured per vertex. */
+function solidMaterial() {
+  return new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide, shininess: 18 });
 }
 
-/** Unit normal of a flat xyz polygon (Newell's method), [0, 0, 0] when it has no area. */
-function polygonNormal(points) {
-  const corners = points.length / 3;
-  let normalX = 0, normalY = 0, normalZ = 0;
-  for (let corner = 0; corner < corners; corner++) {
-    const here = corner * 3, next = ((corner + 1) % corners) * 3;
-    normalX += (points[here + 1] - points[next + 1]) * (points[here + 2] + points[next + 2]);
-    normalY += (points[here + 2] - points[next + 2]) * (points[here] + points[next]);
-    normalZ += (points[here] - points[next]) * (points[here + 1] + points[next + 1]);
-  }
-  const length = Math.hypot(normalX, normalY, normalZ);
-  return length > 0 ? [normalX / length, normalY / length, normalZ / length] : [0, 0, 0];
-}
-
-/** Mean of every corner of a cell's faces: the point its faces shrink toward. */
-function cellCentre(faces) {
-  const sum = [0, 0, 0];
-  let count = 0;
-  for (const face of faces) {
-    for (let index = 0; index < face.length; index += 3) {
-      sum[0] += face[index]; sum[1] += face[index + 1]; sum[2] += face[index + 2];
-      count++;
-    }
-  }
-  return sum.map((value) => value / count);
-}
-
-/** Keep the cells and joints of a shapes message whose numbers are well formed. */
-function checkShapes(message) {
-  const cells = (Array.isArray(message.cells) ? message.cells : []).filter((cell) =>
-    cell && Number.isInteger(cell.id) && Array.isArray(cell.faces) && cell.faces.length > 0
-    && cell.faces.every(goodPolygon)).map((cell) => ({ ...cell, centre: cellCentre(cell.faces) }));
-  const joints = (Array.isArray(message.joints) ? message.joints : []).filter((joint) =>
-    joint && Number.isInteger(joint.a) && Number.isInteger(joint.b) && goodPolygon(joint.polygon));
-  return { step: message.step, stats: message.stats || {}, cells, joints, side: boxSide(cells),
-    byId: new Map(cells.map((cell) => [cell.id, cell])) };
-}
-
-/** Side of the periodic cube the cells fill: the cube root of their summed volume (signed, by their faces). */
-function boxSide(cells) {
-  let sixTimes = 0;
-  for (const cell of cells) {
-    for (const face of cell.faces) {
-      const [firstX, firstY, firstZ] = face;
-      for (let at = 3; at + 5 < face.length; at += 3) {
-        const [nextX, nextY, nextZ, lastX, lastY, lastZ] = face.slice(at, at + 6);
-        sixTimes += firstX * (nextY * lastZ - nextZ * lastY) + firstY * (nextZ * lastX - nextX * lastZ)
-          + firstZ * (nextX * lastY - nextY * lastX);
-      }
-    }
-  }
-  return Math.cbrt(Math.abs(sixTimes) / 6) || 1;
-}
-
-/** The periodic image of `point` nearest `reference`, in a cube of `side`. */
-function wrapNear(point, reference, side) {
-  return point.map((value, axis) => value - side * Math.round((value - reference[axis]) / side));
-}
-
-/** Squared distance between two points, along the shortest way round the periodic cube. */
-function wrappedDistance(point, reference, side) {
-  return wrapNear(point, reference, side).reduce((sum, value, axis) => sum + (value - reference[axis]) ** 2, 0);
-}
-
-/** Middle of the periodic cube: the camera looks here. */
-function boxMiddle() {
-  return latest ? [latest.side / 2, latest.side / 2, latest.side / 2] : [0, 0, 0];
-}
-
-/** Pick the `drawLimit` energy volumes nearest the box middle, each placed at its image nearest the middle. */
-function selectTracked() {
-  const middle = boxMiddle();
-  tracked = new Map(latest.cells.map((cell) => ({ id: cell.id, at: wrapNear(cell.centre, middle, latest.side) }))
-    .map((entry) => ({ ...entry, away: Math.hypot(...entry.at.map((value, axis) => value - middle[axis])) }))
-    .sort((first, second) => first.away - second.away).slice(0, drawLimit).map((entry) => [entry.id, entry.at]));
-}
-
-/**
- * Follow the drawn energy volumes to the new message. The box scaled by `ratio` about the origin, so each
- * drawn centre is first scaled. Ids only change by joint collapse, which renumbers in order of the lowest
- * old id with `removed` volumes gone: an old id k is now in k-removed..k. With no collapse the id is kept;
- * after one, the nearest volume in that id window is taken, and volumes that fell into one are drawn once.
- * Each centre goes to its periodic image nearest where it was, so a volume never jumps across the box.
- */
-function followTracked(ratio, removed) {
-  const next = new Map(), side = latest.side;
-  for (const [id, at] of tracked) {
-    const predicted = at.map((value) => value * ratio);
-    let cell = removed === 0 ? latest.byId.get(id) : null;
-    if (removed !== 0) {
-      let best = Infinity;
-      for (let candidate = Math.max(0, id - removed); candidate <= id; candidate++) {
-        const here = latest.byId.get(candidate), away = here ? wrappedDistance(here.centre, predicted, side) : Infinity;
-        if (away < best) { best = away; cell = here; }
-      }
-    }
-    if (!cell || next.has(cell.id)) continue;
-    next.set(cell.id, wrapNear(cell.centre, predicted, side));
-  }
-  tracked = next;
-}
-
-/** Empty buffers for `vertexTotal` corners and `indexTotal` triangle indices, with write cursors. */
-function makeBuffers(vertexTotal, indexTotal) {
-  return { position: new Float32Array(vertexTotal * 3), normal: new Float32Array(vertexTotal * 3),
-    strength: new Float32Array(vertexTotal), index: new Uint32Array(indexTotal), vertex: 0, cursor: 0 };
-}
-
-/** Write one polygon, fanned into triangles, with its normal and strength. */
-function writePolygon(points, normal, strength, buffers) {
-  const corners = points.length / 3, start = buffers.vertex;
-  for (let corner = 0; corner < corners; corner++) {
-    buffers.position.set(points.slice(corner * 3, corner * 3 + 3), (start + corner) * 3);
-    buffers.normal.set(normal, (start + corner) * 3);
-    buffers.strength[start + corner] = strength;
-  }
-  for (let corner = 1; corner < corners - 1; corner++) {
-    buffers.index.set([start, start + corner, start + corner + 1], buffers.cursor);
-    buffers.cursor += 3;
-  }
-  buffers.vertex += corners;
-}
-
-/** A flat xyz list moved by `shift` (one periodic-image offset). */
-function shifted(points, shift) {
-  return points.map((value, index) => value + shift[index % 3]);
-}
-
-/** Write one cell's own faces, moved by `shift`, each shrunk toward the cell's centre. */
-function writeCell(cell, shift, buffers) {
-  const strength = unit(cell.pull);
-  for (const face of cell.faces) {
-    const shrunk = face.map((value, index) => cell.centre[index % 3] + (value - cell.centre[index % 3]) * SHRINK);
-    writePolygon(shifted(shrunk, shift), polygonNormal(face), strength, buffers);
-  }
-}
-
-/** Write one joint, moved by `shift`, as a slab on its face: two caps half its real thickness either side, joined by sides. */
-function writeJoint(joint, shift, buffers) {
-  const points = shifted(joint.polygon, shift), corners = points.length / 3, normal = polygonNormal(points);
-  const half = Number.isFinite(joint.thickness) && joint.thickness > 0 ? joint.thickness / 2 : 0;
-  const offset = (sign) => points.map((value, index) => value + sign * normal[index % 3] * half);
-  const top = offset(1), bottom = offset(-1), strength = pushAboveTypical(joint.push);
-  writePolygon(top, normal, strength, buffers);
-  writePolygon(bottom, normal, strength, buffers);
-  for (let corner = 0; corner < corners; corner++) {
-    const next = (corner + 1) % corners, pick = (list, at) => list.slice(at * 3, at * 3 + 3);
-    const side = [...pick(top, corner), ...pick(top, next), ...pick(bottom, next), ...pick(bottom, corner)];
-    writePolygon(side, polygonNormal(side), strength, buffers);
-  }
-}
-
-/**
- * Outlines of the given joints' faces (each polygon's corners joined in a ring, moved by its first volume's
- * shift), as one line set in `material`, each segment carrying its joint's push as strength.
- */
-function outlineLines(joints, shifts, material, order) {
-  const corners = [], strengths = [];
-  for (const joint of joints) {
-    const points = shifted(joint.polygon, shifts.get(joint.a)), count = points.length / 3, strength = pushAboveTypical(joint.push);
-    for (let corner = 0; corner < count; corner++) {
-      const next = (corner + 1) % count;
-      corners.push(...points.slice(corner * 3, corner * 3 + 3), ...points.slice(next * 3, next * 3 + 3));
-      strengths.push(strength, strength);
-    }
-  }
+/** A dynamic geometry of `vertexTotal` vertices with these triangle indices. */
+function dynamicGeometry(vertexTotal, indices) {
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(corners), 3));
-  geometry.setAttribute("strength", new THREE.BufferAttribute(new Float32Array(strengths), 1));
-  const lines = new THREE.LineSegments(geometry, material);
-  lines.frustumCulled = false;
-  lines.renderOrder = order;
-  return lines;
-}
-
-/** One mesh from written buffers, with the glass material. */
-function glassMesh(buffers, material, order) {
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(buffers.position.subarray(0, buffers.vertex * 3), 3));
-  geometry.setAttribute("faceNormal", new THREE.BufferAttribute(buffers.normal.subarray(0, buffers.vertex * 3), 3));
-  geometry.setAttribute("strength", new THREE.BufferAttribute(buffers.strength.subarray(0, buffers.vertex), 1));
-  geometry.setIndex(new THREE.BufferAttribute(buffers.index.subarray(0, buffers.cursor), 1));
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.frustumCulled = false;
-  mesh.renderOrder = order;
-  return mesh;
-}
-
-/** Drop the meshes and the seal lines and free their GPU buffers. */
-function clearMeshes() {
-  for (const name of ["volumes", "joints", "seals"]) {
-    if (!scene3d[name]) continue;
-    scene3d.scene.remove(scene3d[name]);
-    scene3d[name].geometry.dispose();
-    scene3d[name] = null;
+  for (const name of ["position", "color"]) {
+    const attribute = new THREE.BufferAttribute(new Float32Array(vertexTotal * 3), 3);
+    attribute.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute(name, attribute);
   }
+  geometry.setIndex(new THREE.BufferAttribute(vertexTotal > 65535 ? new Uint32Array(indices) : new Uint16Array(indices), 1));
+  return geometry;
 }
 
-/** Joint slabs as one glass mesh, each moved by its first volume's shift. */
-function jointSlabs(joints, shifts) {
-  let corners = 0, indices = 0;
-  for (const joint of joints) {
-    const count = joint.polygon.length / 3;
-    corners += count * 6; indices += (count - 2) * 6 + count * 6;
-  }
-  const buffers = makeBuffers(corners, indices);
-  joints.forEach((joint) => writeJoint(joint, shifts.get(joint.a), buffers));
-  return glassMesh(buffers, scene3d.jointMaterial, 2);
+/** Triangle-fan indices for a polygon whose vertices start at `start`. */
+function fan(start, count, indices) {
+  for (let corner = 1; corner + 1 < count; corner++) indices.push(start, start + corner, start + corner + 1);
 }
 
-/** Rebuild from the latest shapes: exactly the tracked energy volumes, and the joints between two of them. */
-function rebuild() {
-  if (!scene3d.renderer || !latest) return;
-  orbit.centre = boxMiddle();
-  const drawn = [...tracked.keys()].map((id) => latest.byId.get(id)).filter(Boolean);
-  const shifts = new Map(drawn.map((cell) => [cell.id, tracked.get(cell.id).map((value, axis) => value - cell.centre[axis])]));
-  const joints = latest.joints.filter((joint) => shifts.has(joint.a) && shifts.has(joint.b));
-  let cellCorners = 0, cellIndex = 0;
-  for (const cell of drawn) {
-    for (const face of cell.faces) { cellCorners += face.length / 3; cellIndex += (face.length / 3 - 2) * 3; }
-  }
-  const cellBuffers = makeBuffers(cellCorners, cellIndex);
-  drawn.forEach((cell) => writeCell(cell, shifts.get(cell.id), cellBuffers));
-  clearMeshes();
-  scene3d.volumes = glassMesh(cellBuffers, scene3d.volumeMaterial, 1);
-  scene3d.joints = scene3d.jointStyle === "lines"
-    ? outlineLines(joints, shifts, scene3d.jointLineMaterial, 2) : jointSlabs(joints, shifts);
-  scene3d.seals = outlineLines(joints.filter((joint) => joint.sealed === true), shifts, scene3d.sealMaterial, 3);
-  scene3d.scene.add(scene3d.volumes, scene3d.joints, scene3d.seals);
-  scene3d.drawnCells = drawn.length;
-  scene3d.drawnJoints = joints.length;
-  orbit.reach = drawnReach(drawn, shifts, orbit.centre);
-  showParts();
-}
-
-/** Distance from the view centre to the farthest drawn corner (each cell moved by its shift). */
-function drawnReach(cells, shifts, centre) {
-  let reach = 1e-6;
-  for (const cell of cells) {
-    const shift = shifts.get(cell.id);
-    for (const face of cell.faces) {
-      for (let index = 0; index < face.length; index += 3) {
-        reach = Math.max(reach, Math.hypot(face[index] + shift[0] - centre[0], face[index + 1] + shift[1] - centre[1],
-          face[index + 2] + shift[2] - centre[2]));
-      }
+/** Vertex tables for the cells: each face once per cell that has it. */
+function cellTables(message) {
+  const corner = [], owner = [], indices = [];
+  message.faces.forEach((face, faceIndex) => {
+    for (const cell of message.face_cells[faceIndex]) {
+      if (cell < 0) continue;
+      fan(corner.length, face.length, indices);
+      for (const point of face) { corner.push(point); owner.push(cell); }
     }
-  }
-  return reach;
+  });
+  return { corner: Int32Array.from(corner), owner: Int32Array.from(owner), indices };
 }
 
-/** Show or hide the energy volumes and the joints by the show toggles. */
-function showParts() {
-  if (scene3d.volumes) scene3d.volumes.visible = scene3d.show.volumes;
-  if (scene3d.joints) scene3d.joints.visible = scene3d.show.joints;
-  if (scene3d.seals) scene3d.seals.visible = scene3d.show.joints;
+/** Vertex tables for the joint walls: each joint face drawn twice (once shrunk toward each cell), joined at the sides. */
+function wallTables(message) {
+  const corner = [], owner = [], other = [], joint = [], indices = [];
+  message.faces.forEach((face, faceIndex) => {
+    const [first, second] = message.face_cells[faceIndex], jointIndex = message.face_joint[faceIndex];
+    if (first < 0 || second < 0 || jointIndex < 0) return;
+    const start = corner.length, count = face.length;
+    fan(start, count, indices);
+    fan(start + count, count, indices);
+    for (let side = 0; side < count; side++) {
+      const next = (side + 1) % count;
+      indices.push(start + side, start + next, start + count + next, start + side, start + count + next, start + count + side);
+    }
+    for (const [cell, partner] of [[first, second], [second, first]]) {
+      for (const point of face) { corner.push(point); owner.push(cell); other.push(partner); joint.push(jointIndex); }
+    }
+  });
+  return { corner: Int32Array.from(corner), owner: Int32Array.from(owner), other: Int32Array.from(other),
+    joint: Int32Array.from(joint), indices };
+}
+
+/** Every cell's distinct corners, as offsets into one flat list, for its centre. */
+function cellCorners(message) {
+  const sets = Array.from({ length: message.cell_count }, () => new Set());
+  message.faces.forEach((face, faceIndex) => {
+    for (const cell of message.face_cells[faceIndex]) if (cell >= 0) for (const point of face) sets[cell].add(point);
+  });
+  const offsets = new Int32Array(message.cell_count + 1), flat = [];
+  sets.forEach((points, cell) => { offsets[cell] = flat.length; flat.push(...points); });
+  offsets[message.cell_count] = flat.length;
+  return { offsets, flat: Int32Array.from(flat) };
+}
+
+/** Is a mesh message well formed: faces index real corners, face_cells and face_joint line up. */
+function goodMesh(message) {
+  const faces = message.faces, cells = message.face_cells, joints = message.face_joint;
+  if (!Array.isArray(faces) || !Array.isArray(cells) || !Array.isArray(joints)) return false;
+  if (cells.length !== faces.length || joints.length !== faces.length) return false;
+  return faces.every((face) => Array.isArray(face) && face.length >= 3
+    && face.every((point) => Number.isInteger(point) && point >= 0 && point < message.corner_count));
+}
+
+/** Replace the drawn geometry with a new mesh's; positions follow on its first frame. */
+function applyMesh(message) {
+  if (!goodMesh(message)) { console.warn("bad mesh message"); return; }
+  const reset = !mesh || message.step === 0 || message.step < (frame ? frame.step : 0);
+  mesh = Object.assign({}, message, { cellTable: cellTables(message), wallTable: wallTables(message),
+    centreTable: cellCorners(message), centres: new Float32Array(message.cell_count * 3),
+    hidden: new Uint8Array(message.cell_count) });
+  frame = null;
+  if (!scene3d.renderer) return;
+  for (const name of ["cells", "walls"]) {
+    if (scene3d[name]) { scene3d.scene.remove(scene3d[name]); scene3d[name].geometry.dispose(); scene3d[name].material.dispose(); }
+  }
+  const cellGeometry = dynamicGeometry(mesh.cellTable.corner.length, mesh.cellTable.indices);
+  const wallGeometry = dynamicGeometry(mesh.wallTable.corner.length, mesh.wallTable.indices);
+  scene3d.cells = new THREE.Mesh(cellGeometry, solidMaterial());
+  scene3d.walls = new THREE.Mesh(wallGeometry, solidMaterial());
+  for (const part of [scene3d.cells, scene3d.walls]) { part.frustumCulled = false; part.visible = false; scene3d.scene.add(part); }
+  drawCube(message.start_box);
+  if (reset) orbit.follow = true;
+}
+
+/** The starting cube's edges, faint. */
+function drawCube(box) {
+  if (scene3d.cube) { scene3d.scene.remove(scene3d.cube); scene3d.cube.geometry.dispose(); scene3d.cube.material.dispose(); scene3d.cube = null; }
+  if (!Array.isArray(box) || box.length !== 2) return;
+  const [low, high] = box, size = [0, 1, 2].map((axis) => Math.max(high[axis] - low[axis], 1e-9));
+  const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(size[0], size[1], size[2]));
+  scene3d.cube = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x8593a6, transparent: true, opacity: 0.35 }));
+  scene3d.cube.position.set(...[0, 1, 2].map((axis) => (low[axis] + high[axis]) / 2));
+  scene3d.scene.add(scene3d.cube);
+}
+
+/** Read one binary frame; null when it is malformed. */
+function parseFrame(buffer) {
+  if (buffer.byteLength < HEADER_BYTES) return null;
+  const [magic, step, meshId, cornerCount, cellCount, jointCount] = new Uint32Array(buffer, 0, 8);
+  const cornerBytes = cornerCount * 12;
+  if (magic !== FRAME_MAGIC || buffer.byteLength !== HEADER_BYTES + cornerBytes + cellCount + jointCount) return null;
+  return { step, meshId, corners: new Float32Array(buffer, HEADER_BYTES, cornerCount * 3),
+    pull: new Uint8Array(buffer, HEADER_BYTES + cornerBytes, cellCount),
+    push: new Uint8Array(buffer, HEADER_BYTES + cornerBytes + cellCount, jointCount) };
+}
+
+/** Take in a binary frame on the current mesh: move the corners, recolour, redraw. */
+function applyFrame(buffer) {
+  const parsed = parseFrame(buffer);
+  if (!parsed) { console.warn("bad frame"); return; }
+  if (!mesh || parsed.meshId !== mesh.mesh_id) return;   // a frame for a mesh this page does not have
+  if (parsed.corners.length !== mesh.corner_count * 3 || parsed.pull.length !== mesh.cell_count
+      || parsed.push.length !== mesh.joint_count) { console.warn("frame does not fit its mesh"); return; }
+  frame = parsed;
+  redraw();
+}
+
+/** Each cell's centre: the mean of its distinct corners. */
+function updateCentres() {
+  const { offsets, flat } = mesh.centreTable, centres = mesh.centres, corners = frame.corners;
+  for (let cell = 0; cell < mesh.cell_count; cell++) {
+    let sumX = 0, sumY = 0, sumZ = 0;
+    const start = offsets[cell], end = offsets[cell + 1];
+    for (let slot = start; slot < end; slot++) {
+      const point = flat[slot] * 3;
+      sumX += corners[point]; sumY += corners[point + 1]; sumZ += corners[point + 2];
+    }
+    const count = Math.max(1, end - start);
+    centres[cell * 3] = sumX / count; centres[cell * 3 + 1] = sumY / count; centres[cell * 3 + 2] = sumZ / count;
+  }
+}
+
+/** The corners' bounding box now: [low, high]. */
+function cornerBox() {
+  const low = [Infinity, Infinity, Infinity], high = [-Infinity, -Infinity, -Infinity], corners = frame.corners;
+  for (let slot = 0; slot < corners.length; slot++) {
+    const axis = slot % 3;
+    if (corners[slot] < low[axis]) low[axis] = corners[slot];
+    if (corners[slot] > high[axis]) high[axis] = corners[slot];
+  }
+  return [low, high];
+}
+
+/** Mark the cells whose centre lies past the cut plane; returns how many stay drawn. */
+function updateHidden(box) {
+  const axis = cut.axis, plane = box[0][axis] + cut.share * (box[1][axis] - box[0][axis]);
+  let shown = 0;
+  for (let cell = 0; cell < mesh.cell_count; cell++) {
+    mesh.hidden[cell] = cut.share < 1 && mesh.centres[cell * 3 + axis] > plane ? 1 : 0;
+    if (!mesh.hidden[cell]) shown++;
+  }
+  return shown;
+}
+
+/** Blend two RGB triples by `share` (0..1) into `target` at `offset`. */
+function blend(from, to, share, target, offset) {
+  for (let channel = 0; channel < 3; channel++) target[offset + channel] = from[channel] + (to[channel] - from[channel]) * share;
+}
+
+/** Write one table's vertices: its corner pulled GAP toward its cell's centre, collapsed when hidden. */
+function writeVertices(table, positions, colours, colourOf, hiddenOf) {
+  const corners = frame.corners, centres = mesh.centres, keep = 1 - GAP;
+  for (let vertex = 0; vertex < table.corner.length; vertex++) {
+    const point = table.corner[vertex] * 3, centre = table.owner[vertex] * 3, slot = vertex * 3;
+    const share = hiddenOf(vertex) ? 0 : keep;
+    for (let axis = 0; axis < 3; axis++) {
+      positions[slot + axis] = centres[centre + axis] + share * (corners[point + axis] - centres[centre + axis]);
+    }
+    colourOf(vertex, colours, slot);
+  }
+}
+
+/** Redraw the current frame: cells and walls at the frame's corners, coloured by pull and push. */
+function redraw() {
+  if (!mesh || !frame || !scene3d.renderer) { showStats(); return; }
+  updateCentres();
+  const box = cornerBox();
+  scene3d.drawnCells = updateHidden(box);
+  const cellTable = mesh.cellTable, wallTable = mesh.wallTable, hidden = mesh.hidden;
+  const cellGeometry = scene3d.cells.geometry, wallGeometry = scene3d.walls.geometry;
+  writeVertices(cellTable, cellGeometry.attributes.position.array, cellGeometry.attributes.color.array,
+    (vertex, colours, slot) => blend(VOLUME_LIGHT, VOLUME_DARK, frame.pull[cellTable.owner[vertex]] / 255, colours, slot),
+    (vertex) => hidden[cellTable.owner[vertex]]);
+  writeVertices(wallTable, wallGeometry.attributes.position.array, wallGeometry.attributes.color.array,
+    (vertex, colours, slot) => blend(JOINT_DIM, JOINT_BRIGHT, frame.push[wallTable.joint[vertex]] / 255, colours, slot),
+    (vertex) => hidden[wallTable.owner[vertex]] || hidden[wallTable.other[vertex]]);
+  for (const geometry of [cellGeometry, wallGeometry]) {
+    geometry.attributes.position.needsUpdate = true;
+    geometry.attributes.color.needsUpdate = true;
+  }
+  scene3d.cells.visible = scene3d.walls.visible = true;
+  const reach = 0.5 * Math.hypot(box[1][0] - box[0][0], box[1][1] - box[0][1], box[1][2] - box[0][2]);
+  if (orbit.follow) orbit.centre = [0, 1, 2].map((axis) => (box[0][axis] + box[1][axis]) / 2);
+  orbit.reach = Math.max(reach, 1e-6);
   requestDraw();
+  showStats();
 }
-
 /* ---------- camera: orbit around the view centre ---------- */
 /** The screen area the scene should fill: the window minus the open panel on wide screens. */
 function freeArea() {
@@ -638,13 +501,12 @@ canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
   zoomView(Math.exp(-event.deltaY * 0.0012));
 }, { passive: false });
-document.getElementById("fit").addEventListener("click", () => { orbit.follow = true; requestDraw(); });
+document.getElementById("fit").addEventListener("click", () => { orbit.follow = true; redraw(); });
 
 /* ---------- panel ---------- */
 const panel = document.getElementById("panel");
 const runButton = document.getElementById("run");
 const stateLabel = document.getElementById("state");
-let running = false, lastStep = -1;
 
 if (window.innerWidth <= 700) panel.classList.add("collapsed");
 document.getElementById("toggle").addEventListener("click", () => {
@@ -668,26 +530,13 @@ document.getElementById("reset").addEventListener("click", () => {
   const cells = Math.max(50, parseInt(document.getElementById("cellCount").value, 10) || 50);
   send({ type: "reset", seed, cells });
   setRunning(false);
-  lastStep = -1;
-  reselect = true;
 });
 
-for (const button of document.querySelectorAll("button.jointStyle")) {
+for (const button of document.querySelectorAll("button.cutAxis")) {
   button.addEventListener("click", () => {
-    scene3d.jointStyle = button.dataset.style;
-    for (const other of document.querySelectorAll("button.jointStyle")) {
-      other.setAttribute("aria-pressed", String(other === button));
-    }
-    rebuild();
-  });
-}
-
-for (const button of document.querySelectorAll("button.show")) {
-  button.addEventListener("click", () => {
-    const part = button.dataset.show;
-    scene3d.show[part] = !scene3d.show[part];
-    button.setAttribute("aria-pressed", String(scene3d.show[part]));
-    showParts();
+    cut.axis = Number(button.dataset.axis);
+    for (const other of document.querySelectorAll("button.cutAxis")) other.setAttribute("aria-pressed", String(other === button));
+    redraw();
   });
 }
 
@@ -701,25 +550,31 @@ function formatNumber(value) {
   return String(parseFloat(value.toPrecision(3)));
 }
 
+
+
 const statsBox = document.getElementById("stats");
-const SHOWN_STATS = new Set(["cells", "joints", "collapses", "size_vs_start", "energy_spread", "lumps", "sealed_lumps", "neighbour_changes"]);
+const NAMED_STATS = [
+  ["cells", "energy volumes"],
+  ["joints", "joints"],
+  ["collapses", "joint collapses so far"],
+  ["splits", "volume splits so far"],
+  ["size_vs_start", "size vs start"],
+  ["total_energy", "total energy"],
+  ["lumps", "lumps"],
+  ["sealed_lumps", "sealed lumps"],
+  ["neighbour_changes", "neighbour changes (should stay 0)"],
+];
 
 /** Write the live stats as plain lines. */
 function showStats() {
-  const stats = latest ? latest.stats : {};
+  const stats = latestStats ? latestStats.stats : {};
+  const named = new Set(NAMED_STATS.map(([name]) => name));
   const lines = [
-    ["step", latest ? latest.step : undefined],
-    ["energy volumes", stats.cells],
-    ["joints", stats.joints],
-    ["joint collapses so far", stats.collapses],
-    ["size vs start", stats.size_vs_start == null ? undefined : formatNumber(stats.size_vs_start) + "x"],
-    ["energy spread (packing)", stats.energy_spread],
-    ["lumps", stats.lumps],
-    ["sealed lumps", stats.sealed_lumps],
-    ["neighbour changes (drawing only)", stats.neighbour_changes],
-    ...Object.keys(stats).filter((name) => !SHOWN_STATS.has(name)).map((name) => [name.replace(/_/g, " "), stats[name]]),
-    ["energy volumes drawn", scene3d.renderer ? scene3d.drawnCells : undefined],
-    ["joints drawn", scene3d.renderer ? scene3d.drawnJoints : undefined],
+    ["step", latestStats ? latestStats.step : undefined],
+    ...NAMED_STATS.map(([name, label]) => [label, name === "size_vs_start" && stats[name] != null
+      ? formatNumber(stats[name]) + "x" : stats[name]]),
+    ...Object.keys(stats).filter((name) => !named.has(name)).map((name) => [name.replace(/_/g, " "), stats[name]]),
+    ["energy volumes drawn", mesh && frame ? scene3d.drawnCells : undefined],
   ];
   statsBox.replaceChildren(...lines.map(([label, value]) => {
     const line = document.createElement("div");
@@ -802,30 +657,20 @@ function applySettings(values) {
   }
 }
 
-/* ---------- view control: how many cells to draw, nearest the view centre first ---------- */
-const DRAW_RANGE = [10, 5000];
-let rebuildTimer = 0;
-const drawSlider = labelledSlider("cells to draw (nearest the view centre)", document.getElementById("viewSettings"), (position) => {
-  drawLimit = Math.round(DRAW_RANGE[0] * Math.pow(DRAW_RANGE[1] / DRAW_RANGE[0], position / 1000));
-  showDrawLimit();
-  clearTimeout(rebuildTimer);
-  rebuildTimer = setTimeout(() => {
-    if (!latest) return;
-    selectTracked();
-    orbit.follow = true;
-    rebuild();
-    showStats();
-  }, 60);
+/* ---------- view control: the cut plane ---------- */
+const cutSlider = labelledSlider("cut (hide the cells past a plane)", document.getElementById("viewSettings"), (position) => {
+  cut.share = position / 1000;
+  showCut();
+  redraw();
 });
 
-/** Show the draw limit on its slider, "all" once it reaches every energy volume. */
-function showDrawLimit() {
-  const total = latest ? latest.cells.length : Infinity;
-  drawSlider.valueLabel.textContent = drawLimit >= total ? `all ${total}` : String(drawLimit);
+/** Show the cut share on its slider, "none" at the far end. */
+function showCut() {
+  cutSlider.valueLabel.textContent = cut.share >= 1 ? "none" : `${Math.round(cut.share * 100)}% across`;
 }
 
-drawSlider.input.value = String(Math.round(1000 * Math.log(DEFAULT_DRAWN / DRAW_RANGE[0]) / Math.log(DRAW_RANGE[1] / DRAW_RANGE[0])));
-showDrawLimit();
+cutSlider.input.value = "1000";
+showCut();
 
 /* ---------- connection ---------- */
 const offline = document.getElementById("offline");
@@ -851,45 +696,31 @@ function showOffline() {
   offline.hidden = false;
 }
 
-/** Take in a shapes message: draw exactly its cells and joints, show its stats. */
-function applyShapes(message) {
-  if (message.step > lastStep && lastStep >= 0 && !running) setRunning(true);
-  if (message.step < lastStep) reselect = true;          // the simulation was reset (here or by another page)
-  lastStep = message.step;
-  const previous = latest;
-  latest = checkShapes(message);
-  typicalPush = medianPush(latest.joints || []);
-  if (latest.stats.joints === 0) setRunning(false);
-  if (reselect || !previous || tracked.size === 0) {
-    selectTracked();
-    reselect = false;
-    orbit.follow = true;
-  } else {
-    followTracked(latest.side / previous.side, Math.max(0, previous.cells.length - latest.cells.length));
-  }
-  rebuild();
-  showDrawLimit();
+/** Take in a stats message: the run state and the numbers. */
+function applyStats(message) {
+  latestStats = message;
+  setRunning(Boolean(message.running));
   showStats();
 }
 
-/** Route one server message to its handler. */
+/** Route one text message to its handler. */
 function handleMessage(message) {
-  if (message.type === "shapes") applyShapes(message);
+  if (message.type === "mesh") applyMesh(message);
+  else if (message.type === "stats") applyStats(message);
   else if (message.type === "settings") applySettings(message.values || {});
 }
 
 /** Open the socket and keep retrying until the server answers. */
 function connect() {
   socket = new WebSocket(socketAddress());
+  socket.binaryType = "arraybuffer";
   socket.addEventListener("open", () => {
     everConnected = true;
     retryDelay = 1000;
     if (THREE_READY) offline.hidden = true; else showNoThree();
-    setRunning(false);
-    lastStep = -1;
-    reselect = true;
   });
   socket.addEventListener("message", (event) => {
+    if (event.data instanceof ArrayBuffer) { applyFrame(event.data); return; }
     let message;
     try { message = JSON.parse(event.data); } catch (error) { console.warn("bad message", error); return; }
     handleMessage(message);

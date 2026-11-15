@@ -14,8 +14,10 @@ rule applies from the next step.
 place) or a pure `physics.cells.step(engine, settings)`; the method wins when
 the Engine has one. Raises ValueError when an energy stops being finite and
 positive (a returned engine is then not taken; one that stepped in place
-already changed). The app holds no geometry: shapes
-come only from `physics.cells.shapes(engine)`.
+already changed). `start_box` is [[x, y, z], [x, y, z]], the bounding box of
+`engine.corners` at the reset (the starting cube), kept through the run.
+The app holds no geometry: corners, faces, pulls and pushes come from the engine
+(`physics.cells.mesh_message`, `physics.cells.frame_arrays`).
 """
 from __future__ import annotations
 
@@ -42,6 +44,8 @@ class Simulation:
     def reset(self, seed: int, cells: int) -> None:
         """Fresh uneven engine and default settings."""
         self.engine = new_engine(cells, seed, self.unevenness)
+        corners = np.asarray(self.engine.corners, dtype=float).reshape(-1, 3)
+        self.start_box = [corners.min(axis=0).tolist(), corners.max(axis=0).tolist()]
         self.settings = EngineSettings.all_on()
         self.ranges = setting_ranges(self.settings)
         self.seed = seed

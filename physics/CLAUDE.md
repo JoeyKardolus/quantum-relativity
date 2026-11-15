@@ -1,40 +1,36 @@
 # physics/
 
 Quantum-relativity simulation. Rules: `docs/bible.md#physicsquantum-relativity`; words: `CONTEXT.md`
-(energy volume, joint, connection, joint collapse, drift (the leak), reference spacetime; never node, edge,
+(energy volume, joint, seam, joint collapse, volume split, drift (the leak); never node, edge,
 vertex, or merge for joint collapse).
 
-The core is `cells/`: the engine. Energy volumes in a periodic box, their exact cell shapes
-from a power (Laguerre) tessellation (pyvoro2, pinned), and a joint on every shared face. `app/`
-is the live simulator on it (`python -m physics.app`); it draws `cells.shapes(engine)` as sent
-(sealed lumps' walls gold) and has no geometry code. `network/`, `rules/`, `measure/` and `experiments/` are the earlier
-joint-network milestones.
+The core is `cells/`: the engine. Energy volumes in an open cube (not wrapped), kept as a mesh of
+shared corners; each face is shared by the two volumes of its joint, an outer face borders nothing.
+`app/` is the live simulator on it (`python -m physics.app`). `network/`, `rules/`, `measure/` and
+`experiments/` are the earlier joint-network milestones.
 
 ## Must not get wrong
 
-- **The engine owns the shapes; positions are labels.** `cells.Engine` = `Grid` (energy, volume,
-  charge per energy volume, joints with their volume, seams) plus a seed position and power weight per
-  cell, used only to tessellate. Rules and measurements read only the Grid, never a position.
-  `step(engine, settings) -> Engine` is pure. The grid is woven: joints start balanced on the
-  shared faces and change only by collapse; drawn shapes drift off them (`neighbour_changes`).
-- **`tessellate.py` calls pyvoro2's private native function** and does the input checks itself;
-  keep `pyvoro2==0.8.0` pinned or re-check that call on an upgrade.
-- **Joints are thin walls holding space** (rest 3% of their volumes' mean, `joint_rest`).
-  Pull destroys squeezed-out space; push swells joints back with new space.
-  **Total energy never changes**: only the leak moves it. Volumes join only through a joint
-  below `push_limit` times rest, keeping both energies.
-- **Energy alone sets volume**: `cells/rest_volume.py` (`(1/E)^3`), set after the leak; in
-  `network/` `energy * length = LENGTH_SCALE`. Push and pull never change an energy volume.
-- **All rules are always on, nothing placed by hand.** Energy starts slightly uneven everywhere;
-  lumps must form by themselves. Drift is the leak (`cells/leak.py`): it flows only along seams
-  (tessellation edges), as open as `cells/seam_openness.py` says (closed past `seal_point`),
-  by pull (`p_b / sum p_k`).
-- **Honesty.** Never tune a setting, seed or fit window until a result passes. Report every number
-  with seed and settings; report a miss. Today (seed 1, 1000 cells, unevenness 0.5, defaults, 300
-  steps): 0 collapses; space 0.85 of its start; lumps 17 at step 50, 1 at 300, none sealed;
-  neighbour_changes 7115 (miss: 26% face area off joints); app 3.7 steps/s.
-- **Speed.** Vectorised numpy, scipy.sparse; a step is about 100 ms at 1000 cells,
-  `new_engine` 5 s, nearly all tessellation; `shapes()` is a 6 MB message at 1000 cells.
+- **Cut once, then only move corners.** `first_mesh.py` is the only tessellation (pyvoro2's private
+  `_core`, at start only; keep `pyvoro2==0.8.0` pinned or re-check it on an upgrade). A step moves
+  corners (`relax_corners.py`); topology changes only in `collapse_cells.py` and `split_cell.py`, so
+  `neighbour_changes` is 0 by construction. Never re-tessellate in `step`.
+- **Contract with the app**: `Engine` (`corners`, `faces`, `face_cells` with -1 outside, `face_joint`,
+  `grid`), `step(engine, settings) -> Engine` (pure), `mesh_message`, `frame_arrays` (float32 corners,
+  uint8 pull, uint8 push), `engine_stats`. Rules read only the Grid, never a corner.
+- **Joints oscillate, undamped**: thickness plus rate (`swing_joints.py`); push and squeeze are springs.
+  Do not add damping to make a result pass. Rest is `joint_rest` x the volumes' mean length.
+- **Total energy never changes**: only the leak moves it, along seams (`leak.py`, `seam_openness.py`,
+  closed past `seal_point`), by pull. Collapse keeps both energies; a split shares energy by volume.
+  Energy sets the volume a cell relaxes toward (`rest_volume.py`, `(1/E)^3`).
+- **Honesty.** Never tune a setting, seed or fit window until a result passes; report every number with
+  seed and settings, and every miss. Today (seed 1, 1000 cells, unevenness 0.5, defaults): space 0.81
+  at step 10, first collapse step 29, runaway to one cell by step 48 (the app pauses there); 0 splits,
+  no growth (miss); energy constant; neighbour changes 0.
+- **Page data stays light.** A JSON "mesh" only on start, collapse or split (~250 kB at 1000 cells); every
+  frame binary (`page_frame.py`: 32-byte header, float32 corners, uint8 pull and push), about 70 kB at 1000
+  cells, at most 10 per second. The drawn gap is a fixed 10% shrink, not the joint's real thickness.
+- **Speed.** A step is about 55 ms at 1000 cells, 100 ms at 2000; `new_engine` 4.5 s at 1000.
 - **Layout.** One public function (or type) per file, helpers `_prefixed`, each subpackage
   `__init__.py` holds the module map and `__all__`.
 - **Port 8765** is the owner's own running app; test on another port (`--port 8766`).

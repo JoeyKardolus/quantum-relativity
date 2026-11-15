@@ -1,73 +1,79 @@
 """Cells layer: the engine. Energy volumes and joints, the rules that step them, and the
-exact, gap-free cell shapes they take in a periodic box.
+mesh of shared corners that is their exact, gap-free geometry in an open cube.
 
-The rules and every measurement read only energies, sizes and the neighbour graph
-(Grid). A working position and a power weight per energy volume are labels the
-engine keeps only to compute the shapes (a periodic power tessellation). The grid
-is woven: its joints are the shared faces of the first tessellation and change only
-by joint collapse; the shapes drawn later may drift from them (neighbour_changes).
+The rules and every measurement read only energies, sizes, joint thicknesses and the
+neighbour graph (Grid). The mesh (corners shared between cells, faces shared between
+the two cells of a joint) is cut once from a Voronoi tessellation at the start; after
+that a step only moves corners, and the topology changes only by joint collapse (two
+cells become one) and volume split (a cell stretched too thin is cut in two).
 
 Module map:
-  engine.py           Engine: Grid + positions, weights, box side, tessellation, counts
-  engine_settings.py  EngineSettings: rule strengths, all_on() defaults
-  new_engine.py       new_engine: seeded uneven energy, settled shapes, joints balanced
-  step.py             step: pure Engine -> Engine; rules, then seeds, box and shapes follow
-  shapes.py           shapes: cells' faces with pull, joints' faces with push, for drawing
-  engine_stats.py     engine_stats: cells, joints, collapses, size, spread, lumps, sealed
-  lumps.py            lumps: lump number per energy volume, and which lumps have sealed
-  grid.py             Grid: per energy volume its energy, volume and charge, the joints
-                      between neighbours with each joint's volume, the seams where three
-                      joints meet; no shapes, no coordinates
-  apply_rules.py      apply_rules: move_space, then collapse of joints below their limit
-  rest_volume.py      rest_volume: the energy-volume rule, volume = (VOLUME_SCALE / E) ** 3
-  joint_rest.py       joint_rest: a joint's rest volume, a share of its neighbours' mean volume
-  joint_balance.py    joint_balance: the volume where a joint's push cancels its pull
-  pull_potential.py   pull_potential: grounded graph-Poisson spread of energy
-  seam_joints.py      seam_joints: the three joints that meet at each seam
-  seam_openness.py    seam_openness: 1 relaxed .. 0 at the seal point, per seam
-  leak.py             leak: each volume leaks energy along open seams, by pull
-  share_space.py      share_space: an energy volume hands space to its joints by their size
-  move_space.py       move_space: pull, push, leak, size from energy; no collapse
-  joint_collapse.py   joint_collapse: joints that gave way, volumes fall into each other
-  joint_squeeze.py    joint_squeeze: 0..1 how close each joint is to its limit (its push)
-  tessellation.py     Tessellation: volumes, centroids, faces, neighbour pairs, seams
-  tessellate.py       tessellate: periodic power tessellation of positions (pyvoro2)
-  target_size.py      target_size: energy volume plus half its joints, per cell
-  fit_weights.py      fit_weights: Newton step of the weights toward the target sizes
-  move_seeds.py       move_seeds: seeds relax to centroids, drawn across squeezed joints, capped
-  reconcile_joints.py reconcile_joints: joints become the new faces (new_engine's settling)
-  neighbour_changes.py neighbour_changes: pairs the shapes changed outside a collapse
+  engine.py             Engine: Grid + corners, faces, face_cells, face_joint, fan, counts
+  engine_settings.py    EngineSettings: rule strengths, all_on() defaults
+  new_engine.py         new_engine: seeded uneven energy, first mesh, joints balanced, settled
+  step.py               step: pure Engine -> Engine; pull, swing, leak, collapse, split, corners
+  engine_stats.py       engine_stats: cells, joints, collapses, splits, size, energy, lumps
+  mesh_message.py       mesh_message: the topology for the page, on start, collapse, split
+  frame_arrays.py       frame_arrays: corners float32, per-cell pull and per-joint push uint8
+  lumps.py              lumps: lump number per energy volume, and which lumps have sealed
+  grid.py               Grid: per energy volume energy, volume, pull, charge; per joint
+                        thickness, rate, squeeze; seams; no shapes, no coordinates
+  rest_volume.py        rest_volume: the energy-volume rule, volume = (VOLUME_SCALE / E) ** 3
+  joint_rest.py         joint_rest: a joint's rest thickness, a share of its volumes' length
+  joint_balance.py      joint_balance: the thickness where push cancels squeeze
+  joint_squeeze.py      joint_squeeze: 0..1 how close each joint is to its limit (its push)
+  swing_joints.py       swing_joints: one undamped spring step of every joint
+  pull_potential.py     pull_potential: grounded graph-Poisson spread of energy
+  seam_joints.py        seam_joints: the three joints that meet at each seam
+  seam_openness.py      seam_openness: 1 relaxed .. 0 at the seal point, per seam
+  leak.py               leak: each volume leaks energy along open seams, by pull
+  first_mesh.py         first_mesh: the one Voronoi tessellation, shared corners (pyvoro2)
+  fan.py                Fan: faces as triangles with (cell, corner) gradient slots
+  build_fan.py          build_fan: the Fan of a topology
+  cell_volumes.py       cell_volumes: each cell's measured volume
+  face_areas.py         face_areas: each face's area
+  cell_targets.py       cell_targets: energy volume plus half its joint walls, per cell
+  relax_corners.py      relax_corners: corners move so cells follow their targets
+  face_joints.py        face_joints: joints from the faces, thickness carried over
+  mesh_seams.py         mesh_seams: three-cell edges of the mesh
+  collapse_cells.py     collapse_cells: the mesh after joints give way
+  split_cell.py         split_cell: one cell cut in two by a new face
+  drop_loose_corners.py drop_loose_corners: corners no face uses go
 """
 from physics.cells.grid import Grid
 from physics.cells.rest_volume import VOLUME_SCALE, rest_volume
 from physics.cells.joint_rest import joint_rest
-from physics.cells.joint_balance import joint_balance
 from physics.cells.engine_settings import EngineSettings
 from physics.cells.pull_potential import pull_potential
+from physics.cells.joint_balance import joint_balance
+from physics.cells.joint_squeeze import joint_squeeze
+from physics.cells.swing_joints import swing_joints
 from physics.cells.seam_joints import seam_joints
 from physics.cells.seam_openness import seam_openness
 from physics.cells.leak import leak
-from physics.cells.share_space import share_space
-from physics.cells.move_space import move_space
-from physics.cells.joint_collapse import joint_collapse
-from physics.cells.joint_squeeze import joint_squeeze
-from physics.cells.apply_rules import apply_rules
-from physics.cells.tessellation import Tessellation
-from physics.cells.tessellate import tessellate
-from physics.cells.target_size import target_size
-from physics.cells.fit_weights import fit_weights
-from physics.cells.move_seeds import move_seeds
-from physics.cells.reconcile_joints import reconcile_joints
-from physics.cells.neighbour_changes import neighbour_changes
+from physics.cells.fan import Fan
+from physics.cells.build_fan import build_fan
+from physics.cells.cell_volumes import cell_volumes
+from physics.cells.face_areas import face_areas
+from physics.cells.cell_targets import cell_targets
+from physics.cells.relax_corners import relax_corners
+from physics.cells.first_mesh import first_mesh
+from physics.cells.face_joints import face_joints
+from physics.cells.mesh_seams import mesh_seams
+from physics.cells.collapse_cells import collapse_cells
+from physics.cells.split_cell import split_cell
+from physics.cells.drop_loose_corners import drop_loose_corners
 from physics.cells.engine import Engine
 from physics.cells.new_engine import new_engine
 from physics.cells.step import step
 from physics.cells.lumps import lumps
-from physics.cells.shapes import shapes
 from physics.cells.engine_stats import engine_stats
+from physics.cells.mesh_message import mesh_message
+from physics.cells.frame_arrays import frame_arrays
 
-__all__ = ["Grid", "VOLUME_SCALE", "rest_volume", "joint_rest", "joint_balance", "EngineSettings",
-           "pull_potential", "seam_joints", "seam_openness", "leak", "share_space", "move_space", "joint_collapse",
-           "joint_squeeze", "apply_rules", "Tessellation", "tessellate", "target_size",
-           "fit_weights", "move_seeds", "reconcile_joints", "neighbour_changes", "Engine", "new_engine", "step",
-           "lumps", "shapes", "engine_stats"]
+__all__ = ["Grid", "VOLUME_SCALE", "rest_volume", "joint_rest", "EngineSettings", "pull_potential",
+           "joint_balance", "joint_squeeze", "swing_joints", "seam_joints", "seam_openness", "leak",
+           "Fan", "build_fan", "cell_volumes", "face_areas", "cell_targets", "relax_corners",
+           "first_mesh", "face_joints", "mesh_seams", "collapse_cells", "split_cell",
+           "drop_loose_corners", "Engine", "new_engine", "step", "lumps", "engine_stats",
+           "mesh_message", "frame_arrays"]
