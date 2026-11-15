@@ -28,6 +28,7 @@ The core depth/seam vocabulary used by `improve-codebase-architecture`, `tdd`, `
 - **deep**: small interface, lots of behaviour behind it.
 - **shallow**: interface nearly as complex as the implementation. _Avoid_: thin, anaemic.
 - **volume split**: an energy volume grown too big tearing apart, the tear becoming a new joint; the mirror of joint collapse and the only way new volumes and joints appear. _Avoid_: division, creation, spawning.
+- **Planck box**: one of the fixed, smallest units of space in the engine's grid; boxes never move or stretch, energy flows through them as a fluid, and every cell (energy volume or joint) is a group of them, its size being how many it holds. _Avoid_: voxel, pixel, cell (a cell is a group of Planck boxes).
 - **seam**: the passage through a joint by which energy leaks from one energy volume to the next (A to B to A); it narrows as the joint is squeezed and closes past the seal point. _Avoid_: channel, pore, edge, Plateau border.
 - **adapter**: concrete thing satisfying an interface at a seam. _Avoid_: impl, plugin.
 - **port**: interface defined for cross-seam dependencies.
