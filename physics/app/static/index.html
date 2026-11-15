@@ -152,16 +152,16 @@ const LABELS = {
   joint_rest: "joint rest thickness",
   leak: "leak (energy flowing to harder-pulling neighbours)",
   seal_point: "seal point (seams close, lump holds)",
-  split_threshold: "split threshold (energy per volume below it, the volume splits)",
+  split_size: "split size (a volume past this many times the starting mean size splits)",
 };
 const RUN_SETTINGS = new Set(["speed", "unevenness"]);
 const GAP = 0.08;                // each volume's outline (and fill) drawn this share smaller about its centre; the joint sits in the gap
 const FRAME_MAGIC = 0x31465251;  // "QRF1", the binary frame's first word (physics/app/page_frame.py)
 const HEADER_BYTES = 32;         // 8 uint32 words
-const VOLUME_LIGHT = [1.0, 0.62, 0.6], VOLUME_DARK = [0.85, 0.05, 0.08];   // deep red, still visible on the dark ground
+const VOLUME_LIGHT = [1.0, 0.82, 0.78], VOLUME_DARK = [0.62, 0.0, 0.05];   // pale pink (pulls least) to deep red (pulls most)
 const FILL_OPACITY = 0.14;
 const LAYER_OPACITY = 0.15;      // the joint layers' blue fill, always drawn
-const JOINT_DIM = [0.1, 0.18, 0.45], JOINT_BRIGHT = [0.55, 0.85, 1.0];
+const JOINT_DIM = [0.06, 0.1, 0.28], JOINT_BRIGHT = [0.62, 0.92, 1.0];
 
 /* ---------- the 3D scene ---------- */
 const canvas = document.getElementById("scene");
@@ -378,6 +378,15 @@ function drawCube(box) {
   scene3d.scene.add(scene3d.cube);
 }
 
+/** Replace each value by its rank among all values, spread over 0..255: colour shows who pulls or pushes harder
+ * than whom, so a few extreme values cannot squeeze everyone else into one shade. */
+function rankBytes(values) {
+  const order = Array.from(values.keys()).sort((first, second) => values[first] - values[second]);
+  const ranked = new Uint8Array(values.length), last = Math.max(values.length - 1, 1);
+  order.forEach((index, place) => { ranked[index] = Math.round(255 * place / last); });
+  return ranked;
+}
+
 /** Read one binary frame; null when it is malformed. */
 function parseFrame(buffer) {
   if (buffer.byteLength < HEADER_BYTES) return null;
@@ -385,8 +394,8 @@ function parseFrame(buffer) {
   const cornerBytes = cornerCount * 12;
   if (magic !== FRAME_MAGIC || buffer.byteLength !== HEADER_BYTES + cornerBytes + cellCount + jointCount) return null;
   return { step, meshId, corners: new Float32Array(buffer, HEADER_BYTES, cornerCount * 3),
-    pull: new Uint8Array(buffer, HEADER_BYTES + cornerBytes, cellCount),
-    push: new Uint8Array(buffer, HEADER_BYTES + cornerBytes + cellCount, jointCount) };
+    pull: rankBytes(new Uint8Array(buffer, HEADER_BYTES + cornerBytes, cellCount)),
+    push: rankBytes(new Uint8Array(buffer, HEADER_BYTES + cornerBytes + cellCount, jointCount)) };
 }
 
 /** Take in a binary frame on the current mesh: move the corners, recolour, redraw. */
