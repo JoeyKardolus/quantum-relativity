@@ -1,17 +1,14 @@
-"""Face areas: each face's area, from the corners and the fan.
+"""Face areas: each triangle's area, from the corners.
 
-Contract: `face_areas(corners, fan)` returns (f,) per face the summed area of its
-fan triangles, |(b - a) x (c - a)| / 2 each (a face need not be flat).
+Contract: `face_areas(corners, faces)` returns (f,) per triangle (a, b, c) of faces
+(f, 3) its area |(b - a) x (c - a)| / 2.
 """
 from __future__ import annotations
 
 import numpy as np
 
-from physics.cells.fan import Fan
 
-
-def face_areas(corners: np.ndarray, fan: Fan) -> np.ndarray:
-    """Per face the area of its fan of triangles."""
-    first, second, third = (corners[fan.triangles[:, column]] for column in range(3))
-    area = np.linalg.norm(np.cross(second - first, third - first), axis=1) / 2
-    return np.bincount(fan.tri_face, area, len(fan.face_cells))
+def face_areas(corners: np.ndarray, faces: np.ndarray) -> np.ndarray:
+    """Per triangle its area."""
+    first, second, third = (corners[faces[:, column]] for column in range(3))
+    return np.linalg.norm(np.cross(second - first, third - first), axis=1) / 2

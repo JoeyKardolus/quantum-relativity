@@ -1,66 +1,81 @@
-"""Relax corners: move the shared corners so each cell's measured volume follows its target.
+"""Relax corners: move the shared corners so each tetrahedron's measured volume follows its target.
 
-Contract: `relax_corners(corners, fan, targets, passes)` returns new corners (k, 3);
-the topology (fan) is untouched, so no two cells start or stop neighbouring here.
-Each pass is one least-squares Newton step on all cells at once: with e the cells'
-errors target - V (cell_volumes.py), each clipped to MAX_CHANGE (5%) of the cell's
-volume (of its target when the volume is not positive), and G the gradients of
-the cells' volumes over the corners (per fan triangle (a, b, c): b x c / 6,
-c x a / 6, a x b / 6, signed by the face side), the corners move by the smallest
-displacement that fixes every clipped error to first order:
-  dx = G^T y,   (G G^T + RIDGE * mean diagonal * I) y = e
-(solved by conjugate gradients). A corner inside the mesh is shared by cells on all
-sides, so a squeeze inside spreads outward through every cell to the outside
-corners, which nothing pushes back: the open cube grows or shrinks at its edge.
-The clip keeps each step inside the range where the straight-line guess holds, so
-a cell far from its target (just split or collapsed) gets there over several
-steps; a small cell is not crushed by big neighbours (every cell's error counts).
-RIDGE (1e-9) only keeps the system definite. Raises RuntimeError if the solve
-does not converge.
+Contract: `relax_corners(corners, tets, targets, passes)` returns new corners (k, 3);
+the topology (tets) is untouched, so no two cells start or stop neighbouring here.
+Each pass is one regularised least-squares Gauss-Newton step on all tetrahedra at
+once: with e the errors target - V (cell_volumes.py), each clipped to MAX_CHANGE (5%)
+of the tetrahedron's volume (of its target when the volume is not positive), and G
+the gradients of the volumes over the corners (for (a, b, c, d):
+(c - a) x (d - a) / 6 at b, (d - a) x (b - a) / 6 at c, (b - a) x (c - a) / 6 at d,
+minus their sum at a), each row of both divided by the tetrahedron's volume (so
+every tetrahedron's error counts as a share of its size, and a small one is not
+crushed by big neighbours), the corners move by
+  dx = (G^T G + RIDGE * mean diagonal * I)^-1 G^T e
+(a sparse direct solve). A tetrahedral mesh has about six tetrahedra per corner, so
+there are more volumes than corner directions: the fit is least squares and a
+tetrahedron's size reaches its target only as far as its neighbours' let it.
+RIDGE (1e-2, Levenberg-Marquardt damping) keeps the system definite and the move small in
+the directions the volumes hold only weakly (it holds the mesh's free translations and
+turns still). A corner inside is shared by tetrahedra on all sides, so a squeeze
+inside spreads outward to the outside corners, which nothing pushes back: the open
+cube grows or shrinks at its edge. A pass whose move would leave any tetrahedron
+with less than KEEP_SHARE (1/2) of its volume is halved, up to HALVINGS (30) times,
+so no tetrahedron is flipped or flattened by the relaxation. Raises RuntimeError if
+the solve gives a value that is not finite or the halvings run out.
 """
 from __future__ import annotations
 
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import cg
+from scipy.sparse.linalg import spsolve
 
 from physics.cells.cell_volumes import cell_volumes
-from physics.cells.fan import Fan
 
 MAX_CHANGE = 0.05
-RIDGE = 1e-9
+RIDGE = 1e-2
+KEEP_SHARE = 0.5
+HALVINGS = 30
 
 
-def relax_corners(corners: np.ndarray, fan: Fan, targets: np.ndarray, passes: int) -> np.ndarray:
-    """Corners after `passes` least-squares Newton steps of every cell toward its target volume."""
+def relax_corners(corners: np.ndarray, tets: np.ndarray, targets: np.ndarray, passes: int) -> np.ndarray:
+    """Corners after `passes` least-squares steps of every tetrahedron toward its target volume."""
     moved = np.array(corners, dtype=float)
-    slot_count = len(fan.slot_cell)
-    columns = (fan.slot_corner[:, None] * 3 + np.arange(3)).ravel()
-    rows = np.repeat(fan.slot_cell, 3)
+    rows = np.repeat(np.arange(len(tets)), 12)
+    columns = (tets[:, :, None] * 3 + np.arange(3)).reshape(-1)
     for _ in range(passes):
-        volume = cell_volumes(moved, fan)
+        volume = cell_volumes(moved, tets)
         limit = MAX_CHANGE * np.where(volume > 0, volume, np.abs(targets))
-        error = np.clip(targets - volume, -limit, limit)
-        gradient = sp.csr_matrix((_slot_gradient(moved, fan, slot_count).ravel(), (rows, columns)),
-                                 shape=(fan.cell_count, 3 * len(moved)))
-        system = (gradient @ gradient.T).tocsr()
+        scale = 1.0 / np.where(volume > 0, volume, np.abs(targets))
+        error = np.clip(targets - volume, -limit, limit) * scale
+        gradient = sp.csr_matrix(((_gradients(moved, tets) * scale[:, None, None]).ravel(),
+                                  (rows, columns)), shape=(len(tets), 3 * len(moved)))
+        system = (gradient.T @ gradient).tocsr()
         diagonal = system.diagonal()
         ridge = RIDGE * float(diagonal.mean()) if len(diagonal) else 0.0
-        system = system + sp.identity(fan.cell_count, format="csr") * ridge
-        weight, failed = cg(system, error, rtol=1e-10, maxiter=20 * fan.cell_count,
-                            M=sp.diags(1.0 / np.maximum(diagonal + ridge, 1e-300)))
-        if failed:
-            raise RuntimeError("corner relaxation did not converge")
-        moved += (gradient.T @ weight).reshape(-1, 3)
+        system = system + sp.identity(system.shape[0], format="csr") * ridge
+        step = spsolve(system.tocsc(), gradient.T @ error)
+        if not np.isfinite(step).all():
+            raise RuntimeError("corner relaxation: the solve gave a value that is not finite")
+        moved = _kept_shape(moved, step.reshape(-1, 3), tets, volume)
     return moved
 
 
-def _slot_gradient(corners: np.ndarray, fan: Fan, slot_count: int) -> np.ndarray:
-    """Per (cell, corner) slot the gradient of that cell's volume over that corner."""
-    centred = corners - corners.mean(axis=0)
-    first, second, third = (centred[fan.triangles[:, column]] for column in range(3))
-    per_vertex = np.stack([np.cross(second, third), np.cross(third, first),
-                           np.cross(first, second)], axis=1).reshape(-1, 3) / 6
-    signed = per_vertex[fan.entry_vertex] * fan.entry_sign[:, None]
-    return np.stack([np.bincount(fan.entry_slot, signed[:, axis], slot_count)
-                     for axis in range(3)], axis=1)
+def _gradients(corners: np.ndarray, tets: np.ndarray) -> np.ndarray:
+    """Per tetrahedron (n, 4, 3) the gradient of its volume over each of its corners."""
+    first, second, third, fourth = (corners[tets[:, column]] for column in range(4))
+    at_second = np.cross(third - first, fourth - first) / 6
+    at_third = np.cross(fourth - first, second - first) / 6
+    at_fourth = np.cross(second - first, third - first) / 6
+    at_first = -(at_second + at_third + at_fourth)
+    return np.stack([at_first, at_second, at_third, at_fourth], axis=1)
+
+
+def _kept_shape(corners: np.ndarray, step: np.ndarray, tets: np.ndarray, volume: np.ndarray) -> np.ndarray:
+    """Corners moved by step, halved until every tetrahedron keeps KEEP_SHARE of its volume."""
+    floor = KEEP_SHARE * volume
+    for _ in range(HALVINGS):
+        moved = corners + step
+        if (cell_volumes(moved, tets) > floor).all():
+            return moved
+        step = step / 2
+    raise RuntimeError("corner relaxation: no move keeps every tetrahedron the right way out")

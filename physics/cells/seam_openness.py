@@ -1,11 +1,11 @@
 """Seam openness: how wide each seam is, 1 relaxed, 0 sealed (bible rule 6).
 
-Contract: `seam_openness(grid, settings)` returns one value in [0, 1] per seam
-of grid.seams. A joint's squeeze depth is d = max(0, 1 - t / R), t its thickness
-and R its rest thickness (joint_rest.py): 0 at or above rest, 1 - push_limit at the
-push limit, where it collapses. A seam is as wide as its most squeezed joint lets
-it be:
-  openness = clip(1 - max(d_ab, d_ac, d_bc) / seal, 0, 1)
+Contract: `seam_openness(grid, settings)` returns one value in [0, 1] per seam of
+grid.seams ((seam, joint) rows, mesh_seams.py). A joint's squeeze depth is
+d = max(0, 1 - t / R), t its thickness and R its rest thickness (joint_rest.py): 0 at
+or above rest, 1 - push_limit at the push limit, where it collapses. A seam is as
+wide as its most squeezed joint lets it be:
+  openness = clip(1 - max over its joints of d / seal, 0, 1)
   seal     = min(settings.seal_point, 1 - push_limit)
 a straight line from 1 at rest down to 0 at the seal point; at and past it the
 seam is closed and passes nothing. A swinging joint opens and narrows its seams
@@ -20,7 +20,6 @@ import numpy as np
 from physics.cells.engine_settings import EngineSettings
 from physics.cells.grid import Grid
 from physics.cells.joint_rest import joint_rest
-from physics.cells.seam_joints import seam_joints
 
 
 def seam_openness(grid: Grid, settings: EngineSettings) -> np.ndarray:
@@ -29,8 +28,8 @@ def seam_openness(grid: Grid, settings: EngineSettings) -> np.ndarray:
         raise ValueError("seal_point must be >= 0: a squeeze depth")
     rest = joint_rest(grid.volume, grid.joints, settings.joint_rest)
     depth = np.maximum(0.0, 1 - grid.thickness / rest)
-    deepest = depth[seam_joints(grid.joints, grid.seams, grid.cell_count)].max(axis=1,
-                                                                             initial=0.0)
+    deepest = np.zeros(grid.seam_count())
+    np.maximum.at(deepest, grid.seams[:, 0], depth[grid.seams[:, 1]])
     seal = min(settings.seal_point, 1 - settings.push_limit)
     if seal <= 0:
         return (deepest <= 0).astype(float)

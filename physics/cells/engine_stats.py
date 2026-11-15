@@ -23,7 +23,7 @@ def engine_stats(engine: Engine) -> dict:
     """Cells, joints, collapses, splits, size against the start, energy, lumps, sealed, neighbour changes."""
     grid = engine.grid
     _, sealed = lumps(grid)
-    space = float(cell_volumes(engine.corners, engine.fan).sum())
+    space = float(cell_volumes(engine.corners, engine.tets).sum())
     return {"cells": grid.cell_count,
             "joints": len(grid.joints),
             "collapses": engine.collapses,

@@ -16,4 +16,4 @@ def test_200_steps_without_collapse_or_split_change_no_neighbour_pair():
     assert np.array_equal(engine.face_cells, start_cells)
     assert engine_stats(engine)["neighbour_changes"] == 0
     assert not np.allclose(engine.corners, start_corners)
-    assert (cell_volumes(engine.corners, engine.fan) > 0).all()
+    assert (cell_volumes(engine.corners, engine.tets) > 0).all()

@@ -19,7 +19,8 @@ Contract: frozen record of floats, read by step() each step:
   seal_point       squeeze depth 1 - t / rest at which a seam closes (seam_openness.py);
                    a depth past 1 - push_limit acts as 1 - push_limit. >= 0
   split_threshold  an energy volume whose energy per measured cell volume falls below
-                   this is stretched too thin and splits in two (split_cell.py);
+                   this is stretched too thin and splits, by the 1-4 move into four
+                   tetrahedra (split_cell.py);
                    0 never splits. Background energy 1 gives energy per volume 1.
 `EngineSettings.all_on(**overrides)` gives the defaults below:
   attraction       0.005  even background (potential 10) squeezes joints by s = 0.05
@@ -32,9 +33,10 @@ Contract: frozen record of floats, read by step() each step:
                           stiffness there is k 2^4 + s = 2.1 (swing_joints.py
                           substeps any stiffness)
   push_limit       0.5    a joint below half its rest thickness gives way
-  joint_rest       0.08   rest thickness 8% of the volumes' mean length: on a typical
-                          Voronoi face (area about 0.375 V^(2/3)) the joint holds about
-                          3% of an energy volume (rule 8: about 2 to 5%)
+  joint_rest       0.02   rest thickness 2% of the volumes' mean length: on the start's
+                          tetrahedra (median face area about 1.9 V^(2/3)) a joint at
+                          balance holds about 3% of an energy volume (rule 8: about
+                          2 to 5%; measured 11% at 0.08, seed 1, 1000 volumes)
   leak             0.05   the rate the removed energy flow had, not tuned to a result
   seal_point       0.4    between the background balance depth (0.23) and the push
                           limit's (0.5); not tuned to a result
@@ -66,4 +68,4 @@ class EngineSettings:
 
 
 _ALL_ON = EngineSettings(attraction=0.005, joint_push=0.1, push_power=3.0, push_limit=0.5,
-                         joint_rest=0.08, leak=0.05, seal_point=0.4, split_threshold=0.05)
+                         joint_rest=0.02, leak=0.05, seal_point=0.4, split_threshold=0.05)

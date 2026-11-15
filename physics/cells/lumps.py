@@ -43,6 +43,13 @@ def _lump_labels(grid: Grid, packed: np.ndarray) -> np.ndarray:
 
 def _leaky_lumps(grid: Grid, label: np.ndarray) -> np.ndarray:
     """Numbers of the lumps with at least one open outer seam."""
-    around = label[grid.seams[grid.seam_open > 0]]
-    whole = (around == around[:, :1]).all(axis=1, keepdims=True)
-    return np.unique(around[(around >= 0) & ~whole])
+    open_rows = grid.seams[grid.seam_open[grid.seams[:, 0]] > 0]
+    seam = np.concatenate([open_rows[:, 0], open_rows[:, 0]])
+    around = label[np.concatenate([grid.joints[open_rows[:, 1], 0], grid.joints[open_rows[:, 1], 1]])]
+    count = grid.seam_count()
+    lowest = np.full(count, np.iinfo(np.int64).max)
+    highest = np.full(count, np.iinfo(np.int64).min)
+    np.minimum.at(lowest, seam, around)
+    np.maximum.at(highest, seam, around)
+    mixed = lowest[seam] != highest[seam]
+    return np.unique(around[mixed & (around >= 0)])

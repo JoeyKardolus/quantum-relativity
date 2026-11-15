@@ -18,5 +18,5 @@ def mesh_message(engine: Engine) -> dict:
     """Faces, their cells and joints, and the counts the frames will carry."""
     return {"type": "mesh", "corner_count": len(engine.corners),
             "cells": engine.grid.cell_count, "joints": len(engine.grid.joints),
-            "faces": [ring.tolist() for ring in engine.faces],
+            "faces": engine.faces.tolist(),
             "face_cells": engine.face_cells.tolist(), "face_joint": engine.face_joint.tolist()}

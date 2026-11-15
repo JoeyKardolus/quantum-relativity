@@ -78,7 +78,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-<canvas id="scene" aria-label="A see-through grid: each energy volume outlined in red, drawn a little inside itself, and each joint a faint blue layer filling the gap between two red outlines; the cube's outer faces have no joint"></canvas>
+<canvas id="scene" aria-label="A see-through grid: each energy volume a tetrahedron outlined in red, drawn a little inside itself, and each joint a faint blue layer filling the gap between two red outlines; the cube's outer faces have no joint"></canvas>
 
 <div id="below">
   <div id="hint">
@@ -120,7 +120,7 @@
     <button type="button" id="fill" aria-pressed="false">fill cells</button>
   </div>
   <div id="viewSettings"></div>
-  <div class="caption">Each red outline is one energy volume, its corners shared with its neighbours and moved by the
+  <div class="caption">Each red outline is one energy volume, a tetrahedron with 4 faces, its corners shared with its neighbours and moved by the
     engine every step; deeper red pulls harder. Every outline is drawn a little inside its volume, so where two volumes
     meet you see two red outlines side by side, and the faint blue layer filling the gap between them is their one
     shared joint; brighter blue pushes harder. So every inner volume sits wrapped in blue, while the cube's outer faces

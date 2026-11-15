@@ -1,12 +1,11 @@
 """Leak: every energy volume leaks energy along its open seams to the volumes around them, by pull (rule 6).
 
 Contract: `leak(joints, seams, energy, pull, openness, rate)` returns the new
-energies. seams (m, 3) are the energy volumes around each seam (Grid.seams; every
-pair of a seam is a joint), openness (m,) each seam's width in [0, 1]
-(seam_openness.py). pull (n,) is per energy volume the pull it exerts (move_space
-passes attraction * p / 2, p = pull_potential; any positive scale gives the same
-result, it cancels below). Energy moves only along seams, never through the
-middle of a joint:
+energies. seams (r, 2) are (seam, joint) rows (Grid.seams, mesh_seams.py), openness
+(m,) each seam's width in [0, 1] (seam_openness.py). pull (n,) is per energy volume
+the pull it exerts (step passes attraction * p / 2, p = pull_potential; any positive
+scale gives the same result, it cancels below). Energy moves only along seams, never
+through the middle of a joint:
   outflow_a  = mean openness of the seams around a (0 with no seam)
   passage_ab = mean openness of the seams joint (a, b) meets (0 with no seam)
   given_a    = rate * E_a * outflow_a
@@ -24,8 +23,6 @@ from __future__ import annotations
 
 import numpy as np
 
-from physics.cells.seam_joints import seam_joints
-
 
 def leak(joints: np.ndarray, seams: np.ndarray, energy: np.ndarray, pull: np.ndarray,
          openness: np.ndarray, rate: float) -> np.ndarray:
@@ -34,12 +31,16 @@ def leak(joints: np.ndarray, seams: np.ndarray, energy: np.ndarray, pull: np.nda
         raise ValueError("leak must be in [0, 1]: a volume cannot give more than it holds")
     if (pull < 0).any():
         raise ValueError("pull must be >= 0 to share the leak")
-    if len(openness) != len(seams) or ((openness < 0) | (openness > 1)).any():
+    seam_count = int(seams[-1, 0]) + 1 if len(seams) else 0
+    if len(openness) != seam_count or ((openness < 0) | (openness > 1)).any():
         raise ValueError("openness must be one value in [0, 1] per seam")
     count = len(energy)
-    each_corner = np.repeat(openness, 3)
-    passage = _mean_over(seam_joints(joints, seams, count).ravel(), each_corner, len(joints))
-    outflow = _mean_over(seams.ravel(), each_corner, count)
+    seam, joint = seams[:, 0], seams[:, 1]
+    passage = _mean_over(joint, openness[seam], len(joints))
+    around_seam = np.unique(np.concatenate([joints[joint, 0] * max(seam_count, 1) + seam,
+                                            joints[joint, 1] * max(seam_count, 1) + seam]))
+    outflow = _mean_over(around_seam // max(seam_count, 1), openness[around_seam % max(seam_count, 1)],
+                         count)
     heads, tails = joints[:, 0], joints[:, 1]
     toward_tails = pull[tails] * passage
     toward_heads = pull[heads] * passage
