@@ -920,6 +920,15 @@ particles in space. Code that breaks a rule below is simulating something else.
 
 Budget: this chapter holds the owner's theory rules in full, one place, changed often in conversation; splitting them across files would let them drift.
 
+### The foundation
+
+Owner, 2026-11-15, replacing every earlier picture of the structure:
+
+1. **ABAB structure.** Two kinds of energy volume: **A**, the energy volumes that pull, and **B**, the joints, which push. Every A touches only B's and every B touches only A's. The arrangement is irregular, scattered like a random mix of black and white marbles, so there is no up, down, left or right built in.
+2. **A pulls** on nearby A's, the pull spreading out and fading with distance. **B pushes** back, harder the more it is squeezed, steeply, and collapses past its limit.
+3. **Energy sets size** for both kinds: more energy makes a volume smaller and more packed. A B is squeezed when it is pressed smaller than its energy wants.
+4. **Everything else** (the leak, seams, drift, light, time) is how energy moves through this structure. The physics keeps only each volume's kind, energy and size and who touches whom; shapes and positions exist only for drawing.
+
 ### The rules
 
 1. **Only relations are fundamental.** There is no background space: a woven grid of cells *is* space and fills it with no gaps. The code stores no coordinates; distance, dimension and curvature are measured from the grid alone (paths, neighbour counts, random walks).
