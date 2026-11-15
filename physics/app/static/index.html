@@ -86,8 +86,8 @@
     <span>drag to rotate, wheel or pinch to zoom</span>
   </div>
   <div id="legend">
-    <span><i class="key volume"></i>red ball = energy volume (deeper red = pulls harder)</span>
-    <span><i class="key joint"></i>blue ball = joint (brighter = more squeezed)</span>
+    <span><i class="key volume"></i>red dot = energy volume (deeper red = pulls harder)</span>
+    <span><i class="key joint"></i>blue dot = joint (brighter = more squeezed)</span>
     <span><i class="key contact"></i>touching</span>
   </div>
 </div>
@@ -118,6 +118,7 @@
   </div>
   <div class="row" style="margin-top:8px">
     <button type="button" id="contactsButton" aria-pressed="true">touching lines</button>
+    <button type="button" id="ballsButton" aria-pressed="false">balls at real size</button>
   </div>
   <div id="viewSettings"></div>
   <div class="caption">Each red ball is one energy volume, drawn at the size its energy gives it (more energy, smaller);
@@ -163,8 +164,8 @@ const BIG_STRUCTURE = 3000;      // past this many volumes each ball is drawn wi
 /* ---------- the 3D scene ---------- */
 const canvas = document.getElementById("scene");
 const THREE_READY = typeof window.THREE === "object" && window.THREE !== null;
-const scene3d = { renderer: null, scene: null, camera: null, volumeBalls: null, jointBalls: null, contactLines: null, drawn: 0 };
-const view = { contacts: true };
+const scene3d = { renderer: null, scene: null, camera: null, volumeBalls: null, jointBalls: null, contactLines: null, dots: null, drawn: 0 };
+const view = { contacts: true, balls: false };   // owner: a grid of dots and lines by default
 const orbit = { theta: 0.7, phi: 1.15, distance: 10, follow: true, centre: [0, 0, 0], reach: 1 };
 const cut = { axis: 0, share: 1 };   // share 1 = no cut; below 1, volumes whose centre is past the plane are hidden
 let mesh = null;      // the latest mesh message: count, kind, contacts, and the tables built from it
@@ -227,15 +228,17 @@ function applyMesh(message) {
     template: THREE_READY ? ballTemplate(message.count > BIG_STRUCTURE ? 0 : 1) : null };
   frame = null;
   if (!scene3d.renderer) return;
-  for (const name of ["volumeBalls", "jointBalls", "contactLines"]) dropPart(name);
+  for (const name of ["volumeBalls", "jointBalls", "contactLines", "dots"]) dropPart(name);
   const perBall = mesh.template.length / 3;
   scene3d.volumeBalls = new THREE.LineSegments(lineGeometry(perBall * volumeTotal),
     new THREE.LineBasicMaterial({ vertexColors: true }));
   scene3d.jointBalls = new THREE.LineSegments(lineGeometry(perBall * mesh.jointTotal),
     new THREE.LineBasicMaterial({ vertexColors: true }));
   scene3d.contactLines = new THREE.LineSegments(lineGeometry(mesh.contacts.length),
-    new THREE.LineBasicMaterial({ color: 0x8593a6, transparent: true, opacity: 0.22, depthWrite: false }));
-  for (const name of ["volumeBalls", "jointBalls", "contactLines"]) {
+    new THREE.LineBasicMaterial({ color: 0x8593a6, transparent: true, opacity: 0.35, depthWrite: false }));
+  scene3d.dots = new THREE.Points(lineGeometry(message.count),
+    new THREE.PointsMaterial({ vertexColors: true, size: 6, sizeAttenuation: false }));
+  for (const name of ["volumeBalls", "jointBalls", "contactLines", "dots"]) {
     scene3d[name].frustumCulled = false; scene3d[name].visible = false; scene3d.scene.add(scene3d[name]);
   }
   if (reset) orbit.follow = true;
@@ -316,6 +319,23 @@ function writeBalls(part, kindWanted, light, dark) {
   geometry.attributes.color.needsUpdate = true;
 }
 
+/** Write one dot per shown volume at its centre: energy volumes red by pull, joints blue by squeeze. */
+function writeDots() {
+  const geometry = scene3d.dots.geometry, positions = geometry.attributes.position.array, colours = geometry.attributes.color.array;
+  let vertex = 0;
+  for (let volume = 0; volume < mesh.count; volume++) {
+    if (mesh.hidden[volume]) continue;
+    for (let axis = 0; axis < 3; axis++) positions[vertex * 3 + axis] = frame.positions[volume * 3 + axis];
+    const share = frame.colour[volume] / 255;
+    if (mesh.kind[volume] === 0) blend(VOLUME_LIGHT, VOLUME_DARK, share, colours, vertex * 3);
+    else blend(JOINT_DIM, JOINT_BRIGHT, share, colours, vertex * 3);
+    vertex++;
+  }
+  geometry.setDrawRange(0, vertex);
+  geometry.attributes.position.needsUpdate = true;
+  geometry.attributes.color.needsUpdate = true;
+}
+
 /** Write a line between every touching pair with both ends shown. */
 function writeContacts() {
   const geometry = scene3d.contactLines.geometry, positions = geometry.attributes.position.array, contacts = mesh.contacts;
@@ -337,10 +357,14 @@ function redraw() {
   if (!mesh || !frame || !scene3d.renderer) { showStats(); return; }
   const box = structureBox();
   scene3d.drawn = updateHidden(box);
-  writeBalls(scene3d.volumeBalls, 0, VOLUME_LIGHT, VOLUME_DARK);
-  writeBalls(scene3d.jointBalls, 1, JOINT_DIM, JOINT_BRIGHT);
+  if (view.balls) {
+    writeBalls(scene3d.volumeBalls, 0, VOLUME_LIGHT, VOLUME_DARK);
+    writeBalls(scene3d.jointBalls, 1, JOINT_DIM, JOINT_BRIGHT);
+  }
+  writeDots();
   if (view.contacts) writeContacts();
-  scene3d.volumeBalls.visible = scene3d.jointBalls.visible = true;
+  scene3d.volumeBalls.visible = scene3d.jointBalls.visible = view.balls;
+  scene3d.dots.visible = true;
   scene3d.contactLines.visible = view.contacts;
   const reach = 0.5 * Math.hypot(box[1][0] - box[0][0], box[1][1] - box[0][1], box[1][2] - box[0][2]);
   if (orbit.follow) orbit.centre = [0, 1, 2].map((axis) => (box[0][axis] + box[1][axis]) / 2);
@@ -496,6 +520,13 @@ for (const button of document.querySelectorAll("button.cutAxis")) {
     redraw();
   });
 }
+
+const ballsButton = document.getElementById("ballsButton");
+ballsButton.addEventListener("click", () => {
+  view.balls = !view.balls;
+  ballsButton.setAttribute("aria-pressed", String(view.balls));
+  redraw();
+});
 
 const contactsButton = document.getElementById("contactsButton");
 contactsButton.addEventListener("click", () => {
