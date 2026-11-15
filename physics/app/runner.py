@@ -3,14 +3,14 @@
 Contract: `Runner(simulation)` serves page connections (`serve(socket)`) and
 runs the stepping loop (`run()`, one asyncio task for the app's life). A new
 page gets, in order: settings, mesh, frame, stats. Client messages (JSON text):
-"start" (step at `speed` steps per second), "pause", "reset" (seed, cells clamped
-to CELL_RANGE; settings, mesh, frame and stats sent), "settings" (values applied,
+"start" (step at `speed` steps per second), "pause", "reset" (seed, volumes clamped
+to VOLUME_RANGE; settings, mesh, frame and stats sent), "settings" (values applied,
 settings echoed). Start and pause answer every page with a stats message, so all
 pages show the same run state.
 While running, an update goes out at most FRAMES_PER_SECOND, and always on the step
 that pauses the run: a "mesh" message (JSON, page_mesh) first only when the topology
 changed (mesh_key: joint collapse or volume split), then the binary frame (page_frame,
-corner positions and pull and push bytes), then a stats message. Each mesh gets a new
+display positions, sizes and colour values), then a stats message. Each mesh gets a new
 mesh_id, carried by every frame drawn on it.
 Every page gets every message (one shared simulation). Steps, resets and encoding run
 in a worker thread under one lock, so the server keeps answering. A bad message or a
@@ -25,6 +25,7 @@ import json
 import time
 import traceback
 
+import numpy as np
 from fastapi import WebSocket, WebSocketDisconnect
 
 from physics.app.mesh_key import mesh_key
@@ -33,10 +34,9 @@ from physics.app.page_mesh import page_mesh
 from physics.app.settings_message import settings_message
 from physics.app.simulation import Simulation
 from physics.app.stats_message import stats_message
-from physics.cells import engine_stats
 
 FRAMES_PER_SECOND = 10
-CELL_RANGE = (50, 20000)
+VOLUME_RANGE = (50, 20000)
 
 
 class Runner:
@@ -89,8 +89,7 @@ class Runner:
                 print("paused: the step failed", flush=True)
                 self.started = False
                 return [json.dumps(stats_message(self.simulation, False))]
-            joints = await asyncio.to_thread(lambda: engine_stats(self.simulation.engine)["joints"])
-            if joints == 0:
+            if not np.any(np.asarray(self.simulation.state.kind) == 1):
                 print("paused: every energy volume fell into one, no joint is left", flush=True)
                 self.started = False
             if self.started and begun - self._last_frame < 1.0 / FRAMES_PER_SECOND:
@@ -109,7 +108,7 @@ class Runner:
                 self.started = False
                 await self._broadcast(json.dumps(stats_message(self.simulation, False)))
             elif kind == "reset":
-                await self._reset(int(message["seed"]), int(message["cells"]))
+                await self._reset(int(message["seed"]), int(message["volumes"]))
             elif kind == "settings":
                 await self._settings(dict(message["values"]))
             else:
@@ -117,10 +116,10 @@ class Runner:
         except (KeyError, TypeError, ValueError) as error:
             print(f"ignored message {message!r}: {error}", flush=True)
 
-    async def _reset(self, seed: int, cells: int) -> None:
-        cells = min(max(cells, CELL_RANGE[0]), CELL_RANGE[1])
+    async def _reset(self, seed: int, volumes: int) -> None:
+        volumes = min(max(volumes, VOLUME_RANGE[0]), VOLUME_RANGE[1])
         async with self._lock:
-            await asyncio.to_thread(self.simulation.reset, seed, cells)
+            await asyncio.to_thread(self.simulation.reset, seed, volumes)
             self._mesh_key = None
             outgoing = await asyncio.to_thread(self._full_update)
         for message in outgoing:
@@ -141,7 +140,7 @@ class Runner:
     def _update(self) -> list[str | bytes]:
         """The mesh only if its topology changed, then the frame and the stats."""
         outgoing: list[str | bytes] = []
-        if mesh_key(self.simulation.engine) != self._mesh_key:
+        if mesh_key(self.simulation.state) != self._mesh_key:
             outgoing.append(self._mesh_text())
         outgoing.append(page_frame(self.simulation, self._mesh_id))
         outgoing.append(json.dumps(stats_message(self.simulation, self.started)))
@@ -149,7 +148,7 @@ class Runner:
 
     def _mesh_text(self) -> str:
         """A mesh message as compact JSON; a new mesh_id when the topology is new."""
-        key = mesh_key(self.simulation.engine)
+        key = mesh_key(self.simulation.state)
         if key != self._mesh_key:
             self._mesh_id += 1
             self._mesh_key = key

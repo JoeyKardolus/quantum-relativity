@@ -1,20 +1,26 @@
-"""Live app: the cell engine running on the owner's PC, drawn in the browser. Display only.
+"""Live app: the ABAB engine running on the owner's PC, drawn in the browser. Display only.
 
 Module map:
   setting_ranges.py    setting_ranges: allowed range of every control
-  simulation.py        Simulation: the engine, its settings, the step count
-  mesh_key.py          mesh_key: the mesh topology as one comparable digest
-  page_mesh.py         page_mesh: "mesh" JSON, faces by corner index, cells and joint per face
-  page_frame.py        page_frame: binary frame, float32 corners, uint8 pull and push
+  volume_radius.py     volume_radius: the radius of a ball holding a volume's size
+  fitted_positions.py  fitted_positions: the building scatter scaled to the drawing
+  settle_positions.py  settle_positions: layout, touching volumes at the sum of their radii
+  volume_alignment.py  volume_alignment: which new volume continues which old one
+  carry_positions.py   carry_positions: drawing positions across a collapse or a split
+  colour_ranks.py      colour_ranks: rank of pull (energy volume) or squeeze (joint), uint8
+  mesh_key.py          mesh_key: kinds and contacts as one comparable digest
+  simulation.py        Simulation: the state, its settings, its drawing positions, the step count
+  page_mesh.py         page_mesh: "mesh" JSON, kind per volume and the contacts
+  page_frame.py        page_frame: binary frame, float32 positions and sizes, uint8 colour value
   stats_message.py     stats_message: the engine's stats, step and run state
   settings_message.py  settings_message: every control's value and range
   runner.py            Runner: the stepping loop, at most 10 frames/s, the open pages
   server.py            create_app: FastAPI, GET / and the /ws connection
-  static/index.html    the page (three.js): solid red cells, blue joint walls in the gaps
-  __main__.py          python -m physics.app [--port 8765] [--cells N] [--seed N]
+  static/index.html    the page (three.js): red wire balls (energy volumes), blue (joints)
+  __main__.py          python -m physics.app [--port 8765] [--volumes N] [--seed N]
 
-The engine (`physics.cells`) owns the mesh (shared corners, faces, joints); the app sends
-its topology only when it changes and its corner positions every frame.
+The engine (`physics.abab`) keeps only kind, energy, size and who touches whom; the app
+alone keeps positions, for drawing, and sends the topology only when it changes.
 """
 from physics.app.simulation import Simulation
 from physics.app.server import create_app

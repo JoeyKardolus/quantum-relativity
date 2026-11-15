@@ -1,23 +1,22 @@
-"""The live simulation: one cell engine stepped under all rules on.
+"""The live simulation: one ABAB state stepped under all rules on, plus its drawing positions.
 
-Contract: `Simulation(cells, seed, unevenness, speed)` resets at once.
-`reset(seed, cells)` builds the start (`new_engine`: energy slightly uneven
-everywhere by `unevenness`, no lump placed) and sets `settings` to all rules on
-at their defaults (`EngineSettings.all_on()`, leak included). Any rule setting
-changed before is dropped; unevenness and speed are kept. Unevenness is a start
-condition, so a new value shows on the next reset.
-`apply(values)` sets the named controls (EngineSettings fields, "unevenness",
-"speed"), each clamped to `ranges`; unknown names raise ValueError. A changed
-rule applies from the next step.
-`advance()` runs one engine step. The engine contract allows either a method
-`engine.step(settings)` (returning the next Engine, or None when it stepped in
-place) or a pure `physics.cells.step(engine, settings)`; the method wins when
-the Engine has one. Raises ValueError when an energy stops being finite and
-positive (a returned engine is then not taken; one that stepped in place
-already changed). `start_box` is [[x, y, z], [x, y, z]], the bounding box of
-`engine.corners` at the reset (the starting cube), kept through the run.
-The app holds no geometry: corners, faces, pulls and pushes come from the engine
-(`physics.cells.mesh_message`, `physics.cells.frame_arrays`).
+Contract: `Simulation(volumes, seed, unevenness, speed)` resets at once.
+`reset(seed, volumes)` builds the start (`physics.abab.new_state(volumes, seed,
+unevenness)`: the irregular ABAB structure, energy slightly uneven everywhere, no lump
+placed; it returns the state and the building positions) and sets `settings` to all rules
+on at their defaults (`Settings.all_on()`). Any rule setting changed before is dropped;
+unevenness and speed are kept (unevenness shows on the next reset). The building
+positions, scaled to the drawing (`fitted_positions`) and settled (START_ITERATIONS
+rounds of `settle_positions`), become `positions`.
+`apply(values)` sets the named controls (`rule_names`, "unevenness", "speed"), each
+clamped to `ranges` (an integer rule stays an integer); unknown names raise ValueError. A
+changed rule applies from the next step.
+`advance()` runs one pure `physics.abab.step(state, settings)`. Raises ValueError when an
+energy or a size stops being finite and positive (that state is then not taken). When the
+topology changed (mesh_key) the positions are carried over (`carry_positions`); then
+FRAME_ITERATIONS rounds of the layout run, warm-started.
+`positions` (float64 (n, 3), one per volume) exist only for drawing: they never enter
+the physics, and the state never sees them.
 """
 from __future__ import annotations
 
@@ -25,29 +24,36 @@ from dataclasses import fields, replace
 
 import numpy as np
 
-from physics import cells as cell_engine
+from physics.abab import Settings, new_state, step
+from physics.app.carry_positions import carry_positions
+from physics.app.fitted_positions import fitted_positions
+from physics.app.mesh_key import mesh_key
 from physics.app.setting_ranges import setting_ranges
-from physics.cells import EngineSettings, new_engine
+from physics.app.settle_positions import settle_positions
+from physics.app.volume_radius import volume_radius
 
-RULE_NAMES = tuple(field.name for field in fields(EngineSettings))
+START_ITERATIONS = 30
+FRAME_ITERATIONS = 4
 
 
 class Simulation:
-    """A cell engine, its rule settings and how many steps it has run."""
+    """An ABAB state, its rule settings, its drawing positions and how many steps it has run."""
 
-    def __init__(self, cells: int = 1000, seed: int = 1, unevenness: float = 0.5,
+    def __init__(self, volumes: int = 2000, seed: int = 1, unevenness: float = 0.5,
                  speed: float = 10.0) -> None:
         self.unevenness = unevenness
         self.speed = speed
-        self.reset(seed, cells)
+        self.reset(seed, volumes)
 
-    def reset(self, seed: int, cells: int) -> None:
-        """Fresh uneven engine and default settings."""
-        self.engine = new_engine(cells, seed, self.unevenness)
-        corners = np.asarray(self.engine.corners, dtype=float).reshape(-1, 3)
-        self.start_box = [corners.min(axis=0).tolist(), corners.max(axis=0).tolist()]
-        self.settings = EngineSettings.all_on()
+    def reset(self, seed: int, volumes: int) -> None:
+        """Fresh uneven structure, default settings, settled drawing positions."""
+        self.state, building = new_state(volumes, seed, self.unevenness)
+        radii = volume_radius(self.state.size)
+        start = fitted_positions(building, self.state.contacts, radii)
+        self.positions = settle_positions(start, self.state.contacts, radii, START_ITERATIONS)
+        self.settings = Settings.all_on()
         self.ranges = setting_ranges(self.settings)
+        self.rule_names = tuple(field.name for field in fields(self.settings) if field.name in self.ranges)
         self.seed = seed
         self.steps = 0
 
@@ -60,29 +66,24 @@ class Simulation:
         for name, value in values.items():
             lowest, highest = self.ranges[name]
             clamped = min(max(float(value), lowest), highest)
-            if name in RULE_NAMES:
-                rules[name] = clamped
+            if name in self.rule_names:
+                rules[name] = round(clamped) if isinstance(getattr(self.settings, name), int) else clamped
             else:
                 setattr(self, name, clamped)
         self.settings = replace(self.settings, **rules)
 
     def advance(self) -> None:
-        """One engine step under the current settings."""
+        """One engine step under the current settings, then the drawing follows."""
         with np.errstate(all="ignore"):
-            stepped = _stepped(self.engine, self.settings)
-        energy = getattr(stepped, "energy", None)
-        if energy is not None:
-            values = np.asarray(energy, dtype=float)
+            stepped = step(self.state, self.settings)
+        for name in ("energy", "size"):
+            values = np.asarray(getattr(stepped, name), dtype=float)
             if not (np.all(np.isfinite(values)) and np.all(values > 0)):
-                raise ValueError(f"step {self.steps + 1}: an energy stopped being finite and positive")
-        self.engine = stepped
+                raise ValueError(f"step {self.steps + 1}: a {name} stopped being finite and positive")
+        positions = self.positions
+        if mesh_key(stepped) != mesh_key(self.state):
+            positions = carry_positions(self.state, stepped, positions)
+        self.positions = settle_positions(positions, stepped.contacts, volume_radius(stepped.size),
+                                          FRAME_ITERATIONS)
+        self.state = stepped
         self.steps += 1
-
-
-def _stepped(engine, settings: EngineSettings):
-    """The next engine, through `engine.step(settings)` when it has one, else `physics.cells.step`."""
-    method = getattr(engine, "step", None)
-    if callable(method):
-        result = method(settings)
-        return engine if result is None else result
-    return cell_engine.step(engine, settings)

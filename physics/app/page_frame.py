@@ -1,32 +1,31 @@
-"""The binary frame: corner positions, pull per cell and push per joint, nothing else.
+"""The binary frame: display position, size and colour value per volume, nothing else.
 
 Contract: `page_frame(simulation, mesh_id)` returns bytes, little-endian:
-  header   HEADER_WORDS uint32: FRAME_MAGIC, step, mesh_id, corner_count,
-           cell_count, joint_count, 0, 0
-  corners  float32 corner_count * 3 (x, y, z per corner, the mesh's corner order)
-  pull     uint8 cell_count, 0..255 (harder pull is higher)
-  push     uint8 joint_count, 0..255 (harder push is higher)
-straight from `physics.cells.frame_arrays(engine)`. The page applies it to the mesh
-with the same mesh_id and drops it otherwise. About 12 bytes per corner plus one per
-cell and joint; no JSON, no faces.
+  header    HEADER_WORDS uint32: FRAME_MAGIC, step, mesh_id, count, 0, 0, 0, 0
+  position  float32 count * 3 (x, y, z per volume, the state's volume order), from
+            `simulation.positions`, the drawing layout (never physics)
+  size      float32 count, the state's size per volume (the page draws a ball of it)
+  colour    uint8 count, `colour_ranks`: rank of pull for an energy volume, rank of
+            squeeze for a joint, 0..255
+The page applies it to the mesh with the same mesh_id and drops it otherwise. 16 bytes
+plus one per volume; no JSON, no contacts.
 """
 from __future__ import annotations
 
 import numpy as np
 
+from physics.app.colour_ranks import colour_ranks
 from physics.app.simulation import Simulation
-from physics.cells import frame_arrays
 
-FRAME_MAGIC = 0x31465251  # "QRF1" read as little-endian uint32
+FRAME_MAGIC = 0x31415251  # "QRA1" read as little-endian uint32
 HEADER_WORDS = 8
 
 
 def page_frame(simulation: Simulation, mesh_id: int) -> bytes:
-    """One binary frame of the simulation's current engine, tagged with `mesh_id`."""
-    corners, pull, push = frame_arrays(simulation.engine)
-    corners = np.ascontiguousarray(corners, dtype="<f4").reshape(-1, 3)
-    pull = np.ascontiguousarray(pull, dtype=np.uint8).ravel()
-    push = np.ascontiguousarray(push, dtype=np.uint8).ravel()
-    header = np.array([FRAME_MAGIC, simulation.steps, mesh_id, len(corners), len(pull), len(push), 0, 0],
-                      dtype="<u4")
-    return header.tobytes() + corners.tobytes() + pull.tobytes() + push.tobytes()
+    """One binary frame of the simulation's current state, tagged with `mesh_id`."""
+    state = simulation.state
+    positions = np.ascontiguousarray(simulation.positions, dtype="<f4").reshape(-1, 3)
+    sizes = np.ascontiguousarray(state.size, dtype="<f4").ravel()
+    colours = colour_ranks(state)
+    header = np.array([FRAME_MAGIC, simulation.steps, mesh_id, len(positions), 0, 0, 0, 0], dtype="<u4")
+    return header.tobytes() + positions.tobytes() + sizes.tobytes() + colours.tobytes()
