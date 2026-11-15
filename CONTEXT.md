@@ -28,7 +28,7 @@ The core depth/seam vocabulary used by `improve-codebase-architecture`, `tdd`, `
 - **deep**: small interface, lots of behaviour behind it.
 - **shallow**: interface nearly as complex as the implementation. _Avoid_: thin, anaemic.
 - **volume split**: an energy volume grown too big tearing apart, the tear becoming a new joint; the mirror of joint collapse and the only way new volumes and joints appear. _Avoid_: division, creation, spawning.
-- **seam**: where an interface lives. _Avoid_: boundary.
+- **seam**: the passage through a joint by which energy leaks from one energy volume to the next (A to B to A); it narrows as the joint is squeezed and closes past the seal point. _Avoid_: channel, pore, edge, Plateau border.
 - **adapter**: concrete thing satisfying an interface at a seam. _Avoid_: impl, plugin.
 - **port**: interface defined for cross-seam dependencies.
 - **leverage**: what callers get from depth. _Avoid_: reuse.
