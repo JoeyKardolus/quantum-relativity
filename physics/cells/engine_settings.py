@@ -18,10 +18,13 @@ Contract: frozen record of floats, read by step() each step:
                    step, split by its neighbours' pull (rule 6, leak.py); in [0, 1]
   seal_point       squeeze depth 1 - t / rest at which a seam closes (seam_openness.py);
                    a depth past 1 - push_limit acts as 1 - push_limit. >= 0
-  split_threshold  an energy volume whose energy per measured cell volume falls below
-                   this is stretched too thin and splits, by the 1-4 move into four
-                   tetrahedra (split_cell.py);
-                   0 never splits. Background energy 1 gives energy per volume 1.
+  split_size       an energy volume whose measured volume is past split_size times
+                   the start's mean volume (Engine.start_mean_volume) has grown too
+                   big, covering too much space, and splits by the 1-4 move into four
+                   tetrahedra (split_cell.py, rule 8). The trigger is size, not
+                   density: a split keeps density, so a density trigger splits for
+                   ever, while each child is a quarter of the size. > 0; inf never
+                   splits
 `EngineSettings.all_on(**overrides)` gives the defaults below:
   attraction       0.005  even background (potential 10) squeezes joints by s = 0.05
   joint_push       0.1    with that squeeze a joint balances at 0.77 of rest
@@ -40,8 +43,10 @@ Contract: frozen record of floats, read by step() each step:
   leak             0.05   the rate the removed energy flow had, not tuned to a result
   seal_point       0.4    between the background balance depth (0.23) and the push
                           limit's (0.5); not tuned to a result
-  split_threshold  0.05   below the lowest energy per volume of an unevenness-0.5 start
-                          (0.5 ** 4 = 0.0625), so no volume starts torn; not tuned
+  split_size       4.0    a split brings a volume back to about the start's mean
+                          (each child a quarter); above the biggest start volume
+                          (2.0 to 2.1 times the mean, seeds 1-3, 1000 volumes), so no
+                          volume starts torn; not tuned to a result
 """
 from __future__ import annotations
 
@@ -50,7 +55,7 @@ from dataclasses import dataclass, replace
 
 @dataclass(frozen=True)
 class EngineSettings:
-    """Strengths of attraction, joint push and its power, push limit, joint rest, leak, seal point, split threshold."""
+    """Strengths of attraction, joint push and its power, push limit, joint rest, leak, seal point, split size."""
 
     attraction: float
     joint_push: float
@@ -59,7 +64,7 @@ class EngineSettings:
     joint_rest: float
     leak: float
     seal_point: float
-    split_threshold: float
+    split_size: float
 
     @classmethod
     def all_on(cls, **overrides: float) -> "EngineSettings":
@@ -68,4 +73,4 @@ class EngineSettings:
 
 
 _ALL_ON = EngineSettings(attraction=0.005, joint_push=0.1, push_power=3.0, push_limit=0.5,
-                         joint_rest=0.02, leak=0.05, seal_point=0.4, split_threshold=0.05)
+                         joint_rest=0.02, leak=0.05, seal_point=0.4, split_size=4.0)

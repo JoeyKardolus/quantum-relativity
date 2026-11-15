@@ -21,13 +21,13 @@ def test_the_first_mesh_is_positive_tetrahedra_filling_their_space():
 
 
 def test_every_cell_has_four_faces_and_every_inner_face_is_one_joint_through_events():
-    """Pull at three times its default for collapses, then a split threshold just above the thinnest volumes; a split
-    keeps a volume's density, so its children split again every step, and the split steps stay few."""
+    """Pull at three times its default for collapses, then a split size just below the biggest volumes, so a few
+    split each step."""
     engine = new_engine(300, 2, 0.5)
-    pulled = EngineSettings.all_on(split_threshold=0.0, attraction=0.015)
+    pulled = EngineSettings.all_on(split_size=np.inf, attraction=0.015)
     for index in range(43):
-        density = np.sort(engine.grid.energy / engine.grid.volume)
-        settings = pulled if index < 40 else replace(pulled, split_threshold=float(density[:3].mean()))
+        biggest = float(np.sort(engine.grid.volume)[-3:].mean()) / engine.start_mean_volume
+        settings = pulled if index < 40 else replace(pulled, split_size=biggest)
         engine = step(engine, settings)
         grid = engine.grid
         assert (_faces_per_cell(engine.face_cells, grid.cell_count) == 4).all()

@@ -20,7 +20,7 @@ def test_a_steady_joint_spring_keeps_its_swing_for_a_thousand_steps(power):
 
 def test_most_joints_cross_their_balance_more_than_once_in_50_steps():
     engine = new_engine(200, 5, 0.5)
-    settings = EngineSettings.all_on(push_limit=0.0, split_threshold=0.0)
+    settings = EngineSettings.all_on(push_limit=0.0, split_size=np.inf)
     signs = []
     for _ in range(50):
         engine = step(engine, settings)

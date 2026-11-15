@@ -25,9 +25,10 @@ one joint between its two volumes, an outer triangle borders nothing.
   closed past `seal_point`), by pull. Collapse hands energy and quanta on; a split shares by volume.
 - **Size follows density** (`rest_volume.py`): `q (q / E)^3`, `q` quanta (the leak never moves them).
 - **Honesty.** Never tune a setting, seed or fit window until a result passes; report every number,
-  seed, settings and miss. Today (seed 1, 968 volumes, unevenness 0.5, defaults): 6 collapses, then
-  splits from step 86 run away (a split keeps density, so children split again) until
-  `SPLIT_CEILING` stops it at step 93; app pauses. Splits off: finite to 300, size 2.20.
+  seed, settings and miss. Today (seed 1, 968 volumes, unevenness 0.5, defaults): finite to 300,
+  1364 volumes, 137 collapses, 297 splits, size 1.33, 92 lumps.
+- **Split by size** (rule 8): past `split_size` (4) x `start_mean_volume`; never by density
+  (a split keeps it, so that splits for ever).
 - **Page data stays light.** A JSON "mesh" only on start, collapse or split; every
   frame binary (`page_frame.py`: 32-byte header, float32 corners, uint8 pull and push), 6 kB at 968
   tetrahedra (mesh 57 kB), at most 10/s. Drawing: red volume outlines inset 8%; each shared face is one blue

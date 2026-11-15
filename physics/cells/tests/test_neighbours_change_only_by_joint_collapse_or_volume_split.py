@@ -6,7 +6,7 @@ from physics.cells import EngineSettings, cell_volumes, engine_stats, new_engine
 
 def test_200_steps_without_collapse_or_split_change_no_neighbour_pair():
     engine = new_engine(200, 4, 0.5)
-    settings = EngineSettings.all_on(push_limit=0.0, split_threshold=0.0)
+    settings = EngineSettings.all_on(push_limit=0.0, split_size=np.inf)
     start_joints, start_cells = engine.grid.joints.copy(), engine.face_cells.copy()
     start_corners = engine.corners.copy()
     for _ in range(200):

@@ -19,7 +19,8 @@ cube of volume `cells`, after its outer slivers are dropped):
   settle     SETTLE_PASSES (200) rounds of relax_corners() toward the targets, so the
              walls find room before step 1; only corners move; then the joints are
              balanced again on the measured volumes
-collapses 0, splits 0, neighbour_changes 0, start_space the settled mesh volume.
+collapses 0, splits 0, neighbour_changes 0, start_space the settled mesh volume,
+start_mean_volume that over the count.
 Nothing is placed by hand. Raises ValueError when unevenness is outside [0, 1)
 (energy must stay positive) or cells < 30.
 """
@@ -72,9 +73,10 @@ def new_engine(cells: int, seed: int, unevenness: float) -> Engine:
         targets = cell_targets(rest, balanced.thickness, faces, face_cells, face_joint, corners)
         corners = relax_corners(corners, tets, targets, 10)
     settled = _balanced(replace(balanced, volume=cell_volumes(corners, tets)), settings)
+    space = float(cell_volumes(corners, tets).sum())
     return Engine(grid=settled, corners=corners, tets=tets, faces=faces, face_cells=face_cells,
-                  face_joint=face_joint, collapses=0, splits=0,
-                  start_space=float(cell_volumes(corners, tets).sum()), neighbour_changes=0)
+                  face_joint=face_joint, collapses=0, splits=0, start_space=space,
+                  start_mean_volume=space / count, neighbour_changes=0)
 
 
 def _balanced(grid: Grid, settings: EngineSettings) -> Grid:

@@ -17,6 +17,8 @@ Contract: a frozen record of
   collapses     joint collapses since the start (edges drawn into one corner)
   splits        volume splits since the start
   start_space   the mesh's volume at the start, for size_vs_start
+  start_mean_volume  the mean energy volume at the start (start_space over the start's
+                count); a volume past split_size times it splits (step.py)
   neighbour_changes  neighbour pairs that changed in a step without a collapse or a
                 split; 0 by construction (step.py counts it to show it)
 The topology (tets, faces, face_cells, face_joint) changes only by joint collapse and
@@ -46,4 +48,5 @@ class Engine:
     collapses: int
     splits: int
     start_space: float
+    start_mean_volume: float
     neighbour_changes: int

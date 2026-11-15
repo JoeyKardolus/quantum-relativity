@@ -17,16 +17,14 @@ old one as it was. Deterministic: the same engine and settings give the same res
                on that edge fall in and hand their energy, quanta and charge to the
                tetrahedra across their other faces, exactly. A giving joint whose
                face an earlier collapse this step removed is skipped.
-  5. split     every energy volume whose energy per measured volume is below
-               split_threshold (and whose measured volume is positive) is cut into
-               four by the 1-4 move (split_cell.py); energy, quanta and charge shared
-               by volume (the last child takes the rest, so the sum is exact); the
-               six inner triangles of the tear are new joints at rest thickness
-               (from the children's measured volumes), rate 0. A split keeps the
-               density, so a child of a thin volume is thin too and splits again
-               next step: the count can grow fourfold a step. Past SPLIT_CEILING
-               (50 000) volumes the step raises RuntimeError instead (the run
-               stops loud rather than run out of memory)
+  5. split     every energy volume whose measured volume is past split_size times
+               the start's mean volume (grown too big, rule 8) is cut into four by
+               the 1-4 move (split_cell.py); energy, quanta and charge shared by
+               volume (the last child takes the rest, so the sum is exact), so each
+               child keeps the density and has a quarter of the size and of the
+               rest volume: below the trigger unless the parent was past four times
+               it. The six inner triangles of the tear are new joints at rest
+               thickness (from the children's measured volumes), rate 0
   6. corners   RELAX_PASSES (5) rounds of relax_corners() toward each tetrahedron's
                target, rest_volume(energy, quanta) plus half its joint walls
                (cell_targets.py). Corners only move: no neighbour changes. The open
@@ -68,7 +66,6 @@ from physics.cells.swing_joints import swing_joints
 from physics.cells.tet_faces import tet_faces
 
 RELAX_PASSES = 5
-SPLIT_CEILING = 50_000
 
 
 @dataclass
@@ -97,7 +94,7 @@ def step(engine: Engine, settings: EngineSettings) -> Engine:
                  origin=np.arange(grid.cell_count), corner_map=np.arange(len(engine.corners)))
     giving = np.flatnonzero(thickness < settings.push_limit * rest)
     collapses = _collapse(work, engine, giving[np.argsort(thickness[giving] / rest[giving], kind="stable")])
-    splits = _split(work, settings.split_threshold)
+    splits = _split(work, settings.split_size * engine.start_mean_volume)
     if not (collapses or splits):
         return _moved(engine, exerted, energy, thickness, rate, settings)
     return _rewoven(engine, work, exerted, thickness, rate, settings, collapses, splits)
@@ -128,22 +125,17 @@ def _collapse(work: _Work, engine: Engine, giving: np.ndarray) -> int:
     return done
 
 
-def _split(work: _Work, threshold: float) -> int:
-    """Split every energy volume stretched below the threshold by the 1-4 move; returns how many split."""
-    measured = cell_volumes(work.corners, work.tets)
-    thin = np.flatnonzero((measured > 0) & (work.values[:, 0] < threshold * measured))
-    if len(work.tets) + 3 * len(thin) > SPLIT_CEILING:
-        raise RuntimeError(f"volume split: {len(thin)} of {len(work.tets)} volumes are below the split "
-                           f"threshold; splitting them passes {SPLIT_CEILING} volumes (a split keeps "
-                           "density, so split volumes split again every step)")
-    for cell in thin:
+def _split(work: _Work, trigger: float) -> int:
+    """Split every energy volume measured past the trigger volume by the 1-4 move; returns how many split."""
+    big = np.flatnonzero(cell_volumes(work.corners, work.tets) > trigger)
+    for cell in big:
         work.corners, work.tets, children, shares = split_cell(work.corners, work.tets, int(cell))
         parent = work.values[cell].copy()
         work.values = np.vstack([work.values, np.zeros((3, work.values.shape[1]))])
         work.values[children[:3]] = shares[:3, None] * parent
         work.values[children[3]] = parent - work.values[children[:3]].sum(axis=0)
         work.origin = np.append(work.origin, np.repeat(work.origin[cell], 3))
-    return len(thin)
+    return len(big)
 
 
 def _moved(engine: Engine, exerted: np.ndarray, energy: np.ndarray, thickness: np.ndarray,
@@ -184,7 +176,7 @@ def _rewoven(engine: Engine, work: _Work, exerted: np.ndarray, thickness: np.nda
     return Engine(grid=after, corners=corners, tets=tets, faces=faces, face_cells=face_cells,
                   face_joint=face_joint, collapses=engine.collapses + collapses,
                   splits=engine.splits + splits, start_space=engine.start_space,
-                  neighbour_changes=engine.neighbour_changes)
+                  start_mean_volume=engine.start_mean_volume, neighbour_changes=engine.neighbour_changes)
 
 
 def _finished(grid: Grid, settings: EngineSettings) -> Grid:
