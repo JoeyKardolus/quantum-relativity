@@ -1,4 +1,4 @@
-"""Command line: `python -m physics.view [--side N] [--seed S] [--unevenness U] [--set name=value ...] [--steps-per-frame K]`.
+"""Command line: `python -m physics.view [--side N] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame K]`.
 
 Contract: sets the Mesa GPU variables (`use_gpu_driver`) before pyglet is imported,
 builds a `FluidSource` (physics.fluid, all rules on, `--set` overrides of `Settings`
@@ -18,7 +18,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m physics.view")
     parser.add_argument("--side", type=int, default=128, help="boxes along each edge of the grid")
     parser.add_argument("--seed", type=int, default=1)
-    parser.add_argument("--unevenness", type=float, default=0.1)
+    parser.add_argument("--unevenness", type=float, default=0.3,
+                        help="root mean square of the log energy across the start")
+    parser.add_argument("--slope", type=float, default=-3.0,
+                        help="spectral slope of the start's ripples, P(k) = k**slope (-3: every size alike)")
     parser.add_argument("--set", action="append", default=[], metavar="name=value",
                         help="override one rule setting, e.g. --set drift=0.1")
     parser.add_argument("--steps-per-frame", type=int, default=1)
@@ -35,7 +38,7 @@ def main() -> None:
     use_gpu_driver()
     from physics.view.fluid_source import FluidSource
     try:
-        source = FluidSource(arguments.side, arguments.seed, arguments.unevenness, overrides)
+        source = FluidSource(arguments.side, arguments.seed, arguments.unevenness, overrides, arguments.slope)
     except TypeError as raised:
         parser.error(f"--set: {raised}")
     from physics.view.point_window import PointWindow

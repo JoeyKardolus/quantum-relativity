@@ -18,10 +18,15 @@ it, at that box's A-to-B share (zero A flux in B's frame). A sealed lump so keep
 its A while it moves or sits and loses A only as its own B flows out. (A flux zero
 in the grid's frame was tried first: it pins a moving sealed lump to the grid; a
 per-face share rule next: the A it moved at B's velocity kept A's own momentum, and
-a moving blob that sealed ran 3.5% fast, measured.) Walls: nothing crosses the grid's outer faces. The substep must
-keep dt * fastest_wave <= courant (step.py), which keeps each box's outflow within
-its content up to a few quanta of rounding (read as 0). Buffers are per (side,
-device) and reused.
+a moving blob that sealed ran 3.5% fast, measured.) Walls: nothing crosses the grid's outer faces. The substep
+keeps dt * fastest_wave <= courant (step.py) for every box above the CFL floor
+(fastest_wave.py), which keeps such a box's outflow within its content up to a few
+quanta of rounding (read as 0). A box whose outflow over dt would pass its content
+(dt times the sum over axes of its sending speed, sending_speed.py, above 1: only near-empty vapour below
+the floor) sends each kind at the share 1 / (dt * that sum) of its donor-cell flux on
+every face, momentum with it, so it sends at most what it holds and keeps its flow
+velocity; every box that sets the substep sends at share 1, unchanged. Buffers are
+per (side, device) and reused.
 """
 from __future__ import annotations
 
@@ -29,6 +34,7 @@ import warp as wp
 
 from physics.fluid.flow_velocity import flow_velocity
 from physics.fluid.grid import QUANTUM, Grid
+from physics.fluid.sending_speed import sending_speed
 
 _QUANTUM = wp.constant(QUANTUM)
 _BUFFERS: dict[tuple[int, str], list] = {}
@@ -48,6 +54,16 @@ def _quanta(amount: float) -> wp.int64:
 def _sent(energy: float, velocity: wp.vec3, axis: int, towards: float) -> float:
     """Energy per time a box sends through its face on side `towards` (+1 or -1) of axis."""
     return energy * wp.max(towards * velocity[axis], 0.0)
+
+
+@wp.func
+def _share(velocity: wp.vec3, box: wp.vec3i, side: int, dt: float) -> float:
+    """The share of its donor-cell flux a box sends: 1, or less when that would pass its content."""
+    outflow = dt * (sending_speed(velocity, 0, box[0], side) + sending_speed(velocity, 1, box[1], side)
+                    + sending_speed(velocity, 2, box[2], side))
+    if outflow <= 1.0:
+        return 1.0
+    return 1.0 / outflow
 
 
 @wp.kernel
@@ -74,12 +90,12 @@ def _face(a_energy: wp.array3d(dtype=wp.int64), b_energy: wp.array3d(dtype=wp.in
     ua_right = flow_velocity(a_momentum[i, j, k], a_energy[i, j, k])
     ub_left = flow_velocity(b_momentum[left[0], left[1], left[2]], b_energy[left[0], left[1], left[2]])
     ub_right = flow_velocity(b_momentum[i, j, k], b_energy[i, j, k])
-    b_forward = _sent(b_left, ub_left, axis, 1.0)
-    b_back = _sent(b_right, ub_right, axis, -1.0)
+    b_forward = _sent(b_left, ub_left, axis, 1.0) * _share(ub_left, left, side, dt)
+    b_back = _sent(b_right, ub_right, axis, -1.0) * _share(ub_right, wp.vec3i(i, j, k), side, dt)
     b_flux[i, j, k] = _quanta((b_forward - b_back) * dt)
     b_carry[i, j, k] = (b_forward * ub_left - b_back * ub_right) * dt
-    a_forward = _sent(a_left, ua_left, axis, 1.0)
-    a_back = _sent(a_right, ua_right, axis, -1.0)
+    a_forward = _sent(a_left, ua_left, axis, 1.0) * _share(ua_left, left, side, dt)
+    a_back = _sent(a_right, ua_right, axis, -1.0) * _share(ua_right, wp.vec3i(i, j, k), side, dt)
     a_flux[i, j, k] = _quanta((a_forward - a_back) * dt)
     a_carry[i, j, k] = (a_forward * ua_left - a_back * ua_right) * dt
 

@@ -2,7 +2,7 @@
 
 Contract: frozen record of floats, read by step() and stats(). Units: one box is
 length 1, one step lasts `step_time`, and the start's mean A-energy per box in the
-ball is 1 (new_grid.py).
+filled cube is 1 (new_grid.py).
   attraction            G in the pull: laplacian(potential) = 4 pi G (A-energy per box);
                         the pull acts on A-energy only (bible: A pulls on A)
   push                  B pressure strength: P = push * b_rest * c**push_power / push_power,
@@ -20,6 +20,11 @@ ball is 1 (new_grid.py).
   courant               CFL number: each substep lasts courant / (fastest wave sum per box)
   potential_cycles      multigrid V-cycles per substep, warm-started from the last potential
   max_substeps          step() raises ValueError when one step needs more substeps
+  cfl_floor             a kind (A or B) holding less energy in a box than this fraction of
+                        the start's mean A per box does not set the substep (fastest_wave.py);
+                        its outflow is capped at its content instead (transport.py), so
+                        near-empty vapour falling fast into a deep core cannot shrink every
+                        box's time step
   occupied_floor        a box is occupied (stats, view) when its energy passes this
                         fraction of the start's mean A per box
   lump_factor           a box is in a lump when its A-energy is at least this times the
@@ -28,7 +33,8 @@ ball is 1 (new_grid.py).
 attraction 0.005, push 0.1, push_power 3, b_rest 0.03 (the joint's 3% price), the seal
 at abab's seal_point 0.4 and the collapse at its push_limit 0.5 as density ratios
 (1/0.6)**3 and (1/0.5)**3, lump_factor 2. Chosen as units, not tuned: friction 1,
-step_time 1, courant 0.4, potential_cycles 2, max_substeps 2000, occupied_floor 0.001.
+step_time 1, courant 0.4, potential_cycles 2, max_substeps 2000, occupied_floor 0.001,
+cfl_floor 0.001 (the occupied floor's value).
 """
 from __future__ import annotations
 
@@ -50,6 +56,7 @@ class Settings:
     courant: float
     potential_cycles: float
     max_substeps: float
+    cfl_floor: float
     occupied_floor: float
     lump_factor: float
 
@@ -62,4 +69,4 @@ class Settings:
 _ALL_ON = Settings(attraction=0.005, push=0.1, push_power=3.0, b_rest=0.03,
                    seal_compression=(1.0 / 0.6) ** 3, collapse_compression=(1.0 / 0.5) ** 3,
                    friction=1.0, step_time=1.0, courant=0.4, potential_cycles=2.0,
-                   max_substeps=2000.0, occupied_floor=1e-3, lump_factor=2.0)
+                   max_substeps=2000.0, cfl_floor=1e-3, occupied_floor=1e-3, lump_factor=2.0)

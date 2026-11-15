@@ -1,6 +1,6 @@
 """The viewer: the fluid engine in a GPU window, drawn as soft additive points (the only viewer).
 
-`python -m physics.view [--side N] [--seed S] [--unevenness U] [--set name=value ...] [--steps-per-frame K]`.
+`python -m physics.view [--side N] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame K]`.
 Boxes denser than the start's mean (plus a fixed 1% sample of the rest) are soft
 points of light at their centres: red for pulling (A) energy, blue for pushing
 (B), both in the same point; the light reads the box's density contrast on a

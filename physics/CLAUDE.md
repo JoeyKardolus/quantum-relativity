@@ -16,12 +16,12 @@ earlier ABAB engine (`abab/`), the browser app (`app/`) and the milestone code w
   when compressed, and gives way past the collapse limit; the flow is frictionless with
   momentum; friction only where A passes through B, and past the seal point A cannot pass.
   Total energy exact (whole quanta, drift 0). Each package's overlay says how.
-- **Open space**: the start is a ball in the middle of a larger empty grid; the walls are
-  closed, so a run whose energy reaches them (`stats()["edge_share"]`) is no longer open
-  space. Report it.
+- **Open space**: the start fills the grid with uneven energy (ripples at every size,
+  `fluid/uneven_field.py`) except an empty margin of side / 16; the walls are closed, so a
+  run whose energy reaches them (`stats()["edge_share"]`) is no longer open space. Report it.
 - **Honesty.** Never tune a setting, seed or threshold until a result passes; report every
-  number, seed, settings and miss. Today the whole ball falls into one box-sized core within
-  about 8 steps and never grows at its edge; see `fluid/CLAUDE.md`.
+  number, seed, settings and miss. Today the whole filled cube still falls into one core
+  within about 10 steps (free fall 7.7 time units at any size); see `fluid/CLAUDE.md`.
 - **GPU**: RTX 5080 under WSL2. CUDA-OpenGL sharing does not work on WSL: copy GPU to host
   once per frame. Tests that need CUDA skip cleanly without it.
 - **A machine keeps no datasets**: long runs and their results go to object storage or tmp,

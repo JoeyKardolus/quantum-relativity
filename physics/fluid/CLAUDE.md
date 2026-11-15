@@ -19,18 +19,24 @@ as a fluid on a fixed cube of boxes, Warp kernels on CUDA. Every box holds A (pu
   before transport. Zero A flux in the grid's frame pins a moving sealed lump; do not.
 - **Friction only in `rub.py`** (rate friction x compression). No viscosity anywhere else.
 - **Order per substep** (`step.py`): potential, CFL dt, pull kick, push kick, rub, transport.
+- **The substep is set by content, not vapour** (`fastest_wave.py`): a kind under `cfl_floor`
+  in a box, and flow into a closed wall (`sending_speed.py`), set nothing; such vapour sends at
+  most its content (`transport.py`). Counting them took 3 to 10 times the substeps.
+- **The start** (`new_grid.py`, `uneven_field.py`): log energy is a Gaussian field, P(k) =
+  k**slope (default -3, every size alike), rms `unevenness`; B = 3% of A in every box.
 - **Walls are closed**; `stats()["edge_share"]` says when energy has reached them. A run whose
   edge share is not ~0 is no longer open space; report it.
 - **Honesty.** Never tune a setting until a result passes; report misses with seed and
-  settings. Today (seed 1, side 128, unevenness 0.5, defaults): the whole ball falls into one
-  box-sized core by step 8 (free fall about 7.7 time units); 47 lumps at step 4, 1 from step 5,
-  sealed from step 10; drift 0 quanta. Step 48 needs more than 2000 substeps (`max_substeps`):
-  velocities into a one-box core. Runs repeat exactly (no float atomics).
+  settings. Today (seed 1, unevenness 0.3, defaults) the whole filled cube falls together
+  into one core cluster by step ~10 (free fall 7.7 time units at density 1, any size). Drift 0;
+  runs repeat exactly (no float atomics).
 
-## Measured (2026-11-15, RTX 5080, steps 2 to 21)
+## Measured (2026-11-15, RTX 5080, filled start, seed 1, unevenness 0.3)
 
-ms per step 28 / 296 / 912 at side 64 / 128 / 192 (41 / 120 / 122 substeps of 0.67 / 2.5 /
-7.5 ms; potential 0.4 / 1.0 / 2.9 ms as one CUDA graph, transport 0.08 / 0.94 / 3.2 ms).
+ms per substep 2.7 at side 128, 18 to 21 at 256. Substeps per step at 128: 11 to 61 (steps
+1 to 6), up to 377 in the fall, 240 by step 45; at 256: 15 to 110, up to 1072, then 580 to
+970; 200 steps at 256 took 48 min. Once fallen the substep is set by real matter at 95 to 150
+boxes per time unit near the core. GPU memory 0.35 GiB at 128, 2.75 GiB at 256.
 
 ## Run
 

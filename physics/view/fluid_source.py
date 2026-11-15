@@ -2,7 +2,7 @@
 
 Contract (the source interface the `Stepper` reads; a test may supply any object
 that has the same):
-  reset()      back to a fresh start: `new_grid(side, seed, unevenness)`, step 0
+  reset()      back to a fresh start: `new_grid(side, seed, unevenness, slope)`, step 0
   step()       one engine step, `physics.fluid.step(grid, settings)`; works whether
                that step changes the grid in place (returns None) or returns a new one
   steps        steps since the last reset
@@ -19,20 +19,21 @@ construction. The energies stay on the GPU; the viewer gathers what it draws the
 from __future__ import annotations
 
 from physics.fluid import Settings, new_grid, stats, step
+from physics.fluid.new_grid import SLOPE
 
 
 class FluidSource:
     """A fluid grid stepped under all rules on, read as per-box A and B energy."""
 
     def __init__(self, side: int, seed: int, unevenness: float,
-                 overrides: dict[str, float] | None = None) -> None:
-        self.side, self.seed, self.unevenness = side, seed, unevenness
+                 overrides: dict[str, float] | None = None, slope: float = SLOPE) -> None:
+        self.side, self.seed, self.unevenness, self.slope = side, seed, unevenness, slope
         self.settings = Settings.all_on(**(overrides or {}))
         self.reset()
 
     def reset(self) -> None:
-        """A fresh start from the same side, seed and unevenness."""
-        self.grid = new_grid(self.side, self.seed, self.unevenness)
+        """A fresh start from the same side, seed, unevenness and slope."""
+        self.grid = new_grid(self.side, self.seed, self.unevenness, self.slope)
         self.steps = 0
 
     def step(self) -> None:
