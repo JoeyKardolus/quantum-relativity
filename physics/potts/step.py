@@ -15,6 +15,10 @@ Contract: `step(universe, settings)` changes the universe in place and returns N
   6. joint_collapse: joints squeezed past their limit vanish and their energy volumes
      fall together; volume_split: volumes grown past the split size tear around a new
      joint; cell_sums after either
+The pull's energy is the self-energy V n / 2 (fluid_energy.py), but the flow runs with V
+held still, so it keeps V n, not V n / 2: the half of V's share the held field does not
+follow, V n / 2 before the flow less after it (clocked, energy-volume boxes), is the
+pull's work during the flow and goes to work_pull too (the re-solve then delivers it).
 The work each non-flow phase does on the fluid's energy (fluid_energy.py, clocked: the
 quantity the steps keep, in which friction's heat is booked, hop.py) is tallied, measured just before and after it: universe.work_pull (the pull's re-solve
 and the cell sums after it), work_compression (the cell sums after the flow: the joints'
@@ -28,6 +32,8 @@ finite or a cell needs a time level over settings.max_level (the universe is the
 partly stepped).
 """
 from __future__ import annotations
+
+import warp as wp
 
 from physics.potts.active_region import active_region
 from physics.potts.box_moves import box_moves
@@ -54,7 +60,9 @@ def step(universe: Universe, settings: Settings) -> None:
     pull(universe, settings)
     cell_sums(universe, settings)
     _tally(universe, settings, "work_pull", before)
+    held = _pull_energy(universe)
     energy_flow(universe, settings)
+    universe.work_pull += held - _pull_energy(universe)
     before = fluid_energy(universe, settings, clocked=True)
     cell_sums(universe, settings)
     before = _tally(universe, settings, "work_compression", before)
@@ -75,3 +83,30 @@ def _tally(universe: Universe, settings: Settings, name: str, before: float) -> 
     now = fluid_energy(universe, settings, clocked=True)
     setattr(universe, name, getattr(universe, name) + now - before)
     return now
+
+
+@wp.kernel
+def _pull_sum(owner: wp.array3d(dtype=wp.int32), kind: wp.array(dtype=wp.int32),
+              potential: wp.array3d(dtype=wp.float32), psi: wp.array3d(dtype=wp.vec2d),
+              clock: wp.array(dtype=wp.float32), low: wp.vec3i, total: wp.array(dtype=wp.float64)):
+    ti, tj, tk = wp.tid()
+    i = ti + low[0]
+    j = tj + low[1]
+    k = tk + low[2]
+    cell = owner[i, j, k]
+    if cell < 0:
+        return
+    if kind[cell] != 0:
+        return
+    held = psi[i, j, k]
+    wp.atomic_add(total, 0, wp.float64(0.5 * clock[cell]) * wp.float64(potential[i, j, k]) * wp.dot(held, held))
+
+
+def _pull_energy(universe: Universe) -> float:
+    """The pull's clocked self-energy, sum over energy-volume boxes of clock V |psi|**2 / 2."""
+    total = wp.zeros(1, dtype=wp.float64, device=universe.owner.device)
+    dims = tuple(top - bottom for bottom, top in zip(universe.low, universe.high))
+    wp.launch(_pull_sum, dim=dims, device=universe.owner.device,
+              inputs=[universe.owner, universe.kind, universe.potential, universe.psi, universe.cell_clock,
+                      wp.vec3i(*universe.low), total])
+    return float(total.numpy()[0])

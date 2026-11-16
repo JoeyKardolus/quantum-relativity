@@ -36,12 +36,22 @@ lattice). Each site tries settings.proposals random plates
      cell losing boxes must stay one piece (its boxes next to the lost ones join up
      inside the block, at least one of them outside the plate) and keep at least one
      box; a cell may gain, and lose, at most max(4, move_share * n) boxes per sweep.
-  4. Energy. A box's energy fluid goes, exactly, to a box of its old cell in the
-     block: that box's psi keeps its phase and grows to hold both energies, |psi|**2
-     summed (heat goes along); a box joining a cell takes half of what its neighbour
-     along a holds, both then holding that neighbour's psi / sqrt(2) (no other site
-     touches that box), so a cell stretches into a box rather than leaving it a
-     vacuum. A move changes only sizes and places, never a cell's energy.
+  4. Energy. A box keeps the norm, the phase's continuity and the flow when it
+     changes cell. Its energy fluid goes, exactly, to its old cell's boxes among its
+     six face neighbours off the plate, its homes, in equal energy shares (to one box
+     of its old cell in the block when it has none): each home's psi becomes home +
+     share (their complex sum, so the flow both carried adds up) scaled to hold both
+     energies, |psi|**2 summed (home's phase kept when the sum is 0; heat goes along
+     in the same shares). Spread, not piled on one home, so a retreating border
+     heaps less energy in its last box. A box joining a cell takes half
+     of the energy of its neighbour along a, the source (no other site touches it),
+     so a cell stretches into a box rather than leaving it a vacuum: both hold
+     |source| / sqrt(2), the source keeps its phase and the joined box's phase
+     continues the source's flow one box further, phase(source) + (phase(source) -
+     phase(beyond)), beyond the box past the source along a when it is the same
+     cell's (else the source's phase), read from the sweep's start (scratch
+     "move_psi", "move_owner": beyond may lie in another site's block). A move
+     changes only sizes and places, never a cell's energy.
 `correcting=True` is the start's size correction (size_correction.py): only the size
 and border terms, aimed at the want, no clock, no move limit.
 A box never becomes empty: space only grows, as cells claim empty edge boxes inside
@@ -153,12 +163,29 @@ def _slot_of(cells: _vec8i, count: int, cell: int) -> int:
 
 @wp.func
 def _joined_psi(home: wp.vec2d, given: wp.vec2d) -> wp.vec2d:
-    """home's psi grown to hold both energies, |home|**2 + |given|**2, keeping home's phase (given's if home is 0)."""
+    """home + given scaled to hold both energies, |home|**2 + |given|**2 (home's phase, or given's, when it sums to 0)."""
     total = wp.dot(home, home) + wp.dot(given, given)
-    size = wp.dot(home, home)
+    joined = home + given
+    size = wp.dot(joined, joined)
+    if size <= wp.float64(1e-24) * total:
+        joined = home
+        size = wp.dot(home, home)
     if size <= wp.float64(0.0):
         return given
-    return home * wp.sqrt(total / size)
+    return joined * wp.sqrt(total / size)
+
+
+@wp.func
+def _continued_psi(source: wp.vec2d, start_source: wp.vec2d, start_beyond: wp.vec2d) -> wp.vec2d:
+    """Half the source's energy, its phase turned on by the step from beyond to the source at the sweep's start."""
+    step = wp.vec2d(start_source[0] * start_beyond[0] + start_source[1] * start_beyond[1],
+                    start_source[1] * start_beyond[0] - start_source[0] * start_beyond[1])
+    size = wp.sqrt(wp.dot(step, step))
+    half = source * wp.sqrt(wp.float64(0.5))
+    if size <= wp.float64(0.0):
+        return half
+    turn = step / size
+    return wp.vec2d(half[0] * turn[0] - half[1] * turn[1], half[0] * turn[1] + half[1] * turn[0])
 
 
 @wp.func
@@ -182,6 +209,7 @@ def _joined(mask: wp.uint64, seeds: wp.uint64) -> int:
 
 @wp.kernel
 def _moves(owner: wp.array3d(dtype=wp.int32), psi: wp.array3d(dtype=wp.vec2d), heat: wp.array3d(dtype=wp.float64),
+           move_owner: wp.array3d(dtype=wp.int32), move_psi: wp.array3d(dtype=wp.vec2d),
            potential: wp.array3d(dtype=wp.float32), kind: wp.array(dtype=wp.int32),
            cell_energy: wp.array(dtype=wp.float64), cell_boxes: wp.array(dtype=wp.int32),
            cell_want: wp.array(dtype=wp.float32), cell_aim: wp.array(dtype=wp.float32),
@@ -357,21 +385,32 @@ def _moves(owner: wp.array3d(dtype=wp.int32), psi: wp.array3d(dtype=wp.vec2d), h
             if old[index] >= 0 and new[index] != old[index]:
                 place = _plate_box(corner, axis, index)
                 cell = old[index]
-                home = wp.vec3i(-1, -1, -1)
+                given = psi[place[0], place[1], place[2]]
+                warmth = heat[place[0], place[1], place[2]]
+                homes = int(0)
                 for face in range(6):
                     there = place + direction(face)
-                    if home[0] < 0 and _plate_index(there, corner, axis, wide_u, wide_v) < 0:
+                    if _plate_index(there, corner, axis, wide_u, wide_v) < 0:
                         if box_owner(owner, there[0], there[1], there[2], side) == cell:
-                            home = there
-                if home[0] < 0:
+                            homes += 1
+                if homes > 0:
+                    share = wp.float64(1.0) / wp.float64(homes)
+                    for face in range(6):
+                        there = place + direction(face)
+                        if _plate_index(there, corner, axis, wide_u, wide_v) < 0:
+                            if box_owner(owner, there[0], there[1], there[2], side) == cell:
+                                psi[there[0], there[1], there[2]] = _joined_psi(psi[there[0], there[1], there[2]],
+                                                                                given * wp.sqrt(share))
+                                heat[there[0], there[1], there[2]] = heat[there[0], there[1], there[2]] + warmth * share
+                else:
+                    home = wp.vec3i(-1, -1, -1)
                     for bit in range(48):
                         there = _block_box(corner, axis, bit)
                         if home[0] < 0 and _plate_index(there, corner, axis, wide_u, wide_v) < 0:
                             if box_owner(owner, there[0], there[1], there[2], side) == cell:
                                 home = there
-                psi[home[0], home[1], home[2]] = _joined_psi(psi[home[0], home[1], home[2]],
-                                                             psi[place[0], place[1], place[2]])
-                heat[home[0], home[1], home[2]] = heat[home[0], home[1], home[2]] + heat[place[0], place[1], place[2]]
+                    psi[home[0], home[1], home[2]] = _joined_psi(psi[home[0], home[1], home[2]], given)
+                    heat[home[0], home[1], home[2]] = heat[home[0], home[1], home[2]] + warmth
                 psi[place[0], place[1], place[2]] = wp.vec2d(wp.float64(0.0), wp.float64(0.0))
                 heat[place[0], place[1], place[2]] = wp.float64(0.0)
                 wp.atomic_add(cell_boxes, cell, -1)
@@ -383,11 +422,16 @@ def _moves(owner: wp.array3d(dtype=wp.int32), psi: wp.array3d(dtype=wp.vec2d), h
                 place = _plate_box(corner, axis, index)
                 source = place + along
                 cell = new[index]
-                halved = psi[source[0], source[1], source[2]] * wp.sqrt(wp.float64(0.5))
+                giving = psi[source[0], source[1], source[2]]
+                beyond = source + along
+                continued = giving * wp.sqrt(wp.float64(0.5))
+                if box_owner(move_owner, beyond[0], beyond[1], beyond[2], side) == cell:
+                    continued = _continued_psi(giving, move_psi[source[0], source[1], source[2]],
+                                               move_psi[beyond[0], beyond[1], beyond[2]])
                 warmth = heat[source[0], source[1], source[2]] * wp.float64(0.5)
-                psi[source[0], source[1], source[2]] = halved
+                psi[source[0], source[1], source[2]] = giving * wp.sqrt(wp.float64(0.5))
                 heat[source[0], source[1], source[2]] = warmth
-                psi[place[0], place[1], place[2]] = halved
+                psi[place[0], place[1], place[2]] = continued
                 heat[place[0], place[1], place[2]] = warmth
                 wp.atomic_add(cell_boxes, cell, 1)
                 wp.atomic_add(cell_place, 3 * cell, wp.int64(place[0]))
@@ -411,11 +455,12 @@ def box_moves(universe: Universe, settings: Settings, correcting: bool = False) 
     universe.lost.zero_()
     sweep = universe.scratch.get("sweeps", 0)
     universe.scratch["sweeps"] = sweep + 1
+    move_owner, move_psi = _sweep_start(universe)
     for phase in range(64):
         offset = wp.vec3i(phase // 16, (phase // 4) % 4, phase % 4)
         seed = (universe.seed * 1000003 + sweep * 64 + phase) % (2 ** 31 - 1)
         wp.launch(_moves, dim=dims, device=device,
-                  inputs=[universe.owner, universe.psi, universe.heat, universe.potential,
+                  inputs=[universe.owner, universe.psi, universe.heat, move_owner, move_psi, universe.potential,
                           universe.kind, universe.cell_energy, universe.cell_boxes, universe.cell_want,
                           universe.cell_aim, universe.cell_potential_mean, universe.cell_clock, universe.cell_place,
                           universe.gained, universe.lost, offset, wp.vec3i(*universe.low),
@@ -423,3 +468,13 @@ def box_moves(universe: Universe, settings: Settings, correcting: bool = False) 
                           settings.push_power, settings.move_share, clock_max,
                           int(settings.proposals), int(correcting), seed, moved])
     return int(moved.numpy()[0])
+
+
+def _sweep_start(universe: Universe) -> tuple:
+    """Copies of the box owners and psi as the sweep starts (scratch "move_owner", "move_psi")."""
+    if "move_psi" not in universe.scratch:
+        universe.scratch["move_owner"] = wp.empty_like(universe.owner)
+        universe.scratch["move_psi"] = wp.empty_like(universe.psi)
+    wp.copy(universe.scratch["move_owner"], universe.owner)
+    wp.copy(universe.scratch["move_psi"], universe.psi)
+    return universe.scratch["move_owner"], universe.scratch["move_psi"]

@@ -6,9 +6,10 @@ hop.py) for the boxes due this substep (the first universe.scratch["site_prefix"
 [threshold] boxes of "site_order", time_levels.py), each for its own dt = fraction *
 step_time / 2**level times its cell's clock (bible: time is local):
   psi <- psi * exp(-i (V + g_box |psi|**2) dt)
-  V      the pull potential (pull.py), in every occupied box: sourced by the energy
-         volumes' energy only, felt by the whole fluid as one potential, so the fluid
-         at an A-B face meets no step in it
+  V      the pull potential (pull.py), in the energy volumes' boxes only: sourced by
+         the energy volumes' energy and felt by it alone (bible: A pulls on nearby
+         A's), so the pull on all A-energy sums to 0 (Newton's third law); a joint's
+         box turns by its push only
   g_box  the fluid's own push (its pressure), g = sound**2 / rest, so its sound speed
          is `sound` at the start's mean density, in both kinds (one fluid); in a
          joint times (1 + push * c**push_power), c its compression: the joint's push
@@ -36,10 +37,12 @@ def _site(order: wp.array(dtype=wp.int32), owner: wp.array3d(dtype=wp.int32), ki
     cell = owner[i, j, k]
     held = psi[i, j, k]
     stiffness = fluid_g
+    felt = wp.float64(potential[i, j, k])
     if kind[cell] == 1:
         stiffness = fluid_g * (1.0 + push * wp.pow(wp.max(compression[cell], 0.0), push_power))
+        felt = wp.float64(0.0)
     dt = fraction * step_time / wp.pow(2.0, float(box_level[i, j, k])) * clock[cell]
-    angle = -(wp.float64(potential[i, j, k]) + wp.float64(stiffness) * wp.dot(held, held)) * wp.float64(dt)
+    angle = -(felt + wp.float64(stiffness) * wp.dot(held, held)) * wp.float64(dt)
     turn_re = wp.cos(angle)
     turn_im = wp.sin(angle)
     psi[i, j, k] = wp.vec2d(held[0] * turn_re - held[1] * turn_im, held[0] * turn_im + held[1] * turn_re)

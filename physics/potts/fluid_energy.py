@@ -4,7 +4,9 @@ Contract: `fluid_energy(universe, settings, clocked=False)` marks the seam boxes
 boxes' present owners (seam_flags.py) and returns, as a Python float, the energy the
 fluid's equation (hop.py, on_site.py) would keep if nothing else changed:
   sum over box faces of w_f t/2 |psi_b - psi_a|**2     (flow, t the face's openness)
-  + sum over boxes of w (V |psi|**2                    (pull)
+  + sum over boxes of w (V |psi|**2 / 2               (pull: A boxes only; half, the
+                                                        self-energy of a field the
+                                                        A-energy exerts on itself)
   + g_box / 2 |psi|**4)                                (the fluid's push, a joint's stiffer)
 with V, g_box as on_site.py has them and t from border_openness.py. Unclocked (the
 default) every weight is 1: the energy in proper time, the units friction's heat is
@@ -40,13 +42,14 @@ def _sum(owner: wp.array3d(dtype=wp.int32), kind: wp.array(dtype=wp.int32), comp
     held = psi[here[0], here[1], here[2]]
     density = wp.dot(held, held)
     stiffness = fluid_g
+    felt = wp.float64(0.5) * wp.float64(potential[here[0], here[1], here[2]])
     if kind[cell] == 1:
         stiffness = fluid_g * (1.0 + push * wp.pow(wp.max(compression[cell], 0.0), push_power))
+        felt = wp.float64(0.0)
     weight = float(1.0)
     if clocked != 0:
         weight = clock[cell]
-    energy = wp.float64(weight) * (wp.float64(potential[here[0], here[1], here[2]])
-                                   + wp.float64(0.5 * stiffness) * density) * density
+    energy = wp.float64(weight) * (felt + wp.float64(0.5 * stiffness) * density) * density
     for axis in range(3):
         there = here + direction(2 * axis)
         if there[axis] < side:

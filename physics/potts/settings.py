@@ -23,10 +23,11 @@ occupied box is 1 (new_universe.py; energy volumes and joints alike).
   seal_compression      c at or past which nothing crosses the joint's border (the seal)
   collapse_compression  c at or past which the joint collapses: it vanishes and its A
                         neighbours fall together into one energy volume
-  friction              across an A-B face the fluid's phase difference (its flow there)
-                        keeps 1 / (1 + friction * c * dt) of itself per hop of length dt,
-                        the lost flow energy booked as heat (hop.py); nowhere else is
-                        there friction
+  friction              across an A-B face the flow crossing it (the phase difference as far
+                        as the flow behind it on both sides carries it) keeps
+                        1 / (1 + friction * c * dt) of itself per hop of length dt, the
+                        lost flow energy booked as heat (hop.py); nowhere else is there
+                        friction
   sound                 the energy fluid's sound speed at the start's mean density, both
                         kinds: its nonlinear term g = sound**2 / rest (on_site.py);
                         also sets a joint's swing, omega = pi * sound / n**(1/3)
