@@ -6,9 +6,11 @@ seed in default_seeds), random (random_points Latin-hypercube points on seed 1),
 recheck (the recheck_top best searched points on every seed in recheck_seeds). Every run is
 appended to `results` as it ends; a phase already in the file is skipped, so a stopped search
 resumes. A run that raises is recorded with score -2 and its error, never dropped.
-Settings fitted, ranges fixed before the first search (2026-11-16): attraction, push,
-collapse_compression, friction (log), push_power (linear), seal_compression =
-collapse_compression ** fraction with fraction in 0.4 .. 0.95 (always below collapse).
+Settings fitted, ranges fixed for the whole-quanta engine (2026-11-16) before any search
+on it: pull_strength, push, collapse_squeeze, friction (log, each a decade or more round
+its default), push_steepness (linear), seal_squeeze = collapse_squeeze * fraction with
+fraction in 0.2 .. 0.9 (always below collapse). The cell engine's search (attraction,
+push_power, compressions) cannot be compared with these.
 No dark-energy or base-push setting is searched (bible rule 8: expansion is drift from
 imperfect transfer, nothing pushes space apart).
 """
@@ -23,14 +25,14 @@ import numpy as np
 
 from physics.fit.fit_run import fit_run
 
-LOG_RANGES = {"attraction": (5e-4, 0.1), "push": (0.01, 1.0), "collapse_compression": (2.0, 20.0),
+LOG_RANGES = {"pull_strength": (1e-8, 1e-6), "push": (0.05, 5.0), "collapse_squeeze": (1.0, 10.0),
               "friction": (0.1, 10.0)}
-LINEAR_RANGES = {"push_power": (1.0, 6.0), "seal_fraction": (0.4, 0.95)}
+LINEAR_RANGES = {"push_steepness": (2.0, 10.0), "seal_fraction": (0.2, 0.9)}
 NAMES = list(LOG_RANGES) + list(LINEAR_RANGES)
 
 
 def _unit_to_overrides(unit):
-    """Map a point of the unit cube to engine settings (seal = collapse ** seal_fraction)."""
+    """Map a point of the unit cube to engine settings (seal = collapse * seal_fraction)."""
     values = {}
     for index, name in enumerate(NAMES):
         if name in LOG_RANGES:
@@ -40,7 +42,7 @@ def _unit_to_overrides(unit):
             low, high = LINEAR_RANGES[name]
             values[name] = float(low + unit[index] * (high - low))
     fraction = values.pop("seal_fraction")
-    values["seal_compression"] = float(values["collapse_compression"] ** fraction)
+    values["seal_squeeze"] = float(values["collapse_squeeze"] * fraction)
     return values
 
 

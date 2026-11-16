@@ -2,15 +2,16 @@
 
 Contract: `expansion(cells_per_side=7, boxes_per_cell_side=10, seed=1, unevenness=0.3,
 steps=60, every=2, settings=None, device="cuda")` builds
-physics.potts.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness), runs
-`steps` steps with settings (default Settings.all_on()), measuring at the start and
+physics.engine.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness), runs
+`steps` steps with settings (default Settings(), every rule on), measuring at the start and
 every `every` steps (sampled_run.py). Returns a dict (numbers and lists of floats, no
 verdict):
   cells_per_side, boxes_per_cell_side, seed, unevenness, steps, settings (dict)
   time               sample times
-  occupied_growth    stats "occupied_growth" per sample: boxes held by cells over the start's
+  occupied_growth    stats "occupied_growth" per sample: boxes holding space over the start's
   occupied_radius    radius of a ball of the occupied boxes (stats "occupied"), boxes
-  energy_radius      RMS radius of all energy about its centre (rms_radius.py), boxes
+  energy_radius      RMS radius of all whole quanta (both signs) about their centre
+                     (rms_radius.py), boxes
   edge_share         stats "edge_share" per sample (not ~0: no longer open space)
   rate_time          midpoints between samples
   occupied_rate      d ln(occupied_radius)/dt there (growth_rates.py)
@@ -19,9 +20,10 @@ verdict):
                      time over the first and the second half of rate_time (least
                      squares); negative then positive = slowed, then sped up. NaN with
                      < 2 points.
-  collapses, energy_drift   stats at the end (drift in quanta; 0 is exact)
-  substeps           substeps the run took
-The Planck boxes are fixed; space grows as cells claim empty boxes at the edge, so the
+  collapses, energy_drift   stats at the end (joint boxes collapsed; drift in quanta, 0
+                     is exact)
+  substeps           steps the run took (the engine has no substeps: one per step)
+The Planck boxes are fixed; space grows as joints claim empty boxes at the edge, so the
 occupied radius is the size of space and the energy radius says where the energy is.
 """
 from __future__ import annotations
@@ -31,7 +33,7 @@ from dataclasses import asdict
 
 import numpy as np
 
-from physics.potts import Settings, Universe, new_universe, stats
+from physics.engine import Settings, State, new_universe, stats
 from physics.scenes.box_energies import box_energies
 from physics.scenes.growth_rates import growth_rates
 from physics.scenes.rms_radius import rms_radius
@@ -41,7 +43,7 @@ from physics.scenes.sampled_run import sampled_run
 def expansion(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int = 1, unevenness: float = 0.3,
               steps: int = 60, every: int = 2, settings: Settings | None = None, device: str = "cuda") -> dict:
     """Occupied and energy radius over time, their growth rates and whether the rate turns."""
-    settings = settings or Settings.all_on()
+    settings = settings or Settings()
     universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device)
     samples = sampled_run(universe, settings, steps, every, lambda sampled: _measure(sampled, settings))
     times = [time for time, _ in samples]
@@ -61,10 +63,10 @@ def expansion(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int 
             "occupied_rate_trend_early": _trend(rate_time[:half], occupied_rate[:half]),
             "occupied_rate_trend_late": _trend(rate_time[half:], occupied_rate[half:]),
             "collapses": final["collapses"], "energy_drift": final["energy_drift"],
-            "substeps": universe.substeps}
+            "substeps": universe.step}
 
 
-def _measure(universe: Universe, settings: Settings) -> dict:
+def _measure(universe: State, settings: Settings) -> dict:
     now = stats(universe, settings)
     a_energy, b_energy = box_energies(universe)
     return {"occupied_growth": now["occupied_growth"],

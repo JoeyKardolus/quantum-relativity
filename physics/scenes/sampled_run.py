@@ -1,21 +1,21 @@
 """Sampled run: step a universe and measure it at fixed intervals.
 
 Contract: `sampled_run(universe, settings, steps, every, measure)` measures the universe
-once before stepping, then calls physics.potts.step `steps` times, measuring after every
+once before stepping, then calls physics.engine.step `steps` times, measuring after every
 `every`-th step and after the last. `measure(universe)` returns anything; the result is
 a list of (time, measurement) pairs, time = steps taken * settings.step_time. The
-universe is stepped in place. Raises ValueError for steps < 0 or every < 1; the engine's
-own errors (too many substeps, a non-finite flow) propagate.
+universe (a physics.engine State) is stepped in place. Raises ValueError for steps < 0
+or every < 1; the engine's own errors propagate.
 """
 from __future__ import annotations
 
 from typing import Any, Callable
 
-from physics.potts import Settings, Universe, step
+from physics.engine import Settings, State, step
 
 
-def sampled_run(universe: Universe, settings: Settings, steps: int, every: int,
-                measure: Callable[[Universe], Any]) -> list[tuple[float, Any]]:
+def sampled_run(universe: State, settings: Settings, steps: int, every: int,
+                measure: Callable[[State], Any]) -> list[tuple[float, Any]]:
     """(time, measure(universe)) at the start, every `every` steps and at the end."""
     if steps < 0 or every < 1:
         raise ValueError(f"need steps >= 0 and every >= 1, got {steps} and {every}")

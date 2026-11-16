@@ -1,9 +1,9 @@
 """Command line: `python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame F]`.
 
 Contract: sets the Mesa GPU variables (`use_gpu_driver`) before pyglet is imported,
-builds a `CellsSource` (physics.potts, a checkerboard of N^3 cells of K^3 Planck
+builds a `CellsSource` (physics.engine, a checkerboard of N^3 cells of K^3 Planck
 boxes each inside an empty margin, `--set` overrides of `Settings` fields, each a
-float; an unknown name or a value that is not a number exits with a message),
+number (whole for a whole-number field); an unknown name or a value that is not a number exits with a message),
 steps it on a `Stepper` thread, F steps between drawn frames, starting paused
 (space starts), and opens the `PointWindow` until it is closed.
 """
@@ -25,7 +25,7 @@ def main() -> None:
     parser.add_argument("--slope", type=float, default=-3.0,
                         help="spectral slope of the start's ripples, P(k) = k**slope (-3: every size alike)")
     parser.add_argument("--set", action="append", default=[], metavar="name=value",
-                        help="override one rule setting, e.g. --set drift=0.1")
+                        help="override one rule setting, e.g. --set friction=2")
     parser.add_argument("--steps-per-frame", type=int, default=1)
     arguments = parser.parse_args()
     overrides = {}

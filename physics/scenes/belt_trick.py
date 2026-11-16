@@ -6,21 +6,22 @@ settings=None, device="cuda")` (bible `physics/quantum-relativity`, milestone 7'
 lead: Dirac's belt trick). Its own settings, not the spin scene's: cells of 10 boxes and
 an odd cells_per_side, so the host energy volume sits on the pull's centre (the whirl
 survives both there, round-3 decisions 3 and 4); margin 13 makes the grid 96 boxes a side.
-Start: new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness=0, margin)
-(every box holds 1); the energy volume whose box centre lies nearest the grid's middle is
-the host, H its start boxes. A whirl of `turns` whole turns round a line along grid
-axis 2 through H's centre (half a box off the boxes) is imprinted as phase on the whole
-grid (Universe.from_host's `phase`), so the line runs through the column out to the
-open edge and the web round the host carries the same winding: the whirl is tied in.
+Start: physics.engine new_universe(cells_per_side, boxes_per_cell_side, seed,
+unevenness=0, margin) (every box holds 1000 quanta); the energy volume (physics.engine
+cells) whose box centre lies nearest the grid's middle is the host, H its start boxes. A
+whirl of `turns` whole turns round a line along grid axis 2 through H's centre (half a
+box off the boxes) is imprinted as phase on the whole grid (State.from_host's `phase`),
+so the line runs through the column out to the open edge and the web round the host
+carries the same winding: the whirl is tied in.
 Two webs, each run twice (driven and still, so the web's own turning is told apart):
   tied     that start as it is: the host wrapped in joints, the joints one web
-  untied   the control: every filled box one energy volume (no web), built with
-           Universe.from_host and boxes_per_cell_side = the filled side, so the one
-           volume wants the size it has and never reaches the split size
+  untied   the control: every filled box one energy volume (no web): the same quanta,
+           all made plus
 Drive: turning the whirl's pattern by an angle a about its own line is turning its
 phase by -turns a, so after each of the first drive_turns * steps_per_turn steps every
 driven box's psi is multiplied by exp(-i turns 2 pi / steps_per_turn) (exact, norm
-kept): tied, the boxes the host owns then; untied, H. The still runs skip it. The
+kept: the box's phase turns, its quanta stay): tied, the boxes of the energy volume
+sharing the most boxes with H then; untied, H. The still runs skip it. The
 host is turned about the whirl's own line only, never across it.
 Measured at the start and after every step, from the complex field (wave_field.py):
   whirl_winding   whole turns inside the square loop of half width loop_half_width
@@ -55,7 +56,7 @@ from dataclasses import asdict
 import numpy as np
 
 from physics.measure import loop_circulation, whirl_strength
-from physics.potts import ENERGY_VOLUME, Settings, Universe, new_universe, step
+from physics.engine import ENERGY_VOLUME, Settings, State, cells, host_boxes, new_universe, step
 from physics.scenes.spin import _enclosed_winding, _same_cell_windings, _whirl_phase
 from physics.scenes.wave_field import wave_field
 
@@ -68,26 +69,23 @@ def belt_trick(cells_per_side: int = 7, boxes_per_cell_side: int = 10, margin: i
                turns: int = 1, drive_turns: int = 2, steps_per_turn: int = 60, loop_half_width: int = 2,
                web_reach: int = 8, settings: Settings | None = None, device: str = "cuda") -> dict:
     """The whirl's winding and strength and the web's twist, every step, while the host turns twice."""
-    settings = settings or Settings.all_on()
+    settings = settings or Settings()
     even = new_universe(cells_per_side, boxes_per_cell_side, seed=seed, unevenness=0.0, margin=margin,
                         device=device)
-    owner, kind = even.owner.numpy(), even.kind.numpy()
-    density = np.abs(wave_field(even)) ** 2
-    host = _host(owner, kind)
-    host_boxes = owner == host
-    core = _box_centre(host_boxes)
+    quanta = host_boxes(even)["quanta"]
+    found = cells(host_boxes(even))
+    host = _host(found)
+    held = found["owner"] == host
+    core = _box_centre(held)
     core[:WHIRL_AXIS] = np.floor(core[:WHIRL_AXIS]) + 0.5
-    phase = np.broadcast_to(_whirl_phase(even.side, core, WHIRL_AXIS, turns), owner.shape)
-    rings = _rings(host_boxes, web_reach)
-    filled = int(round(np.count_nonzero(owner >= 0) ** (1.0 / 3.0)))
-    starts = {"tied": lambda: Universe.from_host(owner, density, kind, boxes_per_cell_side, seed, device, phase),
-              "untied": lambda: Universe.from_host(np.where(owner >= 0, 0, -1), density,
-                                                   np.array([ENERGY_VOLUME]), filled, seed, device, phase)}
+    phase = np.broadcast_to(_whirl_phase(even.side, core, WHIRL_AXIS, turns), quanta.shape)
+    rings = _rings(held, web_reach)
+    starts = {"tied": lambda: State.from_host(quanta, phase, seed=seed, device=device),
+              "untied": lambda: State.from_host(np.abs(quanta), phase, seed=seed, device=device)}
     runs = {}
     for web, start in starts.items():
         for name, driven in ((web, drive_turns), (f"{web}_still", 0)):
-            tracker = _Tracker(core, rings, host if web == "tied" else None, host_boxes, loop_half_width,
-                               boxes_per_cell_side // 2 + 2)
+            tracker = _Tracker(core, rings, web == "tied", held, loop_half_width, boxes_per_cell_side // 2 + 2)
             runs[name] = _run(start(), settings, tracker, turns, driven, steps_per_turn, drive_turns)
     return {"cells_per_side": cells_per_side, "boxes_per_cell_side": boxes_per_cell_side, "margin": margin,
             "seed": seed, "turns": turns, "drive_turns": drive_turns, "steps_per_turn": steps_per_turn,
@@ -95,17 +93,11 @@ def belt_trick(cells_per_side: int = 7, boxes_per_cell_side: int = 10, margin: i
             "host": int(host), "runs": runs}
 
 
-def _host(owner: np.ndarray, kind: np.ndarray) -> int:
+def _host(found: dict) -> int:
     """The energy volume whose box centre lies nearest the grid's middle."""
-    occupied = owner >= 0
-    places = np.argwhere(occupied).astype(np.float64)
-    cells = owner[occupied]
-    boxes = np.bincount(cells, minlength=kind.size).astype(np.float64)
-    centre = np.stack([np.bincount(cells, weights=places[:, axis], minlength=kind.size) for axis in range(3)],
-                      axis=1) / np.maximum(boxes, 1.0)[:, None]
-    volumes = np.flatnonzero((kind == ENERGY_VOLUME) & (boxes > 0))
-    middle = (owner.shape[0] - 1) / 2.0
-    return int(volumes[np.argmin(np.linalg.norm(centre[volumes] - middle, axis=1))])
+    volumes = np.flatnonzero(found["kind"] == ENERGY_VOLUME)
+    middle = (found["owner"].shape[0] - 1) / 2.0
+    return int(volumes[np.argmin(np.linalg.norm(found["centre"][volumes] - middle, axis=1))])
 
 
 def _box_centre(mask: np.ndarray) -> np.ndarray:
@@ -113,21 +105,21 @@ def _box_centre(mask: np.ndarray) -> np.ndarray:
     return np.argwhere(mask).astype(np.float64).mean(axis=0)
 
 
-def _rings(host_boxes: np.ndarray, reach: int) -> list[np.ndarray]:
+def _rings(held: np.ndarray, reach: int) -> list[np.ndarray]:
     """H, then the closed surfaces of boxes at Chebyshev distance 1..reach from H's bounding cube."""
-    places = np.argwhere(host_boxes)
+    places = np.argwhere(held)
     low, high = places.min(axis=0), places.max(axis=0)
-    axes = [np.arange(size) for size in host_boxes.shape]
+    axes = [np.arange(size) for size in held.shape]
     gaps = [np.maximum(np.maximum(low[axis] - axes[axis], axes[axis] - high[axis]), 0) for axis in range(3)]
     distance = np.maximum(np.maximum(gaps[0][:, None, None], gaps[1][None, :, None]), gaps[2][None, None, :])
-    inside = np.zeros(host_boxes.shape, dtype=bool)
+    inside = np.zeros(held.shape, dtype=bool)
     inside[tuple(slice(low[axis], high[axis] + 1) for axis in range(3))] = True
-    if reach < 1 or np.any(low - reach < 0) or np.any(high + reach >= np.array(host_boxes.shape)):
+    if reach < 1 or np.any(low - reach < 0) or np.any(high + reach >= np.array(held.shape)):
         raise ValueError(f"web_reach must be >= 1 and keep every surface inside the grid, got {reach}")
-    return [host_boxes] + [(distance == ring) & ~inside for ring in range(1, reach + 1)]
+    return [held] + [(distance == ring) & ~inside for ring in range(1, reach + 1)]
 
 
-def _run(universe: Universe, settings: Settings, tracker: "_Tracker", turns: int, driven_turns: int,
+def _run(universe: State, settings: Settings, tracker: "_Tracker", turns: int, driven_turns: int,
          steps_per_turn: int, drive_turns: int) -> dict:
     """Step drive_turns * steps_per_turn times, turning the host for driven_turns turns, measuring every step."""
     steps = drive_turns * steps_per_turn
@@ -146,36 +138,41 @@ def _run(universe: Universe, settings: Settings, tracker: "_Tracker", turns: int
     return run
 
 
-def _turn_phase(universe: Universe, boxes: np.ndarray, angle: float) -> None:
-    """Multiply psi by exp(i angle) on the given boxes (an exact on-site turn, norm kept)."""
-    pairs = universe.psi.numpy()
-    field = pairs[..., 0] + 1j * pairs[..., 1]
-    field[boxes] *= complex(math.cos(angle), math.sin(angle))
-    universe.psi.assign(np.stack([field.real, field.imag], axis=-1))
+def _turn_phase(universe: State, boxes: np.ndarray, angle: float) -> None:
+    """Multiply psi by exp(i angle) on the given boxes: their phase turns, their whole quanta stay."""
+    phase = universe.phase.numpy().astype(np.float64)
+    phase[boxes] = np.angle(np.exp(1j * (phase[boxes] + angle)))
+    universe.phase.assign(phase.astype(np.float32))
 
 
 class _Tracker:
     """Holds the start's field on the surfaces; measure() reads every number off the field now."""
 
-    def __init__(self, core, rings, host, host_boxes, loop_half_width, web_half_width):
-        self.core, self.rings, self.host, self.host_boxes = np.array(core), rings, host, host_boxes
+    def __init__(self, core, rings, tied, held, loop_half_width, web_half_width):
+        self.core, self.rings, self.tied, self.held = np.array(core), rings, tied, held
         self.loop_half_width, self.web_half_width = loop_half_width, web_half_width
         self.start = None
         self.tracked, self.last_raw = 0.0, None
 
-    def driven(self, universe: Universe) -> np.ndarray:
-        """The boxes turned by the drive: the host's own boxes now (tied), else H."""
-        if self.host is None:
-            return self.host_boxes
-        return universe.owner.numpy() == self.host
+    def driven(self, universe: State, found: dict | None = None) -> np.ndarray:
+        """The boxes turned by the drive: the energy volume sharing most boxes with H now (tied), else H."""
+        if not self.tied:
+            return self.held
+        found = found or cells(host_boxes(universe))
+        owner = found["owner"]
+        shared = owner[self.held & (owner >= 0) & (owner < found["volumes"])]
+        if shared.size == 0:
+            return np.zeros(self.held.shape, dtype=bool)
+        return owner == np.bincount(shared).argmax()
 
-    def measure(self, universe: Universe) -> dict:
+    def measure(self, universe: State) -> dict:
         field = wave_field(universe)
         if self.start is None:
             self.start = field.copy()
-        owner = universe.owner.numpy()
+        found = cells(host_boxes(universe))
+        owner = found["owner"]
         nearest = tuple(np.rint(self.core).astype(int))
-        driven = self.driven(universe) & (owner >= 0)
+        driven = self.driven(universe, found) & (owner >= 0)
         windings = _same_cell_windings(field, owner)
         strength = (whirl_strength(field, self.core, np.eye(3)[WHIRL_AXIS], float(self.loop_half_width),
                                    float(self.loop_half_width), valid=driven) if driven.any() else 0.0)

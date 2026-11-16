@@ -1,6 +1,6 @@
 """Occupied Planck boxes are drawn tinted by their cell's kind, borders brighter, lit against the start.
 
-The fake source here stands in for the engine (physics.potts) in this test only;
+The fake source here stands in for the engine (physics.engine) in this test only;
 the command always runs the real engine.
 """
 from __future__ import annotations
@@ -66,7 +66,7 @@ class _PackingSource:
         return _view(centres, self.density, kind, np.zeros(64))
 
     def stats(self) -> dict:
-        return {"total_energy": float(self.density.sum()), "cells": 2, "cell_count_growth": 1.0}
+        return {"amount": int(self.density.sum()), "cells": 2, "cell_count_growth": 1.0}
 
 
 def test_each_occupied_box_is_drawn_at_its_centre_in_its_cell_kind_colour():

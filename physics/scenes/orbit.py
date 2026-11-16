@@ -7,12 +7,12 @@ start of wrapped cells, a big ball of extra energy big_energy in the middle, a s
 ball small_energy at that distance along x (energy volumes sit at all-odd cell places,
 so the middle cell is one when cells_per_side is 3, 7, 11, ... and the balls land on
 energy volumes when the distances are whole multiples of two cell sides), moving along y at the Newtonian circular
-speed sqrt(G (M + m) / distance) for G = settings.attraction and the two balls' extra
-energies M, m, the big ball moving the other way so the pair's momentum is 0. Empty
+speed sqrt(G (M + m) / distance) for G = settings.pull_strength and the two balls' extra
+quanta M, m (energies in units of blob_start's BOX_QUANTA, 1000 quanta), the big ball moving the other way so the pair's momentum is 0. Empty
 space holds no boxes, so the blobs move through the foam (bible: the space between
-masses is cells). Each run takes `steps` steps (default settings Settings.all_on()),
-measuring after every step. A blob is the A-energy above the even foam's 1 per A box
-(the excess, clipped at 0). The big centre is the excess's centre within big_radius + 3
+masses is cells). Each run takes `steps` steps (default settings Settings(), every rule
+on), measuring after every step. A blob is the plus quanta above the even foam's
+BOX_QUANTA per plus box (the excess, clipped at 0). The big centre is the excess's centre within big_radius + 3
 of its last place; the small blob is all excess farther than that from the new big
 centre, and its centre is that excess's centre; with no excess left there it has
 fallen in (radius 0).
@@ -21,7 +21,7 @@ Returns a dict (no verdict):
   small_energy
   runs        per distance: time, radius (centre to centre, boxes), angle (unwrapped,
               radians, in the x-y plane), spread (RMS radius of the small blob's excess
-              about its centre, rms_radius.py) and small_energy (its excess) per
+              about its centre, rms_radius.py) and small_energy (its excess quanta) per
               sample, mean_radius, min_radius, max_radius,
               turns (angle swept / 2 pi), period (2 pi / |least-squares angular speed|,
               inf when it does not turn), early_period (the same over the first quarter of
@@ -33,6 +33,8 @@ Returns a dict (no verdict):
               (last over first, minus 1; NaN when the first is 0)
   kepler      kepler per distance; Kepler's rule holds when these are equal
   newton_kepler   4 pi**2 / (G (M + m)), the value Newton's pull gives every distance
+                  (the pull settles at light speed, physics/engine/pull_wave.py, so a
+                  blob farther than light_speed * time from the other has not felt it yet)
 """
 from __future__ import annotations
 
@@ -41,15 +43,14 @@ from dataclasses import asdict
 
 import numpy as np
 
-from physics.potts import Settings, Universe
-from physics.scenes.blob_start import blob_start
+from physics.engine import Settings, State
+from physics.scenes.blob_start import BOX_QUANTA, blob_start
 from physics.scenes.box_energies import box_energies
 from physics.scenes.energy_centre import energy_centre
 from physics.scenes.rms_radius import rms_radius
 from physics.scenes.sampled_run import sampled_run
 
 TRACK_MARGIN = 3.0
-FOAM_A = 1.0
 
 
 def orbit(cells_per_side: int = 11, boxes_per_cell_side: int = 4, distances: tuple[float, ...] = (8.0, 16.0),
@@ -57,8 +58,8 @@ def orbit(cells_per_side: int = 11, boxes_per_cell_side: int = 4, distances: tup
           big_radius: float = 3.0, small_energy: float = 20.0, small_radius: float = 1.5, steps: int = 120,
           settings: Settings | None = None, device: str = "cuda") -> dict:
     """Radius, period and period**2 / radius**3 of a small blob round a big one, per distance."""
-    settings = settings or Settings.all_on()
-    pull = settings.attraction * (big_energy + small_energy)
+    settings = settings or Settings()
+    pull = settings.pull_strength * (big_energy + small_energy) * BOX_QUANTA
     runs = []
     for distance in distances:
         speed = math.sqrt(pull / distance)
@@ -82,9 +83,9 @@ class _Tracker:
     def __init__(self, big: np.ndarray, big_radius: float):
         self.big, self.reach = big, big_radius + TRACK_MARGIN
 
-    def measure(self, universe: Universe) -> dict:
+    def measure(self, universe: State) -> dict:
         a_energy, _ = box_energies(universe)
-        energy = np.where(universe.owner.numpy() >= 0, np.maximum(a_energy - FOAM_A, 0.0), 0.0)
+        energy = np.where(a_energy > 0, np.maximum(a_energy - BOX_QUANTA, 0.0), 0.0)
         axis = np.arange(universe.side, dtype=np.float64)
         self.big = energy_centre(energy, _distance(axis, self.big) <= self.reach)
         outside = _distance(axis, self.big) > self.reach

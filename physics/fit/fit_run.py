@@ -1,12 +1,12 @@
 """fit_run: one fit-set universe, stepped and scored on expansion shape and structure.
 
 Contract: fit_run(overrides, seed, cells, boxes, steps, every, observers=3) -> dict. Builds
-new_universe(cells, boxes, seed), steps it with Settings.all_on(**overrides) keeping every
-cell's elapsed local time (physics.scenes.clocked_run) and samples every `every` steps. The
+physics.engine new_universe(cells, boxes, seed), steps it with Settings(**overrides)
+keeping every energy volume's elapsed local time (physics.scenes.clocked_run) and samples every `every` steps. The
 expansion is timed as an astronomer times it: by the mean local clock of the `observers` most
 packed energy volumes at the end (physics.scenes.observer_cells; bible: time is local), not by
-the step counter. The baseline is the first sample after step 0 (the first step's size
-correction is a jump, not the dynamics). score = 0.5 E + 0.5 S:
+the step counter. The baseline is the first sample after step 0 (kept from the cell
+engine, whose first step was a size correction). score = 0.5 E + 0.5 S:
   E  expansion dip min(r1 - r2, r3 - r2) / mean |r| over the occupied radius's growth rate
      against the observers' clock, in thirds of the run, clipped to +-1; -1 when space does
      not grow or shrinks or no observer exists; minus 1 when edge_share > 0.01 (the walls are
@@ -15,7 +15,7 @@ The settings searched hold no dark-energy or base-push term (bible rule 8: expan
 from imperfect transfer). Whether the observers' clock makes expansion look accelerating is the
 timescape scene's unfitted test, never part of this score.
   S  mean of tanh(ln contrast ratio), tanh(lump gain / 5) and tanh(large-scale minus
-     small-scale ln power growth), on the central cube the start fills.
+     small-scale ln power growth), on the central cube the start fills (whole quanta per box, both signs).
 Only the engine's public face and the scenes' shared measures, as the scenes use them.
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ import time
 
 import numpy as np
 
-from physics.potts import Settings, new_universe, stats
+from physics.engine import Settings, host_boxes, new_universe, stats
 from physics.scenes import box_energies, clocked_run, growth_rates, observer_cells, power_spectrum
 
 
@@ -74,12 +74,12 @@ def _structure_score(first, last):
 
 
 def fit_run(overrides, seed, cells, boxes, steps, every, observers=3):
-    """Run one universe with Settings.all_on(**overrides) and return its scores and series."""
+    """Run one universe with Settings(**overrides) and return its scores and series."""
     started = time.time()
-    settings = Settings.all_on(**overrides)
+    settings = Settings(**overrides)
     universe = new_universe(cells, boxes, seed)
-    owner = universe.owner.numpy()
-    occupied_axis = np.nonzero((owner >= 0).any(axis=(1, 2)))[0]
+    occupied = host_boxes(universe)["quanta"] != 0
+    occupied_axis = np.nonzero(occupied.any(axis=(1, 2)))[0]
     lower, upper = int(occupied_axis.min()), int(occupied_axis.max()) + 1
     samples, local = clocked_run(universe, settings, steps, every,
                                  lambda sampled: _measure(sampled, settings, lower, upper))
@@ -100,5 +100,5 @@ def fit_run(overrides, seed, cells, boxes, steps, every, observers=3):
             "occupied_growth_end": last["occupied_growth"], "edge_share_end": last["edge_share"],
             "lumps": [measured["lumps"] for _, measured in samples],
             "contrast": [measured["contrast"] for _, measured in samples],
-            "radius": radii, "collapses_end": last["collapses"], "substeps": universe.substeps,
+            "radius": radii, "collapses_end": last["collapses"], "substeps": universe.step,
             "seconds": time.time() - started}

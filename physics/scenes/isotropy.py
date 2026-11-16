@@ -2,41 +2,47 @@
 
 Contract: `isotropy(cells_per_side=12, boxes_per_cell_side=4, blob_energy=500.0,
 blob_radius=3.0, flow_radius=16.0, speed=0.3, steps=20, seeds=(1, 2, 3, 4),
-cone_degrees=20.0, settings=None, device="cuda")` makes two measurements on the even
-checkerboard (default settings Settings.all_on()). The Planck boxes form a cubic grid
+cone_degrees=20.0, pull_steps=200, settings=None, device="cuda")` makes two measurements on
+the even checkerboard (default settings Settings(), every rule on). The Planck boxes form a cubic grid
 with six face directions, so a direction-free foam should show no difference between a
 face axis and a diagonal. Every ball sits on the middle energy volume: the one whose
 box centre lies nearest the centre of all the energy volumes' boxes (with an even
 cells_per_side the energy volumes, at all-odd cell places, are not centred on the grid),
 so the foam's own pull and push are even round it.
-Pull: one ball of extra energy blob_energy and radius blob_radius at rest, one step (the
-pull is solved in it), then every living cell's mean pull potential (stats refreshes the
-cell sums) against its centre's distance from the ball. A cell counts as "axis" when its
-direction from the ball lies within cone_degrees of a face axis (plus or minus x, y, z),
-"diagonal" when within cone_degrees of a body diagonal (plus or minus 1, 1, 1).
+Pull: one ball of extra energy blob_energy (units of 1000 quanta, blob_start.py) and
+radius blob_radius at rest, `pull_steps` steps (the pull is a wave from light speed,
+physics/engine/pull_wave.py: 200 steps of 0.25 let it cross 50 boxes, so it has formed
+round the ball; the ball's own fluid moves meanwhile), then every occupied box's pull
+against its distance from the ball. A box counts as "axis" when its direction from the
+ball lies within cone_degrees of a face axis (plus or minus x, y, z), "diagonal" when
+within cone_degrees of a body diagonal (plus or minus 1, 1, 1). The pull is 0 in empty
+boxes (space ends there), so the filled cube's faces bound it: nearer along an axis than
+along a diagonal.
 Distances are binned one cell side wide from blob_radius + 1 out to the farthest bin
 both sets reach.
 Flow: a push big enough to measure (round 3, 2026-11-16: the earlier ball of radius 3 and
 density 1 moved the energy centre 0.004 boxes, far under the engine's run-to-run scatter).
-The foam's own energy (1 per box, nothing added) is given flow only, no phase jump: phase
+The foam's own quanta (1000 per box, nothing added) are given flow only, no phase jump: phase
 = speed (x - centre) . direction, times min(1, flow_radius / |x - centre|), so the
 speed is `speed` inside flow_radius and the phase levels off outside it (known shift
 about 2.35 boxes at the defaults). Along x, the face diagonal (1, 1, 0) / sqrt 2 and the
 body diagonal (1, 1, 1) / sqrt 3, `steps` steps each, and once at rest, for each seed in
-`seeds` (the engine is not bit-repeatable, so several seeds average its scatter). What
-is followed is the centre of all the energy (energy_centre.py over every box, energy
-volumes and joints), so energy that leaves through the seams, as sound or into joints,
+`seeds` (each seed is the whole-number rounding's seed, so several seeds average its
+scatter). What
+is followed is the centre of all the whole quanta (energy_centre.py over every box, plus
+and minus), so energy that crosses into joints, as sound or into joints,
 still counts; each seed's rest run (the foam's own pull and push) is taken off its
 moving runs. Its known value is where the start's momentum carries it: the start's
-lattice momentum P = sum over box faces inside one cell of Im(conj psi_a psi_b) along
-the face (the flow the hops make at openness 1), over the total energy, times the time;
-a seam or a closed cell border turns or stops some of it, which is what "carried" shows.
+lattice momentum P = sum over box faces between two boxes of one sign of Im(conj psi_a
+psi_b) along the face (the flow the hops make at openness 1), over the total quanta,
+times the time; a plus-minus face's friction turns or stops some of it, which is what
+"carried" shows.
 Returns a dict (no verdict; same in every direction means the ratios are 1 and the
 differences 0):
   cells_per_side, boxes_per_cell_side, steps, seeds, settings (dict), blob_energy,
   flow_radius, speed, ball_offset (the ball's place from the grid's middle, boxes)
-  pull     distance (bin middles, boxes), axis, diagonal (mean cell potential per bin),
-           axis_cells, diagonal_cells (cells per bin), relative_difference per bin
+  pull     distance (bin middles, boxes), axis, diagonal (mean box pull per bin),
+           axis_cells, diagonal_cells (boxes per bin), relative_difference per bin
            ((diagonal - axis) / |axis|), mean_relative_difference (mean of its absolute)
   flow     per direction name ("axis", "face_diagonal", "body_diagonal"): along,
            across (boxes, mean over seeds of the energy centre's shift less that seed's
@@ -54,7 +60,7 @@ from dataclasses import asdict
 
 import numpy as np
 
-from physics.potts import ENERGY_VOLUME, Settings, Universe, new_universe, stats, step
+from physics.engine import Settings, State, cells, host_boxes, new_universe, step
 from physics.scenes.blob_start import blob_start
 from physics.scenes.energy_centre import energy_centre
 from physics.scenes.wave_field import wave_field
@@ -64,17 +70,19 @@ DIRECTIONS = {"axis": (1.0, 0.0, 0.0), "face_diagonal": (1.0, 1.0, 0.0), "body_d
 
 def isotropy(cells_per_side: int = 12, boxes_per_cell_side: int = 4, blob_energy: float = 500.0,
              blob_radius: float = 3.0, flow_radius: float = 16.0, speed: float = 0.3, steps: int = 20,
-             seeds: tuple = (1, 2, 3, 4), cone_degrees: float = 20.0, settings: Settings | None = None,
-             device: str = "cuda") -> dict:
+             seeds: tuple = (1, 2, 3, 4), cone_degrees: float = 20.0, pull_steps: int = 200,
+             settings: Settings | None = None, device: str = "cuda") -> dict:
     """Pull profile along axes against diagonals, and how far a pushed foam's energy goes along each."""
-    settings = settings or Settings.all_on()
+    settings = settings or Settings()
     offset = _middle_volume_offset(cells_per_side, boxes_per_cell_side, device)
     pull_blob = {"offset": offset, "radius": blob_radius, "energy": blob_energy}
     push = {"offset": offset, "radius": flow_radius, "speed": speed}
     return {"cells_per_side": cells_per_side, "boxes_per_cell_side": boxes_per_cell_side, "steps": steps,
             "seeds": list(seeds), "settings": asdict(settings), "blob_energy": blob_energy,
             "flow_radius": flow_radius, "speed": speed, "ball_offset": [float(value) for value in offset],
-            "pull": _pull_profile(cells_per_side, boxes_per_cell_side, pull_blob, cone_degrees, settings, device),
+            "pull_steps": pull_steps,
+            "pull": _pull_profile(cells_per_side, boxes_per_cell_side, pull_blob, cone_degrees, pull_steps,
+                                  settings, device),
             "flow": _flow(cells_per_side, boxes_per_cell_side, push, steps, seeds, settings, device)}
 
 
@@ -109,29 +117,24 @@ def _flow(cells_per_side, boxes_per_cell_side, push, steps, seeds, settings, dev
 def _middle_volume_offset(cells_per_side, boxes_per_cell_side, device) -> tuple:
     """The box centre of the energy volume nearest all energy volumes' centre, from the grid's middle."""
     even = new_universe(cells_per_side, boxes_per_cell_side, seed=1, unevenness=0.0, device=device)
-    owner, kind = even.owner.numpy(), even.kind.numpy()
-    volume_box = (owner >= 0) & (kind[np.maximum(owner, 0)] == ENERGY_VOLUME)
-    places = np.argwhere(volume_box).astype(np.float64)
-    cells = owner[volume_box]
-    boxes = np.bincount(cells, minlength=kind.size).astype(np.float64)
-    centres = np.stack([np.bincount(cells, weights=places[:, axis], minlength=kind.size) for axis in range(3)],
-                       axis=1)
-    volumes = np.flatnonzero(boxes > 0)
-    centres = centres[volumes] / boxes[volumes, None]
+    boxes = host_boxes(even)
+    found = cells(boxes)
+    centres = found["centre"][:found["volumes"]]
+    places = np.argwhere(boxes["quanta"] > 0).astype(np.float64)
     middle = centres[np.argmin(np.linalg.norm(centres - places.mean(axis=0), axis=1))]
     return tuple(float(value) for value in middle - (even.side - 1) / 2.0)
 
 
-def _pull_profile(cells_per_side, boxes_per_cell_side, blob, cone_degrees, settings, device) -> dict:
-    """Mean cell potential per distance bin, for cells near a face axis and near a body diagonal."""
+def _pull_profile(cells_per_side, boxes_per_cell_side, blob, cone_degrees, pull_steps, settings, device) -> dict:
+    """Mean box pull per distance bin, for boxes near a face axis and near a body diagonal."""
     universe = blob_start(cells_per_side, boxes_per_cell_side, [dict(blob, velocity=(0.0, 0.0, 0.0))], device=device)
     ball = (universe.side - 1) / 2.0 + np.asarray(blob["offset"], dtype=np.float64)
-    step(universe, settings)
-    stats(universe, settings)
-    boxes = universe.cell_boxes.numpy().astype(np.float64)
-    living = (universe.alive.numpy() == 1) & (boxes > 0)
-    places = universe.cell_place.numpy().reshape(-1, 3).astype(np.float64)[living] / boxes[living, None]
-    potential = universe.cell_potential_mean.numpy().astype(np.float64)[living]
+    for _ in range(pull_steps):
+        step(universe, settings)
+    boxes = host_boxes(universe)
+    occupied = boxes["quanta"] != 0
+    places = np.argwhere(occupied).astype(np.float64)
+    potential = boxes["pull"][occupied].astype(np.float64)
     offsets = places - ball
     distance = np.linalg.norm(offsets, axis=1)
     unit = offsets / np.maximum(distance, 1e-12)[:, None]
@@ -163,11 +166,12 @@ def _pull_profile(cells_per_side, boxes_per_cell_side, blob, cone_degrees, setti
 def _shift(cells_per_side, boxes_per_cell_side, push, unit, seed, steps, settings, device) -> tuple:
     """How far the centre of all the energy moved over the run, and the start's momentum over its total energy."""
     universe = _pushed_start(cells_per_side, boxes_per_cell_side, push, unit, seed, device)
-    owner = universe.owner.numpy()
+    quanta = host_boxes(universe)["quanta"]
     field = wave_field(universe)
     energy = np.abs(field) ** 2
     start = energy_centre(energy)
-    momentum = _lattice_momentum(field, owner) / float(energy.sum())
+    kinds = np.where(quanta > 0, 1, np.where(quanta < 0, 2, -1))
+    momentum = _lattice_momentum(field, kinds) / float(energy.sum())
     for _ in range(steps):
         step(universe, settings)
     return energy_centre(np.abs(wave_field(universe)) ** 2) - start, momentum
@@ -176,20 +180,19 @@ def _shift(cells_per_side, boxes_per_cell_side, push, unit, seed, steps, setting
 def _pushed_start(cells_per_side, boxes_per_cell_side, push, unit, seed, device):
     """The even foam given flow along `unit` at push["speed"] inside push["radius"], levelling off outside it."""
     even = new_universe(cells_per_side, boxes_per_cell_side, seed=1, unevenness=0.0, device=device)
-    owner, kind = even.owner.numpy(), even.kind.numpy()
-    energy = np.abs(wave_field(even)) ** 2
+    quanta = host_boxes(even)["quanta"]
     side = even.side
     places = np.stack(np.meshgrid(*[np.arange(side, dtype=np.float64)] * 3, indexing="ij"), axis=-1)
     offsets = places - ((side - 1) / 2.0 + np.asarray(push["offset"], dtype=np.float64))
     distance = np.linalg.norm(offsets, axis=-1)
     taper = np.minimum(1.0, push["radius"] / np.maximum(distance, 1e-12))
     phase = push["speed"] * (offsets @ np.asarray(unit, dtype=np.float64)) * taper
-    phase[owner < 0] = 0.0
-    return Universe.from_host(owner, energy, kind, boxes_per_cell_side, seed=seed, device=device, phase=phase)
+    phase[quanta == 0] = 0.0
+    return State.from_host(quanta, phase, seed=seed, device=device)
 
 
 def _lattice_momentum(field: np.ndarray, owner: np.ndarray) -> np.ndarray:
-    """Sum over box faces inside one cell of Im(conj psi_a psi_b), per axis: the flow the hops make."""
+    """Sum over box faces between two boxes of one kind of Im(conj psi_a psi_b), per axis: the flow the hops make."""
     momentum = np.zeros(3)
     for axis in range(3):
         lower = [slice(None)] * 3

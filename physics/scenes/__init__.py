@@ -1,8 +1,10 @@
 """Scenes: the fit's scorecard (bible `physics/quantum-relativity`, "How results are trusted").
 
-Each scene builds a start, runs the cell engine (physics.potts: new_universe, step,
-stats, Settings; Universe.from_host for placed blobs and placed phases) for a given number of steps and
-returns measured numbers as a dict. No scene passes or fails, and none tunes a setting.
+Each scene builds a start, runs the engine (physics.engine: new_universe, step, stats,
+cells, Settings; State.from_host for placed blobs and placed phases) for a given number of
+steps and returns measured numbers as a dict. No scene passes or fails, and none tunes a
+setting. Energy is counted in whole quanta (bible rule 4); energy volumes are connected
+plus regions and joints the minus web, read off the signs (physics.engine cells).
 
 Module map:
   expansion.py       expansion: occupied (space) and energy radius over time, growth rate, its trend
@@ -13,19 +15,19 @@ Module map:
   black_hole.py      black_hole: sealed region radius against collapsed energy, per ball
   sampled_run.py     sampled_run: step a universe, measure it every few steps
   blob_start.py      blob_start: moving balls of extra energy in an even checkerboard
-  box_energies.py    box_energies: A- and B-energy per Planck box on the host, by owner kind
+  box_energies.py    box_energies: plus (A) and minus (B) quanta per Planck box on the host
   energy_centre.py   energy_centre: energy-weighted centre of masked boxes
   rms_radius.py      rms_radius: energy-weighted RMS distance from that centre
   growth_rates.py    growth_rates: d ln(size) / dt between samples
   power_spectrum.py  power_spectrum: shell power of the density contrast
-  sealed_region.py   sealed_region: the densest energy volume, its joints, and whether they seal it
-  wave_field.py      wave_field: the fluid's complex number per box (psi) on the host
-  space_dimension.py space_dimension: ball and spectral dimension of the cell-contact graph, beside a grid's
+  sealed_region.py   sealed_region: the most packed energy volume, its joint boxes, whether they seal it
+  wave_field.py      wave_field: the fluid's sqrt(|quanta|) e^(i phase) per box on the host
+  space_dimension.py space_dimension: ball and spectral dimension of the volume-neighbour graph, beside a grid's
   isotropy.py        isotropy: pull and flow along a grid axis against the diagonals
   spin.py            spin: one whole-step whirl carried across a joint; winding, flow, strength, axis per step
   belt_trick.py      belt_trick: a whirl tied into the joint web turned once and twice; the web's twist per step
   timescape.py       timescape: growth of space timed by the step counter and by clocks in the densest lumps
-  clocked_run.py     clocked_run: sampled_run that also keeps every cell's elapsed local time
+  clocked_run.py     clocked_run: sampled_run that also keeps every energy volume's elapsed local time
   observer_cells.py  observer_cells: the most packed energy volumes that kept a clock all run
   deceleration.py    deceleration: q = -a'' a / a'^2 from a quadratic fit (q < 0 speeds up)
 """

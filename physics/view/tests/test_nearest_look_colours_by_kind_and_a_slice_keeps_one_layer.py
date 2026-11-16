@@ -1,6 +1,6 @@
 """The nearest look colours every shown box by kind with density as a tint; a slice keeps one box layer; the view refits as space grows.
 
-The fake sources here stand in for the engine (physics.potts) in this test only;
+The fake sources here stand in for the engine (physics.engine) in this test only;
 the command always runs the real engine.
 """
 from __future__ import annotations

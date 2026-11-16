@@ -1,6 +1,6 @@
 # physics/view/
 
-The only viewer: a pyglet GPU window of the Planck-box engine (`physics.potts`) as small
+The only viewer: a pyglet GPU window of the whole-quanta engine (`physics.engine`) as small
 squares. Module map in `__init__.py`.
 
 ## Must not get wrong

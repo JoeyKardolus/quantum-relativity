@@ -16,7 +16,7 @@ def test_the_fit_search_runs_two_points_on_a_tiny_universe(tmp_path):
     for record in records:
         assert "error" not in record, record.get("trace")
         assert math.isfinite(record["score"]) and math.isfinite(record["E"]) and math.isfinite(record["S"])
-        assert record["overrides"]["seal_compression"] < record["overrides"]["collapse_compression"]
+        assert record["overrides"]["seal_squeeze"] < record["overrides"]["collapse_squeeze"]
         assert record["observer_ids"] and len(record["local_time"]) == len(record["time"])
         assert record["local_time"][0] == 0.0
         assert all(later > earlier for earlier, later in zip(record["local_time"], record["local_time"][1:]))

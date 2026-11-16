@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from physics.potts import uneven_field
+from physics.engine import uneven_field
 from physics.scenes import power_spectrum
 
 

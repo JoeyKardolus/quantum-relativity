@@ -2,9 +2,9 @@
 
 Contract: `structure(cells_per_side=7, boxes_per_cell_side=10, seed=1, unevenness=0.3,
 steps=30, every=5, settings=None, device="cuda")` builds
-physics.potts.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness), runs
-`steps` steps with settings (default Settings.all_on()) and measures the energy per
-Planck box (A plus B, box_energies.py) at the start and every `every` steps. Returns a
+physics.engine.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness), runs
+`steps` steps with settings (default Settings(), every rule on) and measures the whole
+quanta per Planck box (A plus B, box_energies.py) at the start and every `every` steps. Returns a
 dict (no verdict):
   cells_per_side, boxes_per_cell_side, seed, unevenness, steps, settings (dict)
   wavenumbers     k = 1 .. side // 2, cycles per grid side (power_spectrum.py)
@@ -22,7 +22,7 @@ from dataclasses import asdict
 
 import numpy as np
 
-from physics.potts import Settings, Universe, new_universe, stats
+from physics.engine import Settings, State, new_universe, stats
 from physics.scenes.box_energies import box_energies
 from physics.scenes.power_spectrum import power_spectrum
 from physics.scenes.sampled_run import sampled_run
@@ -31,7 +31,7 @@ from physics.scenes.sampled_run import sampled_run
 def structure(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int = 1, unevenness: float = 0.3,
               steps: int = 30, every: int = 5, settings: Settings | None = None, device: str = "cuda") -> dict:
     """The density contrast's spectrum, RMS and lump count at each sample, and the spectrum's growth."""
-    settings = settings or Settings.all_on()
+    settings = settings or Settings()
     universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device)
     samples = sampled_run(universe, settings, steps, every, lambda sampled: _measure(sampled, settings))
     first, last = np.asarray(samples[0][1]["power"]), np.asarray(samples[-1][1]["power"])
@@ -43,7 +43,7 @@ def structure(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int 
             "power_growth": (last / first).tolist(), "lumps": [measured["lumps"] for _, measured in samples]}
 
 
-def _measure(universe: Universe, settings: Settings) -> dict:
+def _measure(universe: State, settings: Settings) -> dict:
     a_energy, b_energy = box_energies(universe)
     density = a_energy + b_energy
     wavenumbers, power = power_spectrum(density)

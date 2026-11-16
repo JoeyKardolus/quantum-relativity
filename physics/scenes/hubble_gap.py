@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from physics.potts import Settings
+from physics.engine import Settings
 from physics.scenes.expansion import expansion
 
 KNOWN_LATE_OVER_EARLY = 73.5 / 67.4

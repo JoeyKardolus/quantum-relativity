@@ -7,6 +7,7 @@ value is known (plain 2D and 3D grids; a placed whirl of known turns). Host nump
 scipy only; no engine import, so every measure runs without a GPU.
 
 Module map:
+  contact_pairs.py       contact_pairs: which cells of an owner array touch, across how many box faces
   adjacency.py           adjacency: touching pairs as one symmetric 0/1 sparse matrix
   grid_graph.py          grid_graph: a plain square or cubic grid, the dimension reference
   central_nodes.py       central_nodes: the nodes deepest inside a graph, from far points
@@ -17,6 +18,7 @@ Module map:
   loop_circulation.py    loop_circulation: winding and flow circulation round a square loop
   whirl_strength.py      whirl_strength: angular momentum about a line per unit density
 """
+from physics.measure.contact_pairs import contact_pairs
 from physics.measure.adjacency import adjacency
 from physics.measure.grid_graph import grid_graph
 from physics.measure.central_nodes import central_nodes
@@ -27,5 +29,5 @@ from physics.measure.whirl_line import whirl_line
 from physics.measure.loop_circulation import loop_circulation
 from physics.measure.whirl_strength import whirl_strength
 
-__all__ = ["adjacency", "grid_graph", "central_nodes", "ball_dimension", "spectral_dimension", "phase_winding",
+__all__ = ["contact_pairs", "adjacency", "grid_graph", "central_nodes", "ball_dimension", "spectral_dimension", "phase_winding",
            "whirl_line", "loop_circulation", "whirl_strength"]

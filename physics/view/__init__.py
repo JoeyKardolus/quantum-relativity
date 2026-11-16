@@ -24,7 +24,7 @@ Module map:
   view_fit.py          the camera fit to the occupied bounds, and when space has outgrown it
   title_line.py        the window title from a snapshot's stats
   gpu_driver.py        Mesa d3d12 variables so OpenGL draws on the NVIDIA card
-  cells_source.py      CellsSource: physics.potts's state behind the source interface
+  cells_source.py      CellsSource: physics.engine's state behind the source interface
   stepper.py           Stepper, Snapshot: steps a source on a thread, hands out snapshots
   point_cloud.py       PointCloud: GL points, depth-tested or summed in a float buffer (needs GL)
   point_window.py      PointWindow: the pyglet window, controls and title (needs GL)

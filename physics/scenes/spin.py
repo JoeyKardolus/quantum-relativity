@@ -2,24 +2,25 @@
 
 Contract: `spin(cells_per_side=8, boxes_per_cell_side=6, turns=1, drift_speed=0.15,
 loop_half_width=2, track_reach=3.0, steps=60, settings=None, device="cuda")` starts
-from new_universe(cells_per_side, boxes_per_cell_side, seed=1, unevenness=0) (every
-box holds 1) and imprints a phase (Universe.from_host's `phase`; the density stays
-as it was, as a whirl is made in a lab):
+from physics.engine new_universe(cells_per_side, boxes_per_cell_side, seed=1,
+unevenness=0) (every box holds 1000 quanta) and imprints a phase (State.from_host's
+`phase`; the quanta stay as they were, as a whirl is made in a lab):
   - the energy volume whose box centre lies nearest the grid's middle hosts the whirl;
-    its joint with the most shared box faces sets the drift direction (the grid axis
-    closest to the line from the volume's centre to the joint's), and the whirl's axis
-    is the next grid axis, (drift + 1) % 3;
+    the nearest joint box straight out from its centre along a grid axis (first of +x,
+    -x, +y, -y, +z, -z on a tie) sets the drift direction, and the whirl's axis is the
+    next grid axis, (drift + 1) % 3;
   - a whirl of `turns` whole turns round a straight line along that axis through the
     volume's centre, moved half a box off the boxes so no box sits on it; the line
     cannot end inside the fluid, so it runs through the whole column of cells along its
     axis, out to the open edge;
   - plus a phase rising drift_speed per box along the drift direction: the whole foam
     flows that way (the flow is the phase's gradient), carrying the whirl into the joint.
-It runs `steps` steps (default settings Settings.all_on()), measuring at the start and
-after every step, all from the complex field (wave_field.py) with physics.measure.
-Cells meet only at their seams, so the phase may jump across a cell border and a square
-of boxes straddling one says nothing about a whirl: only squares whose four boxes share
-one cell count (phase_winding, the rest set to 0). From those: the whirl's local stretch
+It runs `steps` steps (default settings Settings(), every rule on), measuring at the
+start and after every step, all from the complex field (wave_field.py) with
+physics.measure. Cells (physics.engine cells: energy volumes, joint web) meet where plus
+boxes face minus boxes, so the phase may jump across a cell border and a square of boxes
+straddling one says nothing about a whirl: only squares whose four boxes share one cell
+count (phase_winding, the rest set to 0). From those: the whirl's local stretch
 (squares within track_reach of the last centre, whirl_line; its along-axis place is held
 at the start's); the winding inside the square loop of half width loop_half_width round
 it (the windings of the counted squares it encloses, normal the whirl's axis, summed:
@@ -28,7 +29,8 @@ the loop's own winding wherever it lies in one cell); the loop's flow circulatio
 loop_half_width, over the boxes of the cell holding its centre) and that cell.
 Returns a dict (no verdict):
   cells_per_side, boxes_per_cell_side, steps, settings (dict), turns, drift_speed,
-  whirl_axis, drift_axis (grid axes), drift_sign, start_cell, toward_joint (cell ids)
+  whirl_axis, drift_axis (grid axes), drift_sign, start_cell, toward_joint (cell ids
+  from physics.engine cells at the start; labels are read fresh at every sample)
   time, found (1 while squares near the centre are pierced), winding (whole turns
   inside the loop), flow_circulation (the loop's flow circulation in whole steps),
   loop_in_one_cell (1 when every loop box lies in one cell, so the flow circulation is
@@ -37,7 +39,7 @@ Returns a dict (no verdict):
   unwrapped, the axis's lean round the start's axis: precession shows as a steady
   turn), drift (boxes moved along the drift direction), core_density (|psi|**2 at the
   box nearest the centre over the loop's mean), host_cell, host_kind (0 energy volume,
-  1 joint, -1 empty) per sample
+  1 joint, -1 empty) per sample (host_cell is that sample's label)
   winding_exact       1 when every sample's winding equals `turns`, else 0
   flow_offset_max     the largest |flow_circulation - turns| over the samples whose loop
                       lies in one cell (over all samples when none does)
@@ -54,7 +56,7 @@ from dataclasses import asdict
 import numpy as np
 
 from physics.measure import loop_circulation, phase_winding, whirl_line, whirl_strength
-from physics.potts import ENERGY_VOLUME, JOINT, Settings, Universe, contact_pairs, new_universe
+from physics.engine import ENERGY_VOLUME, JOINT, Settings, State, cells, host_boxes, new_universe
 from physics.scenes.sampled_run import sampled_run
 from physics.scenes.wave_field import wave_field
 
@@ -63,10 +65,11 @@ def spin(cells_per_side: int = 8, boxes_per_cell_side: int = 6, turns: int = 1, 
          loop_half_width: int = 2, track_reach: float = 3.0, steps: int = 60, settings: Settings | None = None,
          device: str = "cuda") -> dict:
     """Winding, flow circulation, strength and axis of one placed whirl, every step, as it drifts."""
-    settings = settings or Settings.all_on()
+    settings = settings or Settings()
     even = new_universe(cells_per_side, boxes_per_cell_side, seed=1, unevenness=0.0, device=device)
-    owner, kind = even.owner.numpy(), even.kind.numpy()
-    host, joint, centre = _host_and_joint(owner, kind)
+    quanta = host_boxes(even)["quanta"]
+    found = cells(host_boxes(even))
+    host, joint, centre = _host_and_joint(found)
     drift_axis = int(np.argmax(np.abs(centre[joint] - centre[host])))
     drift_sign = 1.0 if centre[joint][drift_axis] >= centre[host][drift_axis] else -1.0
     whirl_axis = (drift_axis + 1) % 3
@@ -76,8 +79,7 @@ def spin(cells_per_side: int = 8, boxes_per_cell_side: int = 6, turns: int = 1, 
             core[axis] = math.floor(core[axis]) + 0.5
     phase = _whirl_phase(even.side, core, whirl_axis, turns) + drift_sign * drift_speed * np.arange(even.side,
         dtype=np.float64).reshape([-1 if axis == drift_axis else 1 for axis in range(3)])
-    universe = Universe.from_host(owner, np.abs(wave_field(even)) ** 2, kind, boxes_per_cell_side, seed=1,
-                                  device=device, phase=np.broadcast_to(phase, owner.shape))
+    universe = State.from_host(quanta, np.broadcast_to(phase, quanta.shape), seed=1, device=device)
     tracker = _Tracker(core, whirl_axis, drift_axis, drift_sign, loop_half_width, track_reach)
     samples = sampled_run(universe, settings, steps, 1, tracker.measure)
     result = {"cells_per_side": cells_per_side, "boxes_per_cell_side": boxes_per_cell_side, "steps": steps,
@@ -90,23 +92,30 @@ def spin(cells_per_side: int = 8, boxes_per_cell_side: int = 6, turns: int = 1, 
     return result
 
 
-def _host_and_joint(owner: np.ndarray, kind: np.ndarray) -> tuple[int, int, np.ndarray]:
-    """The energy volume nearest the middle, its joint sharing the most faces, and every cell's centre."""
-    occupied = owner >= 0
-    places = np.argwhere(occupied).astype(np.float64)
-    cells = owner[occupied]
-    boxes = np.bincount(cells, minlength=kind.size).astype(np.float64)
-    centre = np.stack([np.bincount(cells, weights=places[:, axis], minlength=kind.size) for axis in range(3)],
-                      axis=1) / np.maximum(boxes, 1.0)[:, None]
+def _host_and_joint(found: dict) -> tuple[int, int, np.ndarray]:
+    """The energy volume nearest the middle, the joint first met straight out from its centre, and every cell's
+    centre (the joint's centre replaced by that first joint box, so the drift points at it)."""
+    owner, kind = found["owner"], found["kind"]
+    centre = found["centre"].copy()
     middle = (owner.shape[0] - 1) / 2.0
-    volumes = np.flatnonzero((kind == ENERGY_VOLUME) & (boxes > 0))
+    volumes = np.flatnonzero(kind == ENERGY_VOLUME)
     host = int(volumes[np.argmin(np.linalg.norm(centre[volumes] - middle, axis=1))])
-    low, high, faces = contact_pairs(owner)
-    touching = (low == host) | (high == host)
-    others = np.where(low[touching] == host, high[touching], low[touching])
-    shared = faces[touching]
-    joints = kind[others] == JOINT
-    return host, int(others[joints][np.argmax(shared[joints])]), centre
+    start = np.rint(centre[host]).astype(int)
+    best, joint, place = None, -1, None
+    for face in range(6):
+        step = np.zeros(3, dtype=int)
+        step[face // 2] = 1 if face % 2 == 0 else -1
+        here = start.copy()
+        for distance in range(1, owner.shape[0]):
+            here = here + step
+            if np.any(here < 0) or np.any(here >= owner.shape[0]) or owner[tuple(here)] < 0:
+                break
+            if kind[owner[tuple(here)]] == JOINT:
+                if best is None or distance < best:
+                    best, joint, place = distance, int(owner[tuple(here)]), here.astype(np.float64)
+                break
+    centre[joint] = place
+    return host, joint, centre
 
 
 def _whirl_phase(side: int, core: np.ndarray, whirl_axis: int, turns: int) -> np.ndarray:
@@ -128,9 +137,10 @@ class _Tracker:
         self.start_axis = np.eye(3)[whirl_axis]
         self.axis = self.start_axis.copy()
 
-    def measure(self, universe: Universe) -> dict:
+    def measure(self, universe: State) -> dict:
         field = wave_field(universe)
-        owner = universe.owner.numpy()
+        found = cells(host_boxes(universe))
+        owner = found["owner"]
         windings = _same_cell_windings(field, owner)
         line = whirl_line(windings, near=self.centre, reach=self.reach)
         if line["found"]:
@@ -158,7 +168,7 @@ class _Tracker:
                 "azimuth": float(math.atan2(lean[up], lean[across])),
                 "drift": float(self.drift_sign * (self.centre[self.drift_axis] - self.start[self.drift_axis])),
                 "core_density": float(density[nearest] / loop_density) if loop_density > 0 else 0.0,
-                "host_cell": host, "host_kind": int(universe.kind.numpy()[host]) if host >= 0 else -1}
+                "host_cell": host, "host_kind": int(found["kind"][host]) if host >= 0 else -1}
 
 
 def _same_cell_windings(field: np.ndarray, owner: np.ndarray) -> np.ndarray:

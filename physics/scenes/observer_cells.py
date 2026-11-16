@@ -1,32 +1,29 @@
 """Observer cells: where an astronomer sits, the most packed energy volumes (timescape's dense region).
 
 Contract: `observer_cells(universe, count, local)` returns an int64 array of up to `count`
-cell ids, most packed first: living energy volumes (kind A, alive, at least one box) whose
-local-time column in `local` (clocked_run.py, shape (samples, cells)) is finite at every
-sample, i.e. that existed and kept a clock for the whole run, ranked by energy per box
-(cell_energy / cell_boxes, as the last step or stats left the cell sums). The observer is
-picked at the end, as an astronomer lives in today's densest lump, and its clock is
-followed back over the run. Empty when no cell qualifies. Raises ValueError for count < 1.
+energy volume labels of a physics.engine State's universe 0 now (physics.engine cells),
+most packed first: volumes whose local-time column in `local` (clocked_run.py, shape
+(samples, columns); column v is the volume labelled v at the end) is finite at every
+sample, i.e. that existed and kept a clock for the whole run, ranked by whole quanta per
+box. The observer is picked at the end, as an astronomer lives in today's densest lump,
+and its clock is followed back over the run. Empty when no volume qualifies. Raises
+ValueError for count < 1.
 """
 from __future__ import annotations
 
 import numpy as np
 
-from physics.potts import ENERGY_VOLUME, Universe
+from physics.engine import State, cells, host_boxes
 
 
-def observer_cells(universe: Universe, count: int, local: np.ndarray) -> np.ndarray:
-    """The `count` most packed living energy volumes that kept a clock for the whole run."""
+def observer_cells(universe: State, count: int, local: np.ndarray) -> np.ndarray:
+    """The `count` most packed energy volumes that kept a clock for the whole run."""
     if count < 1:
         raise ValueError(f"need count >= 1, got {count}")
-    boxes = universe.cell_boxes.numpy().astype(np.float64)
-    energy = universe.cell_energy.numpy()
-    kind = universe.kind.numpy()
-    alive = universe.alive.numpy()
-    width = min(local.shape[1], boxes.size)
-    whole_run = np.zeros(boxes.size, dtype=bool)
-    whole_run[:width] = np.isfinite(local[:, :width]).all(axis=0)
-    eligible = (kind == ENERGY_VOLUME) & (alive == 1) & (boxes > 0) & whole_run
-    packing = np.where(eligible, energy / np.maximum(boxes, 1.0), -np.inf)
-    ranked = np.argsort(-packing, kind="stable")
-    return ranked[:count][eligible[ranked[:count]]].astype(np.int64)
+    found = cells(host_boxes(universe))
+    volumes = min(found["volumes"], local.shape[1])
+    whole_run = np.isfinite(local[:, :volumes]).all(axis=0)
+    packing = found["quanta"][:volumes] / np.maximum(found["boxes"][:volumes], 1)
+    packing = np.where(whole_run, packing, -np.inf)
+    ranked = np.argsort(-packing, kind="stable")[:count]
+    return ranked[whole_run[ranked]].astype(np.int64)

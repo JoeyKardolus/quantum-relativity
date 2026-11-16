@@ -4,32 +4,35 @@ Rules: `docs/bible.md#physicsquantum-relativity` ("The foundation" and "How the 
 the foam" first); words: `CONTEXT.md` (Planck box, energy volume, joint; never node, edge,
 vertex, or merge for joint collapse).
 
-Five packages. `potts/` is the engine: a fixed grid of Planck boxes on the GPU (Warp, CUDA)
-carrying the energy as a quantum fluid, one complex number per box; energy volumes (A) and
-joints (B) are cells, groups of boxes, every A wrapped in joints, and a cell's size is how many
-boxes it holds (cellular Potts). `view/` is the only viewer, a pyglet window on the GPU.
-`scenes/` is the scorecard: each scene runs the engine and returns measured numbers, no
-verdict. `fit/` searches settings on the fit set only (expansion shape, structure) and never changes a default. `measure/` holds the measures scenes share (dimension, whirl winding), CPU only. The fluid engine without cells (`fluid/`),
-the earlier ABAB engine (`abab/`), the browser app and the milestone code were removed (owner,
-2026-11-15); they are in git history. Its kept kernels (multigrid pull, uneven field) live in
-`potts/`.
+Seven packages. `engine/` is the engine: a fixed grid of Planck boxes on the GPU (Warp,
+CUDA), each holding one signed whole number of quanta (plus: an energy volume's box, minus:
+a joint's, 0: no space) and the quantum fluid's phase; every rule reads only neighbours;
+universes run side by side in one batch; energy volumes and joints are read off the signs
+(`engine/cells.py`), never stored as labels. `ladder/` is the detail ladder the engine keeps
+beside its boxes once attached; `bench/` the side-by-side and size harness. `view/` is the
+only viewer, a pyglet window on the GPU. `scenes/` is the scorecard: each scene runs the
+engine and returns measured numbers, no verdict. `fit/` searches settings on the fit set
+only (expansion shape, structure), by random search or by Warp gradients through a smooth
+stand-in of the engine, and never changes a default. `measure/` holds the measures
+scenes share (dimension, contacts, whirl winding), CPU only. The cell engine (`potts/`,
+cellular Potts with float energy) was replaced by `engine/` (issue #3, 2026-11-16); it and
+earlier engines are in git history.
 
 ## Must not get wrong
 
-- **The rules are the bible's**: A pulls through joints, fading with distance; B pushes,
-  steeply when squeezed, and collapses past the limit (the joint vanishes, its energy volumes
-  fall together); energy sets size; flow frictionless inside a cell, friction only crossing
-  into a joint (at its seams), nothing past the seal; a joint is a full cell (rule 8); every A
-  wrapped in joints on all 26 sides, joints one web. Total energy (sum |psi|^2) holds to
-  float64 rounding. `potts/CLAUDE.md` says how.
+- **The rules are the bible's**: A pulls, fading with distance, at light speed; B pushes,
+  steeply when squeezed, and collapses past the limit (its minus quanta turn plus); flow
+  frictionless inside one sign, friction only crossing plus-minus faces, nothing past the
+  seal; every A wrapped in joints on all 26 sides, joints one web. The amount ignoring sign
+  is exact to the quantum (bible rule 4). `engine/CLAUDE.md` says how.
 - **Open space**: the start is a block of wrapped cells with uneven energy (ripples at every size,
-  `potts/uneven_field.py`) inside an empty margin; space grows as cells claim empty boxes.
+  `engine/uneven_field.py`) inside an empty margin; space grows as joints claim empty boxes.
   The grid's walls are closed, so a run whose cells reach them (`stats()["edge_share"]`) is
   no longer open space. Report it.
 - **Honesty.** Never tune a setting, seed or threshold until a result passes; report every
   number, seed, settings and miss.
 - **Expansion check before any fit** (seed 1, defaults): the numbers are in
-  `potts/CLAUDE.md`. The margin is as wide as the filled cube, so walls come late.
+  `scenes/CLAUDE.md`. The margin is as wide as the filled cube.
 - **GPU**: RTX 5080 under WSL2. CUDA-OpenGL sharing does not work on WSL: copy GPU to host
   once per frame. Tests that need CUDA skip cleanly without it.
 - **A machine keeps no datasets**: long runs and their results go to object storage or tmp,

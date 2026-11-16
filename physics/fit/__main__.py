@@ -1,5 +1,8 @@
 """Run the fit search: python -m physics.fit OUT_DIR [--cells N --boxes N --steps N --every N --points N].
 
+With --compare it runs compare_fits instead (gradient fit against random search on the
+side-by-side stand-in, both checked on the real score) and writes OUT_DIR/summary.json.
+
 Writes OUT_DIR/results.jsonl (one line per run, resumable) and OUT_DIR/summary.txt, and prints
 one progress line per run and the summary's path at the end. OUT_DIR must be outside the repo
 (tmp or object storage): results are data, not code.
@@ -7,9 +10,11 @@ one progress line per run and the summary's path at the end. OUT_DIR must be out
 from __future__ import annotations
 
 import argparse
+import json
 import pathlib
 import sys
 
+from physics.fit.compare_fits import compare_fits
 from physics.fit.fit_search import fit_search
 from physics.fit.summarize_search import summarize_search
 
@@ -22,11 +27,17 @@ def _parse(argv):
     parser.add_argument("--steps", type=int, default=120)
     parser.add_argument("--every", type=int, default=6)
     parser.add_argument("--points", type=int, default=80, help="Latin-hypercube points")
+    parser.add_argument("--compare", action="store_true", help="gradient fit against random search")
     return parser.parse_args(argv)
 
 
 def main(argv=None):
     arguments = _parse(argv)
+    if arguments.compare:
+        summary = compare_fits(arguments.out_dir, cells=arguments.cells, boxes=arguments.boxes)
+        (arguments.out_dir / "summary.json").write_text(json.dumps(summary, indent=1))
+        print(f"compare written to {arguments.out_dir / 'summary.json'}")
+        return 0
     records = fit_search(arguments.out_dir / "results.jsonl", cells=arguments.cells, boxes=arguments.boxes,
                          steps=arguments.steps, every=arguments.every, random_points=arguments.points)
     summary = arguments.out_dir / "summary.txt"

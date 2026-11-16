@@ -19,20 +19,33 @@ fitted on the fit set only, the expansion shape (slowing, then speeding up) and 
 - **One GPU run at a time**: the search runs every universe in one process, one after another.
   Never start a second GPU job beside it.
 - **Results are data**: OUT_DIR goes to tmp or object storage, never into the repo.
-- **Not bit-repeatable**: the same seed run twice moves the score by up to 0.04; compare
-  settings by their mean over seeds against that noise.
+- **Seeds**: the whole-quanta engine is bit-repeatable per seed; compare settings by their
+  mean over seeds.
 
-## First search (2026-11-16, 8^3 cells of 6^3, 120 steps, 140 runs, 0 errors)
+## Gradient fit (`stand_in_score`, `gradient_fit`, `compare_fits`)
 
-Defaults -0.41 +- 0.03 (5 runs); best (attraction 0.047, push 0.45, push_power 1, collapse
-8.9, seal 2.9, friction 0.33) 0.17 +- 0.06 over seeds 1-3, all on structure; attraction
-drives it (rank correlation 0.82). No run slows then speeds up (dip -0.27 to -0.01). The top
-three and defaults, tested unfitted: no setting passes any scene on both runs (orbits fall
-in, nothing seals, Hubble late/early 0.05 to 0.2 against 1.09). Scorecard on issue #1.
+- **Gradients go through a stand-in**, never the engine: whole quanta, claims and collapse
+  have no gradient. The stand-in is the engine's fluid in float psi, every box keeping its
+  kind, scored like `fit_run` without lumps and with the counter's time. A stand-in
+  winner is checked on the real `fit_run` score.
+- **Its gradient is a direction, not a derivative.** The full tape gradient blew up to 1e26
+  in 10 steps (a box's own quanta turning its phase through the steep joint push), so
+  potentials, openness and clocks read a density the tape does not see. Adam steps by a
+  fixed share of the unit cube.
+- Stand-in universes run side by side, each with its own settings; the engine takes one
+  setting per batch.
+
+## First comparison (2026-11-16, 7^3 cells of 10, seed 1 start, one run)
+
+Stand-in 24 steps: random, 64 points side by side, best 0.42 in 2.8 s; gradient, 4 starts x
+15 steps, best 0.16 (peak 0.28) in 14.6 s. Real score, seeds 1-3: defaults 0.00; random's
+two best -0.10, -0.11; gradient's best 0.12 (pull 1e-6 and steepness 2.0, both range
+edges), its second -0.13. The stand-in ranks the real score badly; one comparison only.
 
 ## Run
 
 ```
-PYTHONPATH=. .venv/bin/python -m physics.fit /tmp/fit-search      # whole search, about 45 min on the 5080
-PYTHONPATH=. .venv/bin/pytest -q physics/fit                     # two points on a tiny universe
+PYTHONPATH=. .venv/bin/python -m physics.fit /tmp/fit-search      # whole search, 140 runs of about 15 s
+PYTHONPATH=. .venv/bin/python -m physics.fit /tmp/fit-compare --compare   # gradient against random, about 5 min
+PYTHONPATH=. .venv/bin/pytest -q physics/fit                     # tiny universes: search, gradient
 ```

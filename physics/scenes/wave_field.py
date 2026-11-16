@@ -1,19 +1,21 @@
 """Wave field: the energy fluid's one complex number per Planck box, on the host.
 
-Contract: `wave_field(universe)` copies the Universe's `psi` (universe.py: vec2d per
-box, real and imaginary part of the Gross-Pitaevskii fluid's number) from the device
-once and returns it as a complex128 numpy array of shape (side, side, side): the box's
-energy is its |psi|**2, its flow comes from how the phase turns from box to box, and
-an empty box holds 0. The universe is not changed.
+Contract: `wave_field(universe, index=0)` copies universe `index` of a physics.engine
+State from the device once and returns its fluid as a complex128 numpy array of shape
+(side, side, side): psi = sqrt(|quanta|) exp(i phase) (the engine never stores it, it
+is tied to the whole quanta, physics/engine/state.py), so |psi|**2 is the box's whole
+quanta ignoring sign, its flow comes from how the phase turns from box to box, and an
+empty box holds 0. The universe is not changed.
 """
 from __future__ import annotations
 
 import numpy as np
 
-from physics.potts import Universe
+from physics.engine import State, host_boxes
 
 
-def wave_field(universe: Universe) -> np.ndarray:
+def wave_field(universe: State, index: int = 0) -> np.ndarray:
     """psi per box as a complex host array."""
-    pairs = universe.psi.numpy().astype(np.float64)
-    return pairs[..., 0] + 1j * pairs[..., 1]
+    boxes = host_boxes(universe, index)
+    size = np.sqrt(np.abs(boxes["quanta"].astype(np.float64)))
+    return size * np.exp(1j * boxes["phase"].astype(np.float64))
