@@ -7,8 +7,8 @@ push_steepness)` returns, per quantum:
   minus box  push * (|quanta| / joint_rest) ** push_steepness: the joint's push, rising
              steeply as it is packed (a hard wall); joints carry the pull but do not feel it
   empty box  0
-It is the derivative of box_energy.py's energy by the box's quanta, so the fluid and the
-the cell corners (move_corners.py) obey one energy.
+The fluid's phase turns by it (on_site.py); the cell corners follow their own rule,
+size_energy / quanta (move_corners.py).
 """
 from __future__ import annotations
 

@@ -37,11 +37,12 @@ detail ladder (`physics/ladder`) sits beside the boxes once attached.
 
 ## Measured (2026-11-16, RTX 5080, defaults)
 
-Seed 1 default start (216^3 boxes, 27 volumes), 300 steps: 31 to 69 steps/s, 5 to 9
-substeps, squeeze max 0.67 falling to 0.50, no collapse, no lumps, one web, no volume
-unwrapped, drift 0, occupied x1.40 at 100 and x1.75 at 300. Straight volume-to-volume
-lines through their own joint fall from 100% to 67 to 88% (5411/6128 at 25, 8662/11948
-at 300); the leak takes only those (12851/12851 boxes at 300). `bench/CLAUDE.md` has sizes.
+Cell size: a cell of q quanta wants (size_energy / q)**3 boxes (more energy, smaller);
+pressures in float64 (float32 overflowed and froze 4-box cells). Seed 1 default start
+(216^3, 27 volumes, at rest by size_energy), 300 steps: ~34 steps/s, no collapse, no
+lumps, one web, drift 0, squeeze max 0.67 falling to 0.48, occupied x1.30 at 50, x1.40
+at 100, x1.76 at 300, gains per 50 steps 102k, 36k, 36k, 32k, 24k, 29k (slows).
+`bench/CLAUDE.md` has sizes.
 
 ## Run
 

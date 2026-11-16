@@ -25,11 +25,15 @@ never changed to make a result pass.
                    more packed box of the pair to the less packed (drift)
   clock_packing    quanta per box at which a local clock runs at half rate; 0 switches
                    local clocks off (side-by-side comparisons only)
+  size_energy      the constant of bible rule 4, length = constant / energy: a cell of q
+                   quanta wants to be size_energy / q boxes across, so more energy makes
+                   it smaller (owner, 2026-11-16); default 1e7 = 10 boxes across at 1e6
+                   quanta, the default start's cell (10**3 boxes of 1000), set before
+                   any run so that start is at rest
   corner_mobility  how fast a lattice corner moves under the pressure of the cells round
                    it, in boxes per unit time per unit force (move_corners.py: each cell
-                   presses with -d(cell energy)/d(cell size), its energy box_energy.py's
-                   at its mean packing, and the pull draws energy volumes; no set size,
-                   no minimum)
+                   presses by how much smaller than its energy wants it is, and the pull
+                   draws energy volumes; no set size, no minimum)
   max_corner_step  numerics, not a rule: the most a corner moves in one step, in boxes,
                    so a box's covering cell changes only to a lattice neighbour
   rehomes_per_step how many of the 27 rehome phases (boxes 3 apart, drain.py and
@@ -65,6 +69,7 @@ class Settings:
     friction: float = 1.0
     spread_share: float = 0.01
     clock_packing: float = 10000.0
+    size_energy: float = 1e7
     corner_mobility: float = 2e-5
     max_corner_step: float = 0.25
     rehomes_per_step: int = 27
@@ -78,6 +83,8 @@ class Settings:
             raise ValueError("the seal must come before the collapse: 0 < seal_squeeze < collapse_squeeze")
         if not 0 <= self.rehomes_per_step <= 27:
             raise ValueError("rehomes_per_step runs between 0 and 27 phases")
+        if not self.size_energy > 0.0:
+            raise ValueError("size_energy must be > 0")
         if self.corner_mobility < 0.0 or not 0.0 <= self.max_corner_step < 1.0:
             raise ValueError("corner_mobility must be >= 0 and max_corner_step in 0 .. 1 box")
         if self.max_turn < 0.0 or not 1 <= self.max_substeps <= 1024:

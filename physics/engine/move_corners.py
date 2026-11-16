@@ -4,14 +4,16 @@ Contract: `move_corners(state, settings)` does, for a state with a cell lattice
 (state.cells_per_side > 0; without one it returns at once):
   1. counts every cell's whole quanta ignoring sign into state.cell_quanta (int64
      atomics, exact) and writes its volume in boxes into state.cell_size
-  2. gives every real cell a pressure, -d(E)/d(size) with E = size * box_energy at its
-     mean packing rho = quanta / size (size: the cell's volume in boxes from its moving
-     corners, kuhn_tet.py; box_energy.py without the pull): an energy volume presses with
-     volume_stiffness rho**2 / (2 volume_rest) (its fluid's own push), a joint with
-     push joint_rest s / (s + 1) (rho / joint_rest)**(s + 1), s = push_steepness (the
-     steep push); the ring of empty space presses with 0. An energy volume is also drawn
-     by the pull, -quanta * grad(pull) at its centre (the pull wave's field, central
-     differences of the boxes round the centre), shared over its eight corners
+  2. gives every real cell a pressure from how much smaller or larger it is than its
+     energy wants (bible rule 4, length = constant / energy): a cell of q quanta wants
+     to be size_energy / q boxes across, so its wanted size is (size_energy / q)**3
+     boxes and its ratio r = wanted size / size (size: the cell's volume in boxes from
+     its moving corners, kuhn_tet.py). An energy volume presses with volume_stiffness
+     volume_rest r**2 / 2 (its fluid's push at volume_rest when r = 1), a joint with
+     push joint_rest s / (s + 1) r**(s + 1), s = push_steepness (the steep push); a cell
+     with no quanta and the ring of empty space press with 0. An energy volume is also
+     drawn by the pull, -quanta * grad(pull) at its centre (the pull wave's field,
+     central differences of the boxes round the centre), shared over its eight corners
   3. moves every real corner by corner_mobility * force * step_time, force = the sum
      over its eight cells of pressure * d(cell size)/d(corner) plus the pull's shares,
      at most max_corner_step boxes, kept inside the universe (0 .. side); the ring's
@@ -20,8 +22,13 @@ Contract: `move_corners(state, settings)` does, for a state with a cell lattice
      below MIN_TET boxes of volume puts its corners back where they were, repeated
      until no cell is inside out (at most CHECKS rounds, then no corner moves this step)
 So a cell's size is set by its own energy pressing against its neighbours' (no set
-size, no minimum): more packed, it presses harder and takes room; squeezed joints push
-back steeply; the pull draws volumes together and so squeezes the joints between them.
+size, no minimum): more energy makes a cell want less room, so it presses less and its
+neighbours take room from it, and it ends smaller and denser (owner, 2026-11-16: "more
+energy, smaller cell"); a joint pressed smaller than its energy wants pushes back
+steeply and swells; the pull draws volumes together and so squeezes the joints between
+them.
+Pressures and forces are float64: a joint far smaller than its energy wants (a start of
+small cells) presses past float32's range, and an overflowed force froze every corner.
 Every force is gathered per corner from its eight cells in a fixed order, no float
 atomics, so a universe moves the same alone or side by side in a batch. Boxes follow
 their cell only through box_targets.py, drain.py and hand_over.py. Returns None.
@@ -72,13 +79,13 @@ def _slope(pull: wp.array3d(dtype=wp.float32), home: int, side: int, box: wp.vec
 
 @wp.kernel
 def _press(corners: wp.array3d(dtype=wp.vec3), cell_quanta: wp.array2d(dtype=wp.int64),
-           pull: wp.array3d(dtype=wp.float32), side: int, cells_per_side: int, volume_rest: float,
-           volume_stiffness: float, joint_rest: float, push: float, push_steepness: float,
-           pressure: wp.array2d(dtype=wp.float32), drawn: wp.array2d(dtype=wp.vec3),
+           pull: wp.array3d(dtype=wp.float32), side: int, cells_per_side: int, size_energy: float,
+           volume_rest: float, volume_stiffness: float, joint_rest: float, push: float, push_steepness: float,
+           pressure: wp.array2d(dtype=wp.float64), drawn: wp.array2d(dtype=wp.vec3),
            cell_size: wp.array2d(dtype=wp.float32)):
     home, cell = wp.tid()
     kind = cell_kind(cell, cells_per_side)
-    pressure[home, cell] = 0.0
+    pressure[home, cell] = wp.float64(0.0)
     cell_size[home, cell] = 0.0
     drawn[home, cell] = wp.vec3(0.0, 0.0, 0.0)
     if kind == 0:
@@ -92,12 +99,13 @@ def _press(corners: wp.array3d(dtype=wp.vec3), cell_quanta: wp.array2d(dtype=wp.
         if tet == 0:
             centre = 0.5 * (start + end)
     cell_size[home, cell] = size
-    if size <= 0.0:
-        return
     amount = float(cell_quanta[home, cell])
-    packing = amount / size
+    if size <= 0.0 or amount <= 0.0:
+        return
+    wanted_side = wp.float64(size_energy) / wp.float64(amount)
+    ratio = wanted_side * wanted_side * wanted_side / wp.float64(size)
     if kind > 0:
-        pressure[home, cell] = volume_stiffness * packing * packing / (2.0 * volume_rest)
+        pressure[home, cell] = wp.float64(volume_stiffness * volume_rest) * ratio * ratio / wp.float64(2.0)
         box = wp.vec3i(home * side + wp.clamp(int(wp.floor(centre[0])), 0, side - 1),
                        wp.clamp(int(wp.floor(centre[1])), 0, side - 1),
                        wp.clamp(int(wp.floor(centre[2])), 0, side - 1))
@@ -105,11 +113,11 @@ def _press(corners: wp.array3d(dtype=wp.vec3), cell_quanta: wp.array2d(dtype=wp.
                                               _slope(pull, home, side, box, 2))
     else:
         power = push_steepness + 1.0
-        pressure[home, cell] = push * joint_rest * push_steepness / power * wp.pow(packing / joint_rest, power)
+        pressure[home, cell] = wp.float64(push * joint_rest * push_steepness / power) * wp.pow(ratio, wp.float64(power))
 
 
 @wp.kernel
-def _propose(corners: wp.array3d(dtype=wp.vec3), pressure: wp.array2d(dtype=wp.float32),
+def _propose(corners: wp.array3d(dtype=wp.vec3), pressure: wp.array2d(dtype=wp.float64),
              drawn: wp.array2d(dtype=wp.vec3), side: int, cells_per_side: int, scale: float, max_step: float,
              proposal: wp.array3d(dtype=wp.vec3)):
     ti, tj, tk = wp.tid()
@@ -123,14 +131,14 @@ def _propose(corners: wp.array3d(dtype=wp.vec3), pressure: wp.array2d(dtype=wp.f
         if vertex[axis] == 0 or vertex[axis] == last:
             return
     extent = cells_per_side + 2
-    force = wp.vec3(0.0, 0.0, 0.0)
+    force = wp.vec3d(0.0, 0.0, 0.0)
     for around in range(8):
         bits = wp.vec3i(around // 4, around // 2 % 2, around % 2)
         place = vertex - bits
         cell = (place[0] * extent + place[1]) * extent + place[2]
         squeeze = pressure[home, cell]
-        force += drawn[home, cell] / 8.0
-        if squeeze != 0.0:
+        force += wp.vec3d(drawn[home, cell] / 8.0)
+        if squeeze != wp.float64(0.0):
             for tet in range(6):
                 start, one, two, end = kuhn_tet(corners, home, place, tet, cells_per_side)
                 for slot in range(4):
@@ -145,12 +153,12 @@ def _propose(corners: wp.array3d(dtype=wp.vec3), pressure: wp.array2d(dtype=wp.f
                         else:
                             grad = -(wp.cross(two - start, end - start) + wp.cross(end - start, one - start)
                                      + wp.cross(one - start, two - start)) / 6.0
-                        force += squeeze * grad
-    move = scale * force
-    length = wp.length(move)
-    if length > max_step:
-        move = move * (max_step / length)
-    moved = old + move
+                        force += squeeze * wp.vec3d(grad)
+    push_by = wp.float64(scale) * force
+    length = wp.length(push_by)
+    if length > wp.float64(max_step):
+        push_by = push_by * (wp.float64(max_step) / length)
+    moved = old + wp.vec3(push_by)
     top = float(side)
     proposal[ti, tj, tk] = wp.vec3(wp.clamp(moved[0], 0.0, top), wp.clamp(moved[1], 0.0, top),
                                    wp.clamp(moved[2], 0.0, top))
@@ -216,11 +224,11 @@ def move_corners(state: State, settings: Settings) -> None:
     count = state.cell_quanta.shape[1]
     state.cell_quanta.zero_()
     wp.launch(_count, dim=state.shape, device=device, inputs=[state.quanta, state.owner, state.side, state.cell_quanta])
-    pressure = wp.zeros((state.universes, count), dtype=wp.float32, device=device)
+    pressure = wp.zeros((state.universes, count), dtype=wp.float64, device=device)
     drawn = wp.zeros((state.universes, count), dtype=wp.vec3, device=device)
     wp.launch(_press, dim=(state.universes, count), device=device,
               inputs=[state.corners, state.cell_quanta, state.pull, state.side, state.cells_per_side,
-                      settings.volume_rest, settings.volume_stiffness, settings.joint_rest, settings.push,
+                      settings.size_energy, settings.volume_rest, settings.volume_stiffness, settings.joint_rest, settings.push,
                       settings.push_steepness, pressure, drawn, state.cell_size])
     proposal = wp.empty_like(state.corners)
     wp.launch(_propose, dim=state.corners.shape, device=device,

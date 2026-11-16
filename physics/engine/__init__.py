@@ -37,7 +37,6 @@ Module map:
   pass_seed.py      pass_seed: the rounding hash's seed per step, substep and pass
   pair_rotation.py  pair_rotation (Warp func): the exact two-box fluid step in whole quanta
   box_potential.py  box_potential (Warp func): energy per quantum (pull, own push, joint push)
-  box_energy.py     box_energy (Warp func): its integral, the energy the cell corners follow
   pull_wave.py      pull_wave: the pull's wave equation, leapfrog, light speed, plus-sourced
   on_site.py        on_site: exact phase turns by the box potential on local clocks
   hop.py            hop: exact pair rotations moving whole quanta inside one sign
@@ -83,7 +82,6 @@ from physics.engine.leak_openness import leak_openness
 from physics.engine.pass_seed import pass_seed
 from physics.engine.pair_rotation import pair_rotation
 from physics.engine.box_potential import box_potential
-from physics.engine.box_energy import box_energy
 from physics.engine.pull_wave import pull_wave
 from physics.engine.on_site import on_site
 from physics.engine.hop import hop
@@ -111,7 +109,7 @@ from physics.engine.view_source import view_source
 
 __all__ = ["Settings", "State", "uneven_field", "new_universe", "lattice_kinds", "cell_place", "cell_kind",
            "shared_joint", "kuhn_corner", "kuhn_tet", "cell_score", "face_step", "inside", "clock_rate", "squeeze", "openness",
-           "leak_openness", "pass_seed", "pair_rotation", "box_potential", "box_energy", "pull_wave", "on_site", "hop", "leak", "substeps",
+           "leak_openness", "pass_seed", "pair_rotation", "box_potential", "pull_wave", "on_site", "hop", "leak", "substeps",
            "move_corners", "box_targets", "rehome_dims", "rehome_site", "one_group", "block_adjacency", "drain", "hand_over", "collapse", "tick_clocks", "totals",
            "attach_ladder", "ladder_sync", "step", "host_boxes", "lattice_of", "ENERGY_VOLUME", "JOINT", "cells", "seams", "stats",
            "view_source"]
