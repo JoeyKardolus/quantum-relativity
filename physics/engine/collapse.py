@@ -39,6 +39,8 @@ def collapse(state: State, settings: Settings, pressed: np.ndarray | None = None
     over = packing >= settings.collapse_packing
     if pressed is not None:
         over |= pressed
+    if not over.any():
+        return 0
     ready = (state.kind == -1) & over & (state.between.min(axis=-1) >= 0)
     if not ready.any():
         return 0

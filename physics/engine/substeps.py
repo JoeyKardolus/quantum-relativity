@@ -16,7 +16,8 @@ everyone while 99 in 100 cells needed 1). Writes state.substeps, a Warp int32 ar
 (universes, capacity), the plan per cell: its size is the cell's count; it is negative
 when the cell's substeps after the first are run over a list of its boxes
 (later_substeps.py), which is every cell needing more than one, unless those cells hold
-more than a quarter of all boxes (then the launches over all boxes run every substep).
+more than a quarter of all boxes, or the batch holds 2**31 boxes or more (the list's
+int32 box index); then the launches over all boxes run every substep.
 Sets state.later: a dict with "dense" (how many launches over all boxes this step
 needs: 1 with a list), "boxes" (None, or a Warp int32 array: the listed cells' boxes as
 indices into the stacked arrays, cells of the highest count first) and "ends" (per
@@ -132,7 +133,8 @@ def _list_boxes(state: State, plans) -> None:
     counts = held[homes, cells]
     sizes = state.cell_boxes[homes, cells].astype(np.int64)
     total = int(sizes.sum())
-    if total == 0 or total > DENSE_SHARE * state.universes * state.side ** 3:
+    every = state.universes * state.side ** 3
+    if total == 0 or total > DENSE_SHARE * every or every >= 2 ** 31:
         state.later["dense"] = int(counts.max())
         return
     starts = np.full(held.shape, -1, dtype=np.int32)

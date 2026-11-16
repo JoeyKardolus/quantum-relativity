@@ -29,28 +29,53 @@ PI = 3.14159265358979
 UNIT = 1048576.0  # numerics: fixed point for order-free sums, 2**20 per unit
 
 
+@wp.func
+def _flush(home: int, cell: int, square: wp.vec3d, first: wp.vec3d, weight: wp.vec3d,
+           squares: wp.array3d(dtype=wp.int64), firsts: wp.array3d(dtype=wp.int64),
+           weights: wp.array3d(dtype=wp.int64)):
+    """Add one run's whole-number sums to its cell."""
+    for axis in range(3):
+        if weight[axis] != wp.float64(0.0):
+            wp.atomic_add(squares, home, cell, axis, wp.int64(square[axis]))
+            wp.atomic_add(firsts, home, cell, axis, wp.int64(first[axis]))
+            wp.atomic_add(weights, home, cell, axis, wp.int64(weight[axis]))
+
+
 @wp.kernel
 def _faces(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32), owner: wp.array3d(dtype=wp.int32),
            side: int, wrap: int, squares: wp.array3d(dtype=wp.int64), firsts: wp.array3d(dtype=wp.int64),
            weights: wp.array3d(dtype=wp.int64)):
-    ti, tj, tk = wp.tid()
-    held = quanta[ti, tj, tk]
-    if held <= 0:
-        return
+    ti, tj = wp.tid()
     home = ti // side
-    here = wp.vec3i(ti, tj, tk)
-    cell = owner[ti, tj, tk]
-    for axis in range(3):
-        there, valid = reach(here, face_step(2 * axis), home, side, wrap)
-        if valid and owner[there[0], there[1], there[2]] == cell:
-            other = quanta[there[0], there[1], there[2]]
-            if other > 0:
-                turn = phase[there[0], there[1], there[2]] - phase[ti, tj, tk]
-                turn = turn - 2.0 * PI * wp.floor((turn + PI) / (2.0 * PI))
-                share = 0.5 * (float(held) + float(other))
-                wp.atomic_add(squares, home, cell, axis, wp.int64(wp.round(share * turn * turn * UNIT)))
-                wp.atomic_add(firsts, home, cell, axis, wp.int64(wp.round(share * turn * UNIT)))
-                wp.atomic_add(weights, home, cell, axis, wp.int64(wp.round(share * UNIT)))
+    run = int(-1)
+    square = wp.vec3d(wp.float64(0.0), wp.float64(0.0), wp.float64(0.0))
+    first = wp.vec3d(wp.float64(0.0), wp.float64(0.0), wp.float64(0.0))
+    weight = wp.vec3d(wp.float64(0.0), wp.float64(0.0), wp.float64(0.0))
+    for tk in range(side):
+        held = quanta[ti, tj, tk]
+        cell = owner[ti, tj, tk]
+        if cell != run:
+            if run >= 0:
+                _flush(home, run, square, first, weight, squares, firsts, weights)
+            run = cell
+            square = wp.vec3d(wp.float64(0.0), wp.float64(0.0), wp.float64(0.0))
+            first = wp.vec3d(wp.float64(0.0), wp.float64(0.0), wp.float64(0.0))
+            weight = wp.vec3d(wp.float64(0.0), wp.float64(0.0), wp.float64(0.0))
+        if held > 0:
+            here = wp.vec3i(ti, tj, tk)
+            for axis in range(3):
+                there, valid = reach(here, face_step(2 * axis), home, side, wrap)
+                if valid and owner[there[0], there[1], there[2]] == cell:
+                    other = quanta[there[0], there[1], there[2]]
+                    if other > 0:
+                        turn = phase[there[0], there[1], there[2]] - phase[ti, tj, tk]
+                        turn = turn - 2.0 * PI * wp.floor((turn + PI) / (2.0 * PI))
+                        share = 0.5 * (float(held) + float(other))
+                        square[axis] = square[axis] + wp.float64(wp.round(share * turn * turn * UNIT))
+                        first[axis] = first[axis] + wp.float64(wp.round(share * turn * UNIT))
+                        weight[axis] = weight[axis] + wp.float64(wp.round(share * UNIT))
+    if run >= 0:
+        _flush(home, run, square, first, weight, squares, firsts, weights)
 
 
 def jiggle(state: State) -> tuple[np.ndarray, np.ndarray]:
@@ -58,8 +83,12 @@ def jiggle(state: State) -> tuple[np.ndarray, np.ndarray]:
     shape = (state.universes, state.capacity, 3)
     device = state.quanta.device
     squares, firsts, weights = (wp.zeros(shape, dtype=wp.int64, device=device) for _ in range(3))
-    wp.launch(_faces, dim=state.shape, device=device,
+    wp.launch(_faces, dim=state.shape[:2], device=device,
               inputs=[state.quanta, state.phase, state.owner, state.side, int(state.wrap), squares, firsts, weights])
-    square, first, weight = (values.numpy() / UNIT for values in (squares, firsts, weights))
+    volumes = state.kind == 1
+    square, first, weight = (values.numpy()[volumes] / UNIT for values in (squares, firsts, weights))
     spread = square - np.where(weight > 0.0, first ** 2 / np.maximum(weight, 1e-300), 0.0)
-    return np.maximum(spread, 0.0).sum(axis=-1), weight.sum(axis=-1)
+    spreads, weighed = np.zeros(state.kind.shape), np.zeros(state.kind.shape)
+    spreads[volumes] = np.maximum(spread, 0.0).sum(axis=-1)
+    weighed[volumes] = weight.sum(axis=-1)
+    return spreads, weighed

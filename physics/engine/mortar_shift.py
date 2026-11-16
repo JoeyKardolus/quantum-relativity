@@ -25,7 +25,8 @@ quanta of A's fullest face-neighbouring box with that box's phase and clock. A s
 waits when B would keep fewer than 2 boxes, a box of S has no box of B left on its
 faces, B's boxes round a box of S would fall into two groups, the minus boxes round j
 would not stay one face-joined group, or j holds fewer minus quanta than S has boxes.
-No quantum changes sign, the amount is exact, ABAB holds. Every moved box is marked (2)
+(The boxes round a site are only read once A's and J's rooms could exceed B's with a
+single box given, which more boxes given never help.) No quantum changes sign, the amount is exact, ABAB holds. Every moved box is marked (2)
 and counted in tallies[u, 2]. Returns the number of shifts.
 """
 from __future__ import annotations
@@ -107,8 +108,12 @@ def _shift(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float3
            outs: wp.array2d(dtype=wp.int32), delta: wp.array2d(dtype=wp.int32), mode: int,
            tallies: wp.array2d(dtype=wp.int64), side: int, wrap: int, span: int, offset: wp.vec3i, chance: float,
            seed: int, keys: wp.array(dtype=wp.int32), adjacency: wp.array(dtype=wp.int32),
-           face_adjacency: wp.array(dtype=wp.int32)):
+           face_adjacency: wp.array(dtype=wp.int32), proposed: wp.array4d(dtype=wp.uint8)):
     home, ti, tj, tk = wp.tid()
+    if mode == 1:
+        if proposed[home, ti, tj, tk] == wp.uint8(0):
+            return
+        proposed[home, ti, tj, tk] = wp.uint8(0)
     steps = wp.vec3i(ti, tj, tk)
     local = wp.vec3i(0, 0, 0)
     for axis in range(3):
@@ -130,7 +135,11 @@ def _shift(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float3
     for pick in range(2):
         first = sides[pick]
         second = sides[1 - pick]
-        found = _scan(quanta, owner, between, site, home, side, wrap, first, second)
+        found = int(0)
+        least = cell_room(sizes[home, second], boxes[home, second] - 1)
+        if cell_room(sizes[home, first], boxes[home, first] + 1) >= least and cell_room(
+                sizes[home, joint], boxes[home, joint]) >= least:
+            found = _scan(quanta, owner, between, site, home, side, wrap, first, second)
         if found > 0:
             lead = cell_room(sizes[home, first], boxes[home, first] + 1) - cell_room(sizes[home, second],
                                                                              boxes[home, second] - found)
@@ -191,6 +200,7 @@ def _shift(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float3
                 if receivers == 0 or not one_group(stays, adjacency):
                     return
     if mode == 0:
+        proposed[home, ti, tj, tk] = wp.uint8(1)
         wp.atomic_add(ins, home, grower, 1)
         wp.atomic_add(ins, home, joint, count - 1)
         wp.atomic_add(outs, home, shrinker, count)
@@ -260,6 +270,7 @@ def mortar_shift(state: State, settings: Settings) -> int:
     adjacency = block_adjacency(device)
     faces = block_adjacency(device, faces_only=True)
     counts = [wp.zeros(state.kind.shape, dtype=wp.int32, device=device) for _ in range(3)]
+    proposed = wp.zeros(dims, dtype=wp.uint8, device=device)
     for phase_index in order:
         place = np.array([phase_index // 25, phase_index // 5 % 5, phase_index % 5]) + shift
         seed = (state.step * 7919 + int(phase_index) * 197 + 3) & 0x7FFFFFFF
@@ -268,7 +279,7 @@ def mortar_shift(state: State, settings: Settings) -> int:
                       inputs=[state.quanta, state.phase, state.clock, state.owner, state.marks, state.cells_d["kind"],
                               state.cells_d["between"], state.cells_d["size"], state.cells_d["rate"], boxes, *counts,
                               mode, state.tallies, state.side, int(state.wrap), int(span),
-                              wp.vec3i(*[int(v) for v in place]), 1.0, int(seed), state.keys, adjacency, faces])
+                              wp.vec3i(*[int(v) for v in place]), 1.0, int(seed), state.keys, adjacency, faces, proposed])
         settle_counts(boxes, counts)
     state.cell_boxes = boxes.numpy().astype(np.int64)
     return int(state.tallies.numpy()[:, 2].sum()) - before

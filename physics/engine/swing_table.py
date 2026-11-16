@@ -3,6 +3,7 @@
 Contract: `swing_table(state)` returns a dict the joint swing reads (joint_swing.py):
   joints        bool (universes, capacity): the joints that swing, kind -1 holding quanta
                 (state.wanted > 0), in a universe with at least 2 of them
+  places        the swinging joints as (universe numbers, cell ids), np.nonzero(joints)
   paired        bool, same shape: joints lying between two energy volumes
   between       Warp vec2i (universes, capacity): state.between
   offsets       Warp int32 (universes, capacity + 1) and members Warp int32 (universes,
@@ -46,7 +47,8 @@ def swing_table(state: State) -> dict:
         volumes_host[universe, :members.size] = volumes
         offsets[universe, 1:] = np.cumsum(np.bincount(volumes, minlength=capacity))
     state.swing = {
-        "joints": joints, "sides": state.between.copy(), "paired": (state.between >= 0).all(axis=-1),
+        "joints": joints, "places": np.nonzero(joints), "sides": state.between.copy(),
+        "paired": (state.between >= 0).all(axis=-1),
         "between": wp.array(np.ascontiguousarray(state.between.astype(np.int32)), dtype=wp.vec2i, device=device),
         "offsets": wp.array(offsets, dtype=wp.int32, device=device),
         "members": wp.array(members_host, dtype=wp.int32, device=device),

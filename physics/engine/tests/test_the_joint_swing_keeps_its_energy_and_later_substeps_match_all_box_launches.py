@@ -87,3 +87,29 @@ def test_later_substeps_over_listed_boxes_match_launches_over_all_boxes_to_the_l
     assert runs[1][3] == 0 and runs[1][4] > 1
     for first, second in zip(runs[0][:3], runs[1][:3]):
         assert np.array_equal(first, second)
+
+
+@needs_gpu
+def test_a_tear_read_and_written_in_the_volumes_own_room_matches_one_done_on_the_whole_universe(monkeypatch):
+    """volume_split.py copies only the torn volume's room to the host (cells_span.py); the tear must be the same."""
+    from physics.engine import volume_split
+    module = sys.modules["physics.engine.volume_split"]
+    settings = Settings(split_across=10.3)
+    for places, margin in ((8, 0), (5, 11)):
+        ends = []
+        for whole in (False, True):
+            if whole:
+                monkeypatch.setattr(module, "cells_span", lambda *args, **kwargs: None)
+            state = new_universe(places, 10, margin=margin)
+            splits = 0
+            for _ in range(3):
+                cell_count(state)
+                cell_laws(state, settings)
+                splits += volume_split(state, settings)
+            ends.append((splits, state.quanta.numpy(), state.owner.numpy(), state.marks.numpy(), state.kind.copy(),
+                         state.between.copy(), state.size.copy()))
+            monkeypatch.undo()
+        print(f"{places} places, margin {margin}: {ends[0][0]} tears each way")
+        assert ends[0][0] == ends[1][0] == 3
+        for first, second in zip(ends[0][1:], ends[1][1:]):
+            assert np.array_equal(first, second)

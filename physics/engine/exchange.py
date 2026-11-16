@@ -29,7 +29,8 @@ no box ever holds two signs and no quantum changes sign; the amount is exact. An
 box beside a joint is taken by that joint the same way, with its clock rate as chance and no
 deficit asked (a joint only pushes and empty space does nothing; not in the
 correction): this is how space grows where joints meet empty space. Each phase first proposes every move, then commits only those that keep the
-order even if every proposal of the phase went through (settle_counts.py), so the boxes
+order even if every proposal of the phase went through (settle_counts.py; only the sites
+that proposed are looked at again), so the boxes
 move the same whatever order the GPU runs the sites in. Every move marks its box (2) and adds to tallies[u, 2]. No size follows the
 boxes: a joint's size is its own swing (joint_swing.py), a volume's its energy's.
 state.cell_boxes is updated.
@@ -104,8 +105,12 @@ def _exchange(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.flo
               outs: wp.array2d(dtype=wp.int32), delta: wp.array2d(dtype=wp.int32), mode: int,
               tallies: wp.array2d(dtype=wp.int64), side: int, wrap: int, stride: int, offset: wp.vec3i, chance: float,
               seed: int, keys: wp.array(dtype=wp.int32), adjacency: wp.array(dtype=wp.int32),
-              face_adjacency: wp.array(dtype=wp.int32)):
+              face_adjacency: wp.array(dtype=wp.int32), proposed: wp.array4d(dtype=wp.uint8)):
     home, ti, tj, tk = wp.tid()
+    if mode == 1:
+        if proposed[home, ti, tj, tk] == wp.uint8(0):
+            return
+        proposed[home, ti, tj, tk] = wp.uint8(0)
     local = wp.vec3i(offset[0] + stride * ti, offset[1] + stride * tj, offset[2] + stride * tk)
     if local[0] >= side or local[1] >= side or local[2] >= side:
         return
@@ -151,6 +156,8 @@ def _exchange(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.flo
     rng = wp.rand_init(seed ^ keys[home], index)
     if wp.randf(rng) >= chance * rate:
         return
+    if not _fits(quanta, owner, kinds, between, site, home, side, wrap, own, goal, adjacency, face_adjacency):
+        return
     giver = wp.vec3i(0, 0, 0)
     given = int(1)
     receivers = int(0)
@@ -173,9 +180,8 @@ def _exchange(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.flo
                 receivers += 1
     if given < 2 or (own >= 0 and receivers == 0):
         return
-    if not _fits(quanta, owner, kinds, between, site, home, side, wrap, own, goal, adjacency, face_adjacency):
-        return
     if mode == 0:
+        proposed[home, ti, tj, tk] = wp.uint8(1)
         wp.atomic_add(ins, home, goal, 1)
         if own >= 0:
             wp.atomic_add(outs, home, own, 1)
@@ -237,6 +243,7 @@ def exchange(state: State, settings: Settings) -> int:
     adjacency = block_adjacency(device)
     faces = block_adjacency(device, faces_only=True)
     counts = [wp.zeros(state.kind.shape, dtype=wp.int32, device=device) for _ in range(3)]
+    proposed = wp.zeros(dims, dtype=wp.uint8, device=device)
     for phase_index in order:
         offset = wp.vec3i(int(phase_index) // (stride * stride), int(phase_index) // stride % stride,
                           int(phase_index) % stride)
@@ -246,7 +253,7 @@ def exchange(state: State, settings: Settings) -> int:
                       inputs=[state.quanta, state.phase, state.clock, state.owner, state.marks, state.cells_d["kind"],
                               state.cells_d["between"], state.cells_d["size"], state.cells_d["rate"], boxes, *counts,
                               mode, state.tallies, state.side, int(state.wrap), stride, offset, float(chance),
-                              int(seed), state.keys, adjacency, faces])
+                              int(seed), state.keys, adjacency, faces, proposed])
         settle_counts(boxes, counts)
     state.cell_boxes = boxes.numpy().astype(np.int64)
     return int(state.tallies.numpy()[:, 2].sum()) - before

@@ -61,7 +61,7 @@ import itertools
 import numpy as np
 import warp as wp
 
-from physics.engine._start import OUTER, PLUS, cell_ids, face_partner, fill_cells, held_boxes
+from physics.engine._start import cell_ids, face_partner, fill_cells, held_boxes
 from physics.engine.cell_count import cell_count
 from physics.engine.cell_laws import cell_laws
 from physics.engine.settings import Settings
@@ -249,7 +249,7 @@ def _settled(energy: np.ndarray, held: np.ndarray) -> np.ndarray:
 
 
 def _diagram(wanted: np.ndarray, lattice: dict, device) -> tuple:
-    """The power diagram's volume per box and each box's carve partner (PLUS a plus box), weights fitted to the wanted sizes.
+    """The power diagram's volume per box and each box's carve partner (-2 a plus box), weights fitted to the wanted sizes.
 
     A volume two lattice places off can only take a box from one a place nearer when its
     weight is more than 2 * period**2 higher, so while the weights lie closer together

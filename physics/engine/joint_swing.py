@@ -186,39 +186,54 @@ def _finish(flags: wp.array2d(dtype=wp.int32), counts: wp.array(dtype=wp.int32),
 def joint_swing(state: State, settings: Settings, pull: np.ndarray) -> np.ndarray:
     """Swing every joint's size one step, energy kept; returns the joints pressed to the collapse limit."""
     table = swing_table(state)
-    joints = table["joints"]
-    pressed = np.zeros(state.kind.shape, dtype=bool)
-    if not joints.any():
-        state.cell_push = np.where(state.kind == -1, _push(state, settings), 0.0)
+    shape = state.kind.shape
+    pressed = np.zeros(shape, dtype=bool)
+    rows, columns = table["places"]
+    if rows.size == 0:
+        state.cell_push = _push(state, settings)
         return pressed
     device = state.quanta.device
-    rate = np.where(joints, state.rate, 0.0)
-    hardness = np.where(joints, settings.push * state.wanted ** 6 / 5.0, 0.0)
-    floor = np.where(joints, state.cell_quanta / settings.collapse_packing, 0.0)
-    size = np.where(joints, state.size, 1.0)
-    born = joints & (size < floor)
-    speed = np.where(joints & ~born, state.speed, 0.0)
-    rates = _volume_rates(table, rate)
-    counts = _counts(settings, joints, rate, rates, state.between, hardness, np.maximum(size, floor))
-    flags = (joints * _ACTIVE + (joints & table["paired"]) * _PAIRED + born * (_HELD | _BORN)).astype(np.int32)
-    on = {name: wp.array(values, dtype=wp.float64, device=device)
-          for name, values in (("rate", rate), ("rates", rates), ("hardness", hardness), ("floor", floor),
-                               ("size", size), ("speed", speed), ("load", np.where(joints, pull, 0.0)),
-                               ("spans", settings.step_time / np.maximum(counts, 1)))}
+    rate = state.rate[rows, columns]
+    floor = state.cell_quanta[rows, columns] / settings.collapse_packing
+    size = state.size[rows, columns].astype(np.float64)
+    born = size < floor
+    hardness = settings.push * state.wanted[rows, columns] ** 6 / 5.0
+    rates = _volume_rates(table, _spread(shape, rows, columns, rate))
+    counts = _counts(settings, rows, rate, rates, state.between[rows, columns], hardness, np.maximum(size, floor),
+                     state.universes)
+    paired = table["paired"][rows, columns]
+    flags = np.zeros(shape, dtype=np.int32)
+    flags[rows, columns] = _ACTIVE + paired * _PAIRED + born * (_HELD | _BORN)
+    on = {name: wp.array(_spread(shape, rows, columns, values, fill), dtype=wp.float64, device=device)
+          for name, values, fill in (("rate", rate, 0.0), ("hardness", hardness, 0.0), ("floor", floor, 0.0),
+                                     ("size", size, 1.0), ("speed", np.where(born, 0.0, state.speed[rows, columns]), 0.0),
+                                     ("load", pull[rows, columns], 0.0))}
+    on["rates"] = wp.array(rates, dtype=wp.float64, device=device)
+    on["spans"] = wp.array(settings.step_time / np.maximum(counts, 1), dtype=wp.float64, device=device)
     for name in ("start", "target", "slope", "pulled", "missed"):
-        on[name] = wp.zeros(state.kind.shape, dtype=wp.float64, device=device)
+        on[name] = wp.zeros(shape, dtype=wp.float64, device=device)
     on["flags"] = wp.array(flags, dtype=wp.int32, device=device)
     on["counts"] = wp.array(counts.astype(np.int32), dtype=wp.int32, device=device)
     inertia = wp.float64(settings.joint_inertia)
-    limit = TOLERANCE * np.maximum(1.0, np.abs(size).max(axis=1, where=joints, initial=0.0))
+    largest = np.zeros(state.universes)
+    np.maximum.at(largest, rows, np.abs(size))
+    limit = TOLERANCE * np.maximum(1.0, largest)
     for sub_index in range(int(counts.max())):
         _substep(state, table, on, inertia, sub_index, counts, limit)
-    after = on["flags"].numpy()
-    state.size = np.where(joints, on["size"].numpy(), state.size)
-    state.speed = np.where(joints, on["speed"].numpy(), state.speed)
-    pressed = joints & table["paired"] & ((after & _HELD) != 0) & ~born
-    state.cell_push = np.where(state.kind == -1, _push(state, settings), 0.0)
+    held = (on["flags"].numpy()[rows, columns] & _HELD) != 0
+    state.size, state.speed = state.size.copy(), state.speed.copy()
+    state.size[rows, columns] = on["size"].numpy()[rows, columns]
+    state.speed[rows, columns] = on["speed"].numpy()[rows, columns]
+    pressed[rows, columns] = paired & held & ~born
+    state.cell_push = _push(state, settings)
     return pressed
+
+
+def _spread(shape: tuple, rows: np.ndarray, columns: np.ndarray, values: np.ndarray, fill: float = 0.0) -> np.ndarray:
+    """The swinging joints' values at their places in a full (universes, capacity) table, `fill` elsewhere."""
+    table = np.full(shape, fill)
+    table[rows, columns] = values
+    return table
 
 
 def _substep(state: State, table: dict, on: dict, inertia, sub_index: int, counts: np.ndarray,
@@ -264,23 +279,27 @@ def _volume_rates(table: dict, rate: np.ndarray) -> np.ndarray:
     return rates
 
 
-def _counts(settings: Settings, joints: np.ndarray, rate: np.ndarray, rates: np.ndarray, between: np.ndarray,
-            hardness: np.ndarray, size: np.ndarray) -> np.ndarray:
-    """Per universe the substeps its stiffest joint needs (omega * substep <= 1/2), 0 with fewer than 2 joints."""
+def _counts(settings: Settings, rows: np.ndarray, rate: np.ndarray, rates: np.ndarray, sides: np.ndarray,
+            hardness: np.ndarray, size: np.ndarray, universes: int) -> np.ndarray:
+    """Per universe the substeps its stiffest joint needs (omega * substep <= 1/2), 0 without swinging joints."""
     others = np.zeros(rate.shape)
     for pick in range(2):
-        volume = between[..., pick]
-        others += np.where(volume >= 0, np.take_along_axis(rates, np.maximum(volume, 0), axis=1) - rate, 0.0)
-    largest = 2.0 * np.max(rate * others, axis=1, where=joints, initial=0.0) / settings.joint_inertia
-    stiffness = np.max(30.0 * hardness / np.where(joints, size, 1.0) ** 7, axis=1, where=joints, initial=0.0)
-    counts = np.zeros(rate.shape[0], dtype=np.int64)
-    for universe in range(rate.shape[0]):
-        if joints[universe].sum() >= 2:
-            omega = math.sqrt(largest[universe] * stiffness[universe])
-            counts[universe] = min(MOST_SUBSTEPS, max(1, math.ceil(settings.step_time * omega / 0.5)))
+        volume = sides[:, pick]
+        others += np.where(volume >= 0, rates[rows, np.maximum(volume, 0)] - rate, 0.0)
+    largest, stiffness = np.zeros(universes), np.zeros(universes)
+    np.maximum.at(largest, rows, 2.0 * rate * others / settings.joint_inertia)
+    np.maximum.at(stiffness, rows, 30.0 * hardness / size ** 7)
+    counts = np.zeros(universes, dtype=np.int64)
+    for universe in np.unique(rows):
+        omega = math.sqrt(largest[universe] * stiffness[universe])
+        counts[universe] = min(MOST_SUBSTEPS, max(1, math.ceil(settings.step_time * omega / 0.5)))
     return counts
 
 
 def _push(state: State, settings: Settings) -> np.ndarray:
-    """push * (wanted / size) ** steepness per cell."""
-    return settings.push * (state.wanted / np.maximum(state.size, 1e-6)) ** settings.push_steepness
+    """push * (wanted / size) ** steepness per joint, 0 for every other cell."""
+    rows, columns = np.nonzero(state.kind == -1)
+    push = np.zeros(state.kind.shape)
+    push[rows, columns] = settings.push * (state.wanted[rows, columns] / np.maximum(state.size[rows, columns], 1e-6)
+                                           ) ** settings.push_steepness
+    return push

@@ -69,12 +69,16 @@ def _move(quanta: wp.array3d(dtype=wp.int32), owner: wp.array3d(dtype=wp.int32),
 @wp.kernel
 def _level(quanta: wp.array3d(dtype=wp.int32), field: wp.array3d(dtype=wp.float32), side: int,
            sums: wp.array2d(dtype=wp.int64)):
-    ti, tj, tk = wp.tid()
-    if quanta[ti, tj, tk] == 0:
-        return
-    home = ti // side
-    wp.atomic_add(sums, home, 0, wp.int64(wp.round(float(field[ti, tj, tk]) * LEVEL_UNIT)))
-    wp.atomic_add(sums, home, 1, wp.int64(1))
+    ti, tj = wp.tid()
+    total = wp.int64(0)
+    occupied = wp.int64(0)
+    for tk in range(side):
+        if quanta[ti, tj, tk] != 0:
+            total += wp.int64(wp.round(float(field[ti, tj, tk]) * LEVEL_UNIT))
+            occupied += wp.int64(1)
+    if occupied > wp.int64(0):
+        wp.atomic_add(sums, ti // side, 0, total)
+        wp.atomic_add(sums, ti // side, 1, occupied)
 
 
 @wp.kernel
@@ -111,7 +115,7 @@ def _take_level(state: State, field) -> None:
     """Subtract each universe's mean over its occupied boxes from `field`."""
     device = state.quanta.device
     sums = wp.zeros((state.universes, 2), dtype=wp.int64, device=device)
-    wp.launch(_level, dim=state.shape, device=device, inputs=[state.quanta, field, state.side, sums])
+    wp.launch(_level, dim=state.shape[:2], device=device, inputs=[state.quanta, field, state.side, sums])
     totals = sums.numpy()
     levels = (totals[:, 0] / LEVEL_UNIT / np.maximum(totals[:, 1], 1)).astype(np.float32)
     wp.launch(_lower, dim=state.shape, device=device,

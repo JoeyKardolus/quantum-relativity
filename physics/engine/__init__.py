@@ -61,6 +61,9 @@ Module map:
   one_group.py      one_group (Warp func): marked boxes round a box form one group
   block_adjacency.py block_adjacency: the 3 x 3 x 3 block's neighbour masks
   collapse.py       collapse: a joint past the limit gives way, its volumes become one
+  cells_span.py     cells_span: the room a few cells' boxes lie in, measured on the GPU
+  window_read.py    window_read: one room's quanta, owners and marks on the host
+  window_write.py   window_write: such a room written back
   volume_split.py   volume_split: a too-big volume tears in two, only it
   wall_press.py     wall_press: the volumes' fluid pressure on each joint's faces
   tick_clocks.py    tick_clocks: each box's and cell's own proper time
@@ -117,6 +120,9 @@ from physics.engine.group_label import group_label
 from physics.engine.one_group import one_group
 from physics.engine.block_adjacency import block_adjacency
 from physics.engine.collapse import collapse
+from physics.engine.cells_span import cells_span
+from physics.engine.window_read import window_read
+from physics.engine.window_write import window_write
 from physics.engine.volume_split import volume_split
 from physics.engine.wall_press import wall_press
 from physics.engine.tick_clocks import tick_clocks
@@ -135,5 +141,5 @@ __all__ = ["Settings", "State", "uneven_field", "new_universe", "reach", "face_s
            "pass_seed", "pair_rotation", "box_potential", "fluid_potential", "cell_count", "cell_laws", "cell_upload", "cell_room", "settle_counts", "swing_table", "joint_swing",
            "pull_wave", "site_turn", "hop_pair", "on_site", "hop", "substeps", "later_substeps", "jiggle", "cross", "quantum_store", "quantum_packet", "quantum_joints", "quantum_move", "quantum_hand",
            "quantum_settle", "quantum_react", "quantum", "exchange", "mortar_shift", "group_label", "one_group", "block_adjacency",
-           "collapse", "volume_split", "wall_press", "tick_clocks", "totals", "attach_ladder", "ladder_sync", "step",
+           "collapse", "cells_span", "window_read", "window_write", "volume_split", "wall_press", "tick_clocks", "totals", "attach_ladder", "ladder_sync", "step",
            "host_boxes", "lattice_of", "ENERGY_VOLUME", "JOINT", "cells", "seams", "stats", "view_source"]
