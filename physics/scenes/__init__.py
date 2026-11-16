@@ -23,6 +23,7 @@ Module map:
   space_dimension.py space_dimension: ball and spectral dimension of the cell-contact graph, beside a grid's
   isotropy.py        isotropy: pull and flow along a grid axis against the diagonals
   spin.py            spin: one whole-step whirl carried across a joint; winding, flow, strength, axis per step
+  belt_trick.py      belt_trick: a whirl tied into the joint web turned once and twice; the web's twist per step
 """
 from physics.scenes.expansion import expansion
 from physics.scenes.hubble_gap import hubble_gap
@@ -42,7 +43,8 @@ from physics.scenes.wave_field import wave_field
 from physics.scenes.space_dimension import space_dimension
 from physics.scenes.isotropy import isotropy
 from physics.scenes.spin import spin
+from physics.scenes.belt_trick import belt_trick
 
 __all__ = ["expansion", "hubble_gap", "structure", "bound_lump", "orbit", "black_hole", "sampled_run",
            "blob_start", "box_energies", "energy_centre", "rms_radius", "growth_rates", "power_spectrum",
-           "sealed_region", "wave_field", "space_dimension", "isotropy", "spin"]
+           "sealed_region", "wave_field", "space_dimension", "isotropy", "spin", "belt_trick"]

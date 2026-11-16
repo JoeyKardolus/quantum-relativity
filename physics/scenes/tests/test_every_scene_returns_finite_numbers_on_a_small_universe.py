@@ -7,8 +7,8 @@ import math
 
 import pytest
 
-from physics.scenes import (black_hole, bound_lump, expansion, hubble_gap, isotropy, orbit, space_dimension,
-                            spin, structure)
+from physics.scenes import (belt_trick, black_hole, bound_lump, expansion, hubble_gap, isotropy, orbit,
+                            space_dimension, spin, structure)
 from physics.scenes.tests._gpu import needs_gpu
 
 SCENES = {
@@ -23,6 +23,7 @@ SCENES = {
     "isotropy": lambda: isotropy(6, 4, blob_energy=100.0, blob_radius=2.0, flow_radius=4.0, speed=0.2, steps=4,
                                   seeds=(1, 2)),
     "spin": lambda: spin(4, 4, drift_speed=0.2, steps=6),
+    "belt_trick": lambda: belt_trick(5, 4, margin=6, steps_per_turn=3, web_reach=2),
 }
 
 
