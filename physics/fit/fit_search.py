@@ -12,8 +12,8 @@ its default), push_steepness (linear), seal_squeeze = collapse_squeeze * fractio
 fraction in 0.2 .. 0.9 (always below collapse). Searched beside them, the start's two
 unevennesses (owner, 2026-11-16, decision D), separate settings of
 physics.engine.new_universe: unevenness (energy volumes) and joint_unevenness (joints), each
-linear in 0 .. 0.6 (ranges fixed 2026-11-16 before any search; the defaults 0.3 and 0 lie
-inside). The unit cube has SEARCHED axes: NAMES (the engine settings, which the stand-in
+linear in 0 .. 0.9 (owner, 2026-11-16: widened from 0 .. 0.6 so the fit decides, the
+owner holding no opinion; the defaults 0.3 and 0 lie inside). The unit cube has SEARCHED axes: NAMES (the engine settings, which the stand-in
 also reads) then START_NAMES. The cell engine's search (attraction, push_power,
 compressions) cannot be compared with these.
 No dark-energy or base-push setting is searched (bible rule 8: expansion is drift from
@@ -34,7 +34,7 @@ LOG_RANGES = {"pull_strength": (1e-8, 1e-6), "push": (0.05, 5.0), "collapse_sque
               "friction": (0.1, 10.0)}
 LINEAR_RANGES = {"push_steepness": (2.0, 10.0), "seal_fraction": (0.2, 0.9)}
 NAMES = list(LOG_RANGES) + list(LINEAR_RANGES)
-START_RANGES = {"unevenness": (0.0, 0.6), "joint_unevenness": (0.0, 0.6)}
+START_RANGES = {"unevenness": (0.0, 0.9), "joint_unevenness": (0.0, 0.9)}
 START_NAMES = list(START_RANGES)
 SEARCHED = NAMES + START_NAMES
 

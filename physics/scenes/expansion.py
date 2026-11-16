@@ -24,7 +24,7 @@ verdict):
   collapses, energy_drift   stats at the end (joint boxes collapsed; drift in quanta, 0
                      is exact)
   substeps           steps the run took (the engine has no substeps: one per step)
-The Planck boxes are fixed; space grows as joints claim empty boxes at the edge, so the
+The Planck boxes are fixed; space grows as outer joints take empty boxes at the edge, so the
 occupied radius is the size of space and the energy radius says where the energy is.
 """
 from __future__ import annotations

@@ -10,35 +10,38 @@ detail ladder (`physics/ladder`) sits beside the boxes once attached.
   quanta; the sum of |quanta| holds to the quantum (`totals`).
 - **The fluid is tied to the quanta**: sqrt(|quanta|) e^{i phase}, never stored;
   `pair_rotation.py` hands over whole quanta. No box drops below 1 quantum by flow.
-- **Quanta change sign only in collapse.** Hops stay inside one sign; plus quanta cross
-  one joint of any thickness as one transfer between the plus boxes at the ends of a
-  straight plus-minus...-plus line (`leak.py`), never deposited in it. A claim changes a
-  box's kind after pushing its quanta out to boxes of its old kind (owner, 2026-11-16).
-  `marks` after a step: 1 collapse, 2 claim; tallies[u, 3] counts quanta turned plus.
-- **Wrapping is local**: a box turns plus only with no empty box or wall among its 26
-  neighbours and the plus boxes round it one group; a plus box turns minus only if the
-  plus boxes round it stay one group, and a minus box turns plus only if the minus boxes
-  in its 18-neighbourhood stay one face-joined group, so the web never breaks (`claim.py`).
+- **Quanta change sign only in collapse.** Hops stay inside one sign and one cell (two
+  volumes only once their shared joint is empty); the leak moves plus quanta between the
+  end boxes of a plus-minus...-plus line, never into the joint. `marks`: 1 collapse, 2
+  owner change.
+- **The cells are a forced lattice** (owner, 2026-11-16): `state.owner` per box,
+  extended-lattice ids (a ring of empty cells round the real ones). Kind and neighbours
+  come from the index alone (`cell_kind.py`, `lattice_kinds.py`, `shared_joint.py`); the
+  leak takes a line only when every minus box on it is its end volumes' shared joint's.
+  Never read labels off the signs.
+- **Corners move, boxes follow late.** `move_corners.py` gathers forces per corner from
+  its 8 cells (no float atomics: alone equals batched) and puts back steps that turn a
+  Kuhn tet inside out. `drain.py` fills no box past the cell's packing (quanta / corner
+  volume) or the leaving box's own quanta, else waits: uncapped draining heaped joints
+  to squeeze 2 to 6 and capped substeps at 64 (measured 2026-11-16).
+- **No lattice** (`from_host` without `lattice`): nothing leaks or moves; single-rule
+  test starts only. Starts built from `new_universe` pass `lattice=lattice_of(even)`.
 - **Pull is a wave** (`pull_wave.py`); 0 in empty boxes and beyond walls.
-- **Universes never touch.** Reads go through `inside`; substeps are per universe:
-  alone equals batched, bit for bit (test).
+- **Universes never touch.** Reads go through `inside`; alone equals batched (test).
 - **The boxes are the truth; the ladder is beside them.** `ladder_sync` writes changed
   blocks after each step; nothing reads back (a COARSE read-back adds rounding noise).
-- **Cells are read, not kept** (`cells.py`, host scipy): volumes = 26-connected plus boxes;
-  volumes and empty space grow into the minus web face step by face step, each minus box
-  keeps its first two sources, and a joint is every box of one source pair: exactly one
-  shared joint between two volumes (owner, 2026-11-16). Ids change between calls. The leak cannot read joints, so after 300
-  steps only ~2/3 of its crossings run through exactly their own joint (open).
+- **Volume split** (new lattice planes) is not built.
 - **No dark energy, no base push.** Never tune a default to pass a test.
 - **Substeps resolve the steep push** (`substeps.py`, numerics): each universe cuts its
-  fluid step so no same-sign face turns more than max_turn (0.25 rad) a substep. Seed 1
-  default start: coarse step (max_turn 0) squeeze 4.1 at step 100, collapse from ~115;
-  substeps (~4 a step): squeeze <= 0.59, no collapse in 300 steps.
+  fluid step so no same-sign face turns more than max_turn (0.25 rad) a substep.
 
 ## Measured (2026-11-16, RTX 5080, defaults)
 
-Before substeps, ms a step: 128^3 0.51, 256^3 5.5, 512^3 47; with them ~4x more on the
-seed 1 default start (~4 substeps a step). Largest universe: `bench/CLAUDE.md`.
+Seed 1 default start (216^3 boxes, 27 volumes), 300 steps: 31 to 69 steps/s, 5 to 9
+substeps, squeeze max 0.67 falling to 0.50, no collapse, no lumps, one web, no volume
+unwrapped, drift 0, occupied x1.40 at 100 and x1.75 at 300. Straight volume-to-volume
+lines through their own joint fall from 100% to 67 to 88% (5411/6128 at 25, 8662/11948
+at 300); the leak takes only those (12851/12851 boxes at 300). `bench/CLAUDE.md` has sizes.
 
 ## Run
 

@@ -10,7 +10,7 @@ Module map:
   fit_run.py           fit_run: one universe stepped and scored (0.5 expansion dip on local clocks + 0.5 structure)
   fit_search.py        fit_search: defaults, Latin hypercube, refine, recheck on seeds; resumable JSON lines
   summarize_search.py  summarize_search: plain-text summary of a search's records
-  stand_in_score.py    stand_in_score: the fit score on a smooth stand-in (no whole numbers, claims or collapse), per-universe settings, differentiable by Warp's tape
+  stand_in_score.py    stand_in_score: the fit score on a smooth stand-in (no whole numbers, moving cells or collapse), per-universe settings, differentiable by Warp's tape
   stand_in_search.py   stand_in_search: random search on the stand-in, many settings side by side in one GPU job
   gradient_fit.py      gradient_fit: Adam ascent of the stand-in score by tape gradients, several starts side by side
   compare_fits.py      compare_fits: gradient fit against random search, both checked on the real score

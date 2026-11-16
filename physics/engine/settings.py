@@ -25,7 +25,15 @@ never changed to make a result pass.
                    more packed box of the pair to the less packed (drift)
   clock_packing    quanta per box at which a local clock runs at half rate; 0 switches
                    local clocks off (side-by-side comparisons only)
-  claims_per_step  how many of the 64 claim phases (blocks 4 apart) run each step
+  corner_mobility  how fast a lattice corner moves under the pressure of the cells round
+                   it, in boxes per unit time per unit force (move_corners.py: each cell
+                   presses with -d(cell energy)/d(cell size), its energy box_energy.py's
+                   at its mean packing, and the pull draws energy volumes; no set size,
+                   no minimum)
+  max_corner_step  numerics, not a rule: the most a corner moves in one step, in boxes,
+                   so a box's covering cell changes only to a lattice neighbour
+  rehomes_per_step how many of the 27 rehome phases (boxes 3 apart, drain.py and
+                   hand_over.py) run each step; 27 checks every box every step
   max_turn         numerics, not a rule (owner 2026-11-16, decision E): the most the
                    phase difference across one same-sign face may turn in one fluid
                    substep, in radians; each step's fluid part is cut into as many equal
@@ -57,7 +65,9 @@ class Settings:
     friction: float = 1.0
     spread_share: float = 0.01
     clock_packing: float = 10000.0
-    claims_per_step: int = 1
+    corner_mobility: float = 2e-5
+    max_corner_step: float = 0.25
+    rehomes_per_step: int = 27
     max_turn: float = 0.25
     max_substeps: int = 64
 
@@ -66,7 +76,9 @@ class Settings:
             raise ValueError("light_speed * step_time must stay below 1 / sqrt(3)")
         if not 0.0 < self.seal_squeeze < self.collapse_squeeze:
             raise ValueError("the seal must come before the collapse: 0 < seal_squeeze < collapse_squeeze")
-        if not 0 <= self.claims_per_step <= 64:
-            raise ValueError("claims_per_step runs between 0 and 64 phases")
+        if not 0 <= self.rehomes_per_step <= 27:
+            raise ValueError("rehomes_per_step runs between 0 and 27 phases")
+        if self.corner_mobility < 0.0 or not 0.0 <= self.max_corner_step < 1.0:
+            raise ValueError("corner_mobility must be >= 0 and max_corner_step in 0 .. 1 box")
         if self.max_turn < 0.0 or not 1 <= self.max_substeps <= 1024:
             raise ValueError("max_turn must be >= 0 and max_substeps between 1 and 1024")

@@ -16,7 +16,7 @@ fitted on the fit set only, the expansion shape (slowing, then speeding up) and 
   2026-11-16's change used the counter. No dark-energy or base-push setting is ever searched.
 - **Fixed before a run**: ranges, score, run size and seeds. Change them only before a new
   search, and say so in its write-up. The start's seed is not fitted; its two unevennesses
-  (energy volumes, joints: `START_RANGES`, 0..0.6) are, by `fit_search` only. The stand-in
+  (energy volumes, joints: `START_RANGES`, 0..0.9) are, by `fit_search` only. The stand-in
   and gradient fit keep the default start.
 - **One GPU run at a time**: the search runs every universe in one process, one after another.
   Never start a second GPU job beside it.
@@ -26,7 +26,7 @@ fitted on the fit set only, the expansion shape (slowing, then speeding up) and 
 
 ## Gradient fit (`stand_in_score`, `gradient_fit`, `compare_fits`)
 
-- **Gradients go through a stand-in**, never the engine: whole quanta, claims and collapse
+- **Gradients go through a stand-in**, never the engine: whole quanta, moving cells and collapse
   have no gradient. The stand-in is the engine's fluid in float psi, every box keeping its
   kind; its quanta still cross plus-minus faces, which the engine replaced with its leak
   (`engine/leak.py`). Scored like `fit_run` without lumps, by the counter. A winner is

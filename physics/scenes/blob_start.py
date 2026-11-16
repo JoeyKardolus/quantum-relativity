@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from physics.engine import State, host_boxes, new_universe
+from physics.engine import State, host_boxes, lattice_of, new_universe
 
 BOX_QUANTA = 1000
 
@@ -48,4 +48,4 @@ def blob_start(cells_per_side: int, boxes_per_cell_side: int, blobs: list[dict],
         extra[inside] += per_box * BOX_QUANTA
         phase[inside] = (offsets @ np.asarray(blob.get("velocity", (0.0, 0.0, 0.0)), dtype=np.float64))[inside]
     quanta = quanta + np.sign(quanta) * np.rint(extra).astype(np.int64)
-    return State.from_host(quanta.astype(np.int32), phase, seed=1, device=device)
+    return State.from_host(quanta.astype(np.int32), phase, seed=1, device=device, lattice=lattice_of(even))

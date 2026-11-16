@@ -7,13 +7,13 @@ Contract: `stats(state, settings=None, universe=0)` copies that universe's boxes
   energy_drift      amount - the start's amount, in quanta (0: exact, bible rule 4);
                     relative_drift that over the start's amount
   plus_share        plus / amount (collapse is the one rule that turns minus into plus)
-  cells, joints     energy volumes and joint cells (cells.py: one shared joint between two volumes);
+  cells, joints     energy volumes and joint cells of the lattice (cells.py);
                     cell_count_growth their number over the start's (start["cells"], set
                     by new_universe; NaN when unknown)
   seam_faces, seam_pairs  faces where two joints meet and how many joint pairs meet (seams.py)
-  collapses, collapsed_quanta, spread, claims  joint boxes collapsed and the minus quanta
-                    they turned plus, quanta spread by drift and claims made since the
-                    start (state tallies)
+  collapses, collapsed_quanta, spread, rehomes  joint boxes collapsed and the minus quanta
+                    they turned plus, quanta spread by drift and boxes that changed
+                    cell since the start (state tallies)
   occupied          boxes holding space; occupied_growth occupied / the start's
   radius            root mean square distance of the occupied boxes from the cube's
                     centre, in boxes
@@ -23,7 +23,7 @@ Contract: `stats(state, settings=None, universe=0)` copies that universe's boxes
                     (settings.seal_squeeze: nothing passes)
   wrap_breaks       energy volumes with a box that has an empty box or a wall among its
                     26 neighbours (0 while every volume is fully wrapped; two volumes
-                    never touch, cells.py joins them)
+                    never touch: drain.py keeps them wrapped)
   web_pieces        face-connected pieces of all joint boxes together (1: one web)
   edge_share        share of the amount in the cube's outermost boxes (not ~0: the run
                     reached the closed walls and is no longer open space)
@@ -70,7 +70,7 @@ def stats(state: State, settings: Settings | None = None, universe: int = 0) -> 
     squeeze = np.abs(quanta[joint_boxes]) / settings.joint_rest - 1.0
     rate = 1.0 / (1.0 + np.abs(quanta[occupied]) / settings.clock_packing) if settings.clock_packing > 0 else \
         np.ones(int(occupied.sum()))
-    spread, collapsed, claims, collapsed_quanta = (int(value) for value in state.tallies.numpy()[universe])
+    spread, collapsed, rehomes, collapsed_quanta = (int(value) for value in state.tallies.numpy()[universe])
     lumps = _lumps(found, start)
     meeting = seams(found)
     return {
@@ -81,7 +81,7 @@ def stats(state: State, settings: Settings | None = None, universe: int = 0) -> 
         "cells": int(volumes.sum()), "joints": int((~volumes).sum()),
         "cell_count_growth": found["kind"].size / start["cells"] if start.get("cells") else float("nan"),
         "seam_faces": meeting["faces"], "seam_pairs": int(len(meeting["pairs"])),
-        "collapses": collapsed, "collapsed_quanta": collapsed_quanta, "spread": spread, "claims": claims,
+        "collapses": collapsed, "collapsed_quanta": collapsed_quanta, "spread": spread, "rehomes": rehomes,
         "occupied": int(occupied.sum()),
         "occupied_growth": float(occupied.sum() / start["boxes"]) if start["boxes"] else 0.0,
         "radius": float(np.sqrt((places ** 2).sum(axis=1).mean())) if places.size else 0.0,

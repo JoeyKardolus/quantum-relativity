@@ -5,8 +5,8 @@ push_steepness)` returns
   plus box   quanta * pull + volume_stiffness * quanta**2 / (2 volume_rest)
   minus box  push * joint_rest * (|quanta| / joint_rest) ** (push_steepness + 1) / (push_steepness + 1)
   empty box  0
-Its derivative by the quanta is box_potential.py. Claims (claim.py) take a box move only
-when it lowers the sum of this over the boxes it touches. A bookkeeping energy for moves,
+Its derivative by the quanta is box_potential.py. move_corners.py presses each cell with -d(size * this at its mean
+packing)/d(size), so the cells' sizes follow the same energy. A bookkeeping energy for moves,
 not the conserved amount: the conserved thing is the quanta themselves.
 """
 from __future__ import annotations

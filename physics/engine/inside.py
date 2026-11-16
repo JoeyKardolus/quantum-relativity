@@ -4,7 +4,7 @@ Contract: `inside(box, home, side)` is True when box is a box of universe `home`
 universes of a batch sit side by side along the first axis (universe u holds first
 indices u * side .. u * side + side - 1, state.py), so it checks home * side <= box[0] <
 (home + 1) * side and 0 <= box[1], box[2] < side. Outside a universe's cube there is no
-space: its walls are closed (no hop, no pull, no claim across them), and no rule ever
+space: its walls are closed (no hop, no pull, no owner change across them), and no rule ever
 reads a neighbouring universe. A box's own universe is its first index // side.
 """
 from __future__ import annotations

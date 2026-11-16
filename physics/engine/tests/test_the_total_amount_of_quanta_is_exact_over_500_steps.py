@@ -1,16 +1,17 @@
 """The amount of energy ignoring sign is exact, to the quantum, over 500 steps with every rule on.
 
 Bible rule 4: energy is the only countable thing, in whole quanta, and the total amount
-ignoring sign stays fixed. A brick start (seed 1, 5**3 cells of 8**3 boxes, 27 energy
-volumes of about +1000 quanta per box, joints -1000 per box, an empty margin of 8
-boxes) runs 500 steps of `step` with the default settings: pull wave, fluid hops with
-friction and drift spreading, claims, collapse, clocks. The sum of |quanta| is
-identical after every 100 steps, and no plus box has an empty box or a wall among its 26
-neighbours (every energy volume stays wrapped).
+ignoring sign stays fixed. A start of the forced cell lattice (new_universe, seed 1,
+5**3 cells of 8**3 boxes, 8 energy volumes of uneven plus quanta, joints -1000 per box,
+an empty margin of 8 boxes) runs 500 steps of `step` with the default settings: pull
+wave, moving cell corners, fluid hops, the leak with friction and drift spreading, boxes
+changing cell, collapse, clocks. The sum of |quanta| is identical after each of the
+first 100 steps and after every 100 steps after, and no plus box has an empty box or a
+wall among its 26 neighbours (every energy volume stays wrapped).
 """
 import numpy as np
 
-from physics.engine import Settings, State, brick_start, step, totals
+from physics.engine import Settings, new_universe, step, totals
 from physics.engine.tests._gpu import needs_gpu
 
 
@@ -27,17 +28,18 @@ def _unwrapped(quanta: np.ndarray) -> int:
 
 @needs_gpu
 def test_the_amount_ignoring_sign_holds_to_the_quantum_and_volumes_stay_wrapped():
-    quanta, phase = brick_start(5, 8, 8, seed=1)
-    state = State.from_host(quanta, phase, seed=1)
+    state = new_universe(5, 8, seed=1, margin=8)
     settings = Settings()
     start = totals(state)
     for count in range(500):
         step(state, settings)
+        if count < 100:
+            assert totals(state)["amount"] == start["amount"]
         if count % 100 == 99:
             now = totals(state)
-            spread, collapsed, claims, _ = state.tallies.numpy()[0]
+            spread, collapsed, rehomes, _ = state.tallies.numpy()[0]
             print(f"step {count + 1}: amount {now['amount']} (start {start['amount']}), plus {now['plus']}, "
                   f"minus {now['minus']}, boxes {now['boxes']}, spread {spread}, collapsed {collapsed}, "
-                  f"claims {claims}")
+                  f"boxes that changed cell {rehomes}")
             assert now["amount"] == start["amount"]
     assert _unwrapped(state.quanta.numpy()) == 0

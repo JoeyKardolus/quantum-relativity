@@ -1,7 +1,8 @@
 """State: the engine's boxes on the GPU, one signed whole number and one phase per Planck box, universes side by side.
 
-Contract: `State.from_host(quanta, phase, seed=1, device=None)` copies signed quanta and
-phases (radians) to the GPU and returns the state step() advances. `quanta` is a cube
+Contract: `State.from_host(quanta, phase, seed=1, device=None, lattice=None)` copies signed
+quanta and phases (radians) and the forced cell lattice to the GPU and returns the state
+step() advances. `quanta` is a cube
 (side, side, side) for one universe, or (universes, side, side, side) for a batch of
 universes stepped side by side in one GPU job (the harness, physics/bench); `phase`
 has the same shape. The universes of a batch lie stacked along the first axis, so every
@@ -18,15 +19,33 @@ next (inside.py), so each is its own closed box of space. Per box:
   pull       float32, the pull field (energy per plus quantum), spread at light speed
   pull_rate  float32, its time derivative (leapfrog, pull_wave.py)
   clock      float32, the proper time this box has lived (local clocks, tick_clocks.py)
-  marks      uint8, per step which rule changed the box's kind: 2 a claim, 1 a collapse
+  marks      uint8, per step which rule changed the box: 2 an owner change, 1 a collapse
              (step.py zeroes it; collapse.py also uses it for its two passes)
   tallies    int64 (universes, 4): per universe the quanta spread by drift, joint boxes
-             collapsed, claims made, minus quanta turned plus by collapse
+             collapsed, owner changes, minus quanta turned plus by collapse
   substeps   int32 (universes,): how many fluid substeps each universe takes this step
              (substeps.py; 1 until a step sets it), read by on_site, hop and leak
   capped     int64 numpy (universes,), on the host: steps that needed more substeps
              than settings.max_substeps and took only that many
-20 bytes and one uint8 per box. `seed` is an int (universe u gets seed + u) or one int
+  owner      int32, the cell of the forced cell lattice the box belongs to (an
+             extended-lattice id, cell_place.py; ring cells are empty space)
+  target     int32, the cell whose moving region covers the box's centre this step
+             (box_targets.py); the box moves to it only once its quanta flowed out
+The forced cell lattice (owner, 2026-11-16): `lattice` is None, or a dict of host
+arrays: "cells_per_side" n, "owner" (one box array, or one per universe) and "corners"
+(float (m + 1, m + 1, m + 1, 3), m = n + 2, or one per universe): the lattice vertices'
+positions in box units. A cell's kind is fixed by its lattice index (cell_kind.py), so
+every box's sign must match its owner's kind (ValueError otherwise). Per lattice:
+  corners      vec3 (universes * (m + 1), m + 1, m + 1), moved every step (move_corners.py)
+  cell_quanta  int64 (universes, m**3): each cell's whole quanta ignoring sign, counted
+             at the start of every step (move_corners.py)
+  cell_size    float32 (universes, m**3): each cell's volume in boxes from its corners,
+             measured with the count (move_corners.py; drain.py fills boxes up to the
+             cell's packing quanta / size)
+`cells_per_side` is n, or 0 without a lattice: then every box belongs to cell 0, no
+corner moves, no box changes owner and nothing leaks (hand-built starts for single
+rules: a pull, a wave, a whirl).
+28 bytes and one uint8 per box. `seed` is an int (universe u gets seed + u) or one int
 per universe; `seeds` keeps them and `keys` (int32, on the device) their hashes, which
 seed each universe's whole-number rounding (hop.py): a universe with seed s steps the
 same alone as side by side in a batch. `step` counts steps (the counter, not time).
@@ -43,6 +62,8 @@ from dataclasses import dataclass
 
 import numpy as np
 import warp as wp
+
+from physics.engine.lattice_kinds import lattice_kinds
 
 
 @dataclass
@@ -65,6 +86,12 @@ class State:
     ladder: object = None
     substeps: object = None
     capped: object = None
+    cells_per_side: int = 0
+    owner: object = None
+    target: object = None
+    corners: object = None
+    cell_quanta: object = None
+    cell_size: object = None
 
     @property
     def shape(self) -> tuple:
@@ -78,8 +105,9 @@ class State:
         return slice(index * self.side, (index + 1) * self.side)
 
     @classmethod
-    def from_host(cls, quanta: np.ndarray, phase: np.ndarray, seed=1, device: str | None = None) -> "State":
-        """Copy signed quanta and phases to the GPU; pull, clocks and tallies start at 0."""
+    def from_host(cls, quanta: np.ndarray, phase: np.ndarray, seed=1, device: str | None = None,
+                  lattice: dict | None = None) -> "State":
+        """Copy signed quanta, phases and the cell lattice to the GPU; pull, clocks and tallies start at 0."""
         quanta = np.asarray(quanta)
         phase = np.asarray(phase)
         if quanta.ndim == 3:
@@ -94,6 +122,7 @@ class State:
         seeds = _seeds(seed, universes)
         stacked = (universes * side, side, side)
         wrapped = _wrapped(phase).reshape(stacked)
+        cells_per_side, owner, corners = _lattice(lattice, quanta)
         keys = np.array([(value * 2654435761 + 12345) & 0x7FFFFFFF for value in seeds], dtype=np.int32)
         return cls(side=side, universes=universes,
                    quanta=wp.array(quanta.astype(np.int32).reshape(stacked), dtype=wp.int32, device=device),
@@ -106,7 +135,31 @@ class State:
                    seeds=seeds, keys=wp.array(keys, dtype=wp.int32, device=device),
                    start=tuple(_start(cube) for cube in quanta),
                    substeps=wp.array(np.ones(universes, dtype=np.int32), dtype=wp.int32, device=device),
-                   capped=np.zeros(universes, dtype=np.int64))
+                   capped=np.zeros(universes, dtype=np.int64), cells_per_side=cells_per_side,
+                   owner=wp.array(owner.reshape(stacked), dtype=wp.int32, device=device),
+                   target=wp.array(owner.reshape(stacked), dtype=wp.int32, device=device),
+                   corners=wp.array(corners.reshape((-1,) + corners.shape[2:]), dtype=wp.vec3, device=device),
+                   cell_quanta=wp.zeros((universes, max(cells_per_side + 2, 1) ** 3), dtype=wp.int64,
+                                        device=device),
+                   cell_size=wp.zeros((universes, max(cells_per_side + 2, 1) ** 3), dtype=wp.float32,
+                                      device=device))
+
+
+def _lattice(lattice: dict | None, quanta: np.ndarray) -> tuple:
+    """(cells_per_side, owner per box, corners per universe) as checked host arrays; cell 0 without a lattice."""
+    universes = quanta.shape[0]
+    if lattice is None:
+        return 0, np.zeros(quanta.shape, dtype=np.int32), np.zeros((universes, 1, 1, 1, 3), dtype=np.float32)
+    cells_per_side = int(lattice["cells_per_side"])
+    kinds = lattice_kinds(cells_per_side).ravel()
+    extent = cells_per_side + 3
+    owner = np.broadcast_to(np.asarray(lattice["owner"], dtype=np.int32), quanta.shape)
+    corners = np.broadcast_to(np.asarray(lattice["corners"], dtype=np.float32), (universes, extent, extent, extent, 3))
+    if owner.min() < 0 or owner.max() >= kinds.size:
+        raise ValueError(f"an owner lies outside the {kinds.size} cells of the lattice")
+    if not np.array_equal(kinds[owner], np.sign(quanta)):
+        raise ValueError("every box's sign must match its owner's kind (plus volume, minus joint, 0 ring)")
+    return cells_per_side, np.ascontiguousarray(owner), np.ascontiguousarray(corners)
 
 
 def _wrapped(phase: np.ndarray) -> np.ndarray:

@@ -56,7 +56,7 @@ from dataclasses import asdict
 import numpy as np
 
 from physics.measure import loop_circulation, whirl_strength
-from physics.engine import ENERGY_VOLUME, Settings, State, cells, host_boxes, new_universe, step
+from physics.engine import ENERGY_VOLUME, Settings, State, cells, host_boxes, lattice_of, new_universe, step
 from physics.scenes.spin import _enclosed_winding, _same_cell_windings, _whirl_phase
 from physics.scenes.wave_field import wave_field
 
@@ -80,7 +80,7 @@ def belt_trick(cells_per_side: int = 7, boxes_per_cell_side: int = 10, margin: i
     core[:WHIRL_AXIS] = np.floor(core[:WHIRL_AXIS]) + 0.5
     phase = np.broadcast_to(_whirl_phase(even.side, core, WHIRL_AXIS, turns), quanta.shape)
     rings = _rings(held, web_reach)
-    starts = {"tied": lambda: State.from_host(quanta, phase, seed=seed, device=device),
+    starts = {"tied": lambda: State.from_host(quanta, phase, seed=seed, device=device, lattice=lattice_of(even)),
               "untied": lambda: State.from_host(np.abs(quanta), phase, seed=seed, device=device)}
     runs = {}
     for web, start in starts.items():

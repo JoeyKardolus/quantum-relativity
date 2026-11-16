@@ -7,7 +7,7 @@ and writes each part to out_dir as JSON:
                  scored side by side on the stand-in (stand_in_search), with its wall time
   gradient.json  gradient_fit from `starts` points: the defaults' unit point and the first
                  starts - 1 of the same lattice, `iterations` Adam steps, with wall times
-  real.jsonl     the real fit score (fit_run: the engine itself, whole quanta, claims and
+  real.jsonl     the real fit score (fit_run: the engine itself, whole quanta, moving cells and
                  collapse, observers' clocks, 120 steps every 6) on every seed of `seeds`, for
                  the defaults and the `top` best points of each method by stand-in score
                  (gradient: each start's last point)

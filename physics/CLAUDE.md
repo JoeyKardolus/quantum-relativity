@@ -7,8 +7,8 @@ vertex, or merge for joint collapse).
 Seven packages. `engine/` is the engine: a fixed grid of Planck boxes on the GPU (Warp,
 CUDA), each holding one signed whole number of quanta (plus: an energy volume's box, minus:
 a joint's, 0: no space) and the fluid's phase; every rule reads only neighbours;
-universes run side by side; energy volumes, joints and seams are read off the signs
-(`engine/cells.py`, `engine/seams.py`), never stored. `ladder/` is the detail ladder the engine keeps
+universes run side by side; each box belongs to a cell of a forced, moving cell lattice
+(`engine/cells.py`, `engine/seams.py`). `ladder/` is the detail ladder the engine keeps
 beside its boxes once attached; `bench/` the side-by-side and size harness. `view/` is the
 only viewer, a pyglet window on the GPU. `scenes/` is the scorecard: each scene runs the
 engine and returns measured numbers, no verdict. `fit/` searches settings on the fit set
@@ -23,9 +23,9 @@ scenes share (dimension, whirl winding), CPU only.
   frictionless inside one sign; A leaks to A across exactly one joint (any thickness),
   with friction, less when squeezed, none past the seal; one shared joint between two
   neighbouring volumes, every A wrapped on all 26 sides, joints one web meeting at seams;
-  a box changes kind only by a claim (its quanta go to the old kind first) or collapse. The amount ignoring sign is exact to the quantum (bible rule 4). `engine/CLAUDE.md` says how.
+  cells a forced moving lattice; a box changes cell only once emptied, sign only by collapse. The amount ignoring sign is exact to the quantum (bible rule 4). `engine/CLAUDE.md` says how.
 - **Open space**: the start is a block of wrapped cells with uneven energy (ripples at every size,
-  `engine/uneven_field.py`) inside an empty margin; space grows as joints claim empty boxes.
+  `engine/uneven_field.py`) inside an empty margin; space grows as outer joints take empty boxes.
   Cells reaching the closed walls (`stats()["edge_share"]`) end open space; report it.
 - **Honesty.** Never tune a setting, seed or threshold until a result passes; report every
   number, seed, settings and miss.

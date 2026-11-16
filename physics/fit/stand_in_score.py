@@ -19,7 +19,7 @@ friction and drift spreading, on plus-minus faces. Here it differs from the engi
 which since 2026-11-16 moves no quanta across a plus-minus face and instead passes plus
 quanta between two plus boxes across one joint of any thickness (physics.engine.leak), so quanta
 change sign only in collapse. What it leaves out, because
-none of it has a gradient: the rounding to whole quanta, the claims (space does not
+none of it has a gradient: the rounding to whole quanta, the moving cells (space does not
 grow: every box keeps its kind) and the collapse (collapse_squeeze still acts through
 the seal). Empty boxes and the grid's walls hold pull 0 and pass nothing, as in the
 engine. Each array a pass writes is new, so the tape can run the run backwards. The
@@ -33,7 +33,7 @@ on (as physics.fit.fit_run): 0.5 E + 0.5 S with
   E  tanh(dip), dip = min(r1 - r2, r3 - r2) / mean |r| of the growth rate d ln R / dt in
      thirds of the run (np.array_split), R the rms radius of the plus quanta round the
      grid centre, t the counter (the real score times by the observers' local clocks and
-     the occupied radius, which cannot move without claims)
+     the occupied radius, which cannot move without moving cells)
   S  (Sc + St) / 2, Sc = tanh(ln contrast ratio), contrast sqrt(mean n^2 / mean n^2 - 1);
      St = tanh(ln growth of the large-scale variance (block means over blocks of `block`
      boxes from the occupied cube's corner) minus ln growth of the small-scale one (mean

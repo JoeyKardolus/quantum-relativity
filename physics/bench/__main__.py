@@ -12,12 +12,13 @@ by side in one State (3 cells a side of 10 boxes with a 1-box margin, a 32**3 gr
 seed 1 + universe index) and steps them with one step call; its size search uses
 new_universe's default margin (the filled cube's width) and reports energy volumes
 beside boxes. A size probe raises MemoryError before building when its boxes would take
-more than the GPU's free memory at 21 bytes a box (the engine's arrays), so no probe
+more than the GPU's free memory at 33 bytes a box (the engine's arrays: 29 kept, among
+them the cell owner and target, and collapse's 4 a step), so no probe
 spills into WSL's shared system memory. The cell engine (physics.potts) this replaced
 measured 22 universe-steps a second at 32**3 and 28.1 million boxes (64 energy volumes)
 at 1.78 steps a second (2026-11-16). With --ladder the engine's step also writes and
 switches the detail ladder kept beside its boxes (physics.engine.attach_ladder); the probe
-then budgets 30 bytes a box (the engine's 21, the 8 of the per-step block copy, about 1 of
+then budgets 42 bytes a box (the engine's 33, the 8 of the per-step block copy, about 1 of
 ladder rows) and reports, after the timed steps, the ladder's bytes a box at each level,
 in use and allocated, and its block counts (physics.ladder.memory_per_box) as "ladder".
 """
@@ -31,8 +32,8 @@ from physics.bench.largest_universe import largest_universe
 from physics.bench.new_quanta_batch import new_quanta_batch
 from physics.bench.throughput import throughput
 
-_ENGINE_BYTES_PER_BOX = 21
-_LADDER_BYTES_PER_BOX = 30
+_ENGINE_BYTES_PER_BOX = 33
+_LADDER_BYTES_PER_BOX = 42
 
 
 def _diffusion_throughput(count: int, side: int, steps: int) -> dict:

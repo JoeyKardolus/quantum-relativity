@@ -56,7 +56,7 @@ from dataclasses import asdict
 import numpy as np
 
 from physics.measure import loop_circulation, phase_winding, whirl_line, whirl_strength
-from physics.engine import ENERGY_VOLUME, JOINT, Settings, State, cells, host_boxes, new_universe
+from physics.engine import ENERGY_VOLUME, JOINT, Settings, State, cells, host_boxes, lattice_of, new_universe
 from physics.scenes.sampled_run import sampled_run
 from physics.scenes.wave_field import wave_field
 
@@ -79,7 +79,8 @@ def spin(cells_per_side: int = 8, boxes_per_cell_side: int = 6, turns: int = 1, 
             core[axis] = math.floor(core[axis]) + 0.5
     phase = _whirl_phase(even.side, core, whirl_axis, turns) + drift_sign * drift_speed * np.arange(even.side,
         dtype=np.float64).reshape([-1 if axis == drift_axis else 1 for axis in range(3)])
-    universe = State.from_host(quanta, np.broadcast_to(phase, quanta.shape), seed=1, device=device)
+    universe = State.from_host(quanta, np.broadcast_to(phase, quanta.shape), seed=1, device=device,
+                               lattice=lattice_of(even))
     tracker = _Tracker(core, whirl_axis, drift_axis, drift_sign, loop_half_width, track_reach)
     samples = sampled_run(universe, settings, steps, 1, tracker.measure)
     result = {"cells_per_side": cells_per_side, "boxes_per_cell_side": boxes_per_cell_side, "steps": steps,

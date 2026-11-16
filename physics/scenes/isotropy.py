@@ -61,7 +61,7 @@ from dataclasses import asdict
 
 import numpy as np
 
-from physics.engine import Settings, State, cells, host_boxes, new_universe, step
+from physics.engine import Settings, State, cells, host_boxes, lattice_of, new_universe, step
 from physics.scenes.blob_start import blob_start
 from physics.scenes.energy_centre import energy_centre
 from physics.scenes.wave_field import wave_field
@@ -189,7 +189,7 @@ def _pushed_start(cells_per_side, boxes_per_cell_side, push, unit, seed, device)
     taper = np.minimum(1.0, push["radius"] / np.maximum(distance, 1e-12))
     phase = push["speed"] * (offsets @ np.asarray(unit, dtype=np.float64)) * taper
     phase[quanta == 0] = 0.0
-    return State.from_host(quanta, phase, seed=seed, device=device)
+    return State.from_host(quanta, phase, seed=seed, device=device, lattice=lattice_of(even))
 
 
 def _lattice_momentum(field: np.ndarray, owner: np.ndarray) -> np.ndarray:

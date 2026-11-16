@@ -25,12 +25,12 @@ fit, and the largest universe that runs at least 1 step a second. Module map in 
 
 ## Measured (2026-11-16, RTX 5080, seed 1, defaults, 3 timed steps from the start)
 
-Largest at >= 1 step/s, cells of 10 boxes, margin the filled width (26/27 of the boxes
-empty): ladder off 30^3 cells, 739M boxes, 5.6 steps/s (31^3 does not fit); ladder on
-26^3, 482M boxes, 5.7 steps/s (27^3 does not fit the 30 B a box budget), the ladder 0.35
-B a box in use, every occupied block FULL (none quiet). Memory, not speed, now limits
-both: the engine's dense boxes stay beside the ladder. The cell engine: 28.1M boxes, 64
-volumes, 1.78 steps/s.
+Forced cell lattice, cells of 10 boxes, margin the filled width, budget 33 B a box
+(owner and target per box, collapse's scratch): ladder off 25^3 cells (1,728 energy
+volumes), 425M boxes, 6.2 steps/s; 26^3 does not fit. 17^3: 134M boxes, 19.0 steps/s.
+Memory, not speed, limits it. Before the lattice (21 B a box): 30^3 cells, 739M boxes,
+5.6 steps/s; ladder on 26^3, 482M boxes (not re-measured with the lattice). The cell
+engine (physics.potts): 28.1M boxes, 64 volumes, 1.78 steps/s.
 
 ## Run
 

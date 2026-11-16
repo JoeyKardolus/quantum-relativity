@@ -7,7 +7,13 @@ counted in cells there is exactly one joint between two energy volumes, counted 
 Planck boxes a joint is as thick as its energy makes it, and energy leaks from one
 energy volume to the next through exactly one joint cell. So a crossing is a straight
 line along `axis`: a plus box, one or more minus boxes (the joint, any thickness), a
-plus box (plus, minus ... minus, plus); an empty box or the wall breaks the line. One
+plus box (plus, minus ... minus, plus); an empty box or the wall breaks the line. Which
+joint a crossing passes is decided by the forced cell lattice, never guessed from the
+boxes (owner, 2026-11-16): a line is a crossing only when its two plus boxes belong to
+two face-neighbouring energy volumes and every minus box on it belongs to the one joint
+they share (shared_joint.py); any other line (through another joint, or between volumes
+that are not face neighbours) carries nothing. A state without a cell lattice
+(state.cells_per_side 0) leaks nothing. One
 thread walks each line of its universe and counts the crossings on it from the low
 end; it takes the crossings whose count has parity `group` (0 or 1), so the crossings
 of one pass share no box and the two groups cover them all. Each crossing takes one
@@ -39,6 +45,7 @@ from physics.engine.leak_openness import leak_openness
 from physics.engine.pair_rotation import pair_rotation
 from physics.engine.pass_seed import pass_seed
 from physics.engine.settings import Settings
+from physics.engine.shared_joint import shared_joint
 from physics.engine.state import State
 
 PI = 3.14159265358979
@@ -102,7 +109,8 @@ def _cross(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float3
 def _leak(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32), side: int, axis: int,
           group: int, duration: float, joint_rest: float, seal_squeeze: float, clock_packing: float,
           friction: float, spread_share: float, seed: int, keys: wp.array(dtype=wp.int32),
-          tallies: wp.array2d(dtype=wp.int64), counts: wp.array(dtype=wp.int32), sub_index: int):
+          tallies: wp.array2d(dtype=wp.int64), counts: wp.array(dtype=wp.int32), sub_index: int,
+          owner: wp.array3d(dtype=wp.int32), cells_per_side: int):
     home, first, second = wp.tid()
     count = counts[home]
     if sub_index >= count:
@@ -111,20 +119,28 @@ def _leak(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32
     last_plus = int(-1)
     joint_boxes = int(0)
     joint_quanta = float(0.0)
+    joint_cell = int(-1)
     crossings = int(0)
     for along in range(side):
         place = _place(home, side, axis, first, second, along)
         held = quanta[place[0], place[1], place[2]]
+        cell = owner[place[0], place[1], place[2]]
         if held == 0:
             last_plus = -1
             joint_boxes = 0
             joint_quanta = 0.0
         elif held < 0:
             if last_plus >= 0:
+                if joint_boxes == 0:
+                    joint_cell = cell
+                elif joint_cell != cell:
+                    joint_cell = -2
                 joint_boxes += 1
                 joint_quanta += float(-held)
         else:
-            if last_plus >= 0 and joint_boxes > 0:
+            near = _place(home, side, axis, first, second, wp.max(last_plus, 0))
+            shared = shared_joint(owner[near[0], near[1], near[2]], cell, cells_per_side)
+            if last_plus >= 0 and joint_boxes > 0 and shared >= 0 and joint_cell == shared:
                 if crossings % 2 == group:
                     _cross(quanta, phase, _place(home, side, axis, first, second, last_plus), place,
                            joint_quanta / float(joint_boxes), span, home, side, joint_rest, seal_squeeze,
@@ -137,9 +153,12 @@ def _leak(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32
 
 def leak(state: State, settings: Settings, axis: int, group: int, duration: float, pass_index: int,
          sub_index: int = 0) -> None:
-    """Move whole plus quanta between plus boxes across one joint along `axis`, the crossings of `group` (0 or 1)."""
+    """Move whole plus quanta between plus boxes across their shared joint along `axis`, the crossings of `group`."""
+    if state.cells_per_side == 0:
+        return
     seed = pass_seed(state.step, sub_index, pass_index)
     wp.launch(_leak, dim=(state.universes, state.side, state.side), device=state.quanta.device,
               inputs=[state.quanta, state.phase, state.side, int(axis), int(group), float(duration),
                       settings.joint_rest, settings.seal_squeeze, settings.clock_packing, settings.friction,
-                      settings.spread_share, int(seed), state.keys, state.tallies, state.substeps, int(sub_index)])
+                      settings.spread_share, int(seed), state.keys, state.tallies, state.substeps, int(sub_index),
+                      state.owner, state.cells_per_side])
