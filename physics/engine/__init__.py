@@ -36,11 +36,15 @@ Module map:
   cell_upload.py    cell_upload: the cell table on the GPU for the box kernels
   cell_room.py      cell_room: (Warp func) the share of a cell's size its boxes lack
   settle_counts.py  settle_counts: a phase's box-count changes applied at once, order-free
+  swing_table.py    swing_table: each volume's swinging joints in one fixed order, kept on the GPU
   joint_swing.py    joint_swing: joints' sizes swing like frictionless springs, energy kept
   pull_wave.py      pull_wave: the pull's wave equation, leapfrog, light speed, local clocks
   on_site.py        on_site: exact phase turns by the box potential on local clocks
   hop.py            hop: exact pair rotations moving whole quanta inside one cell
-  substeps.py       substeps: fluid substeps per universe from its steepest face in a cell
+  site_turn.py      site_turn (Warp func): one box's phase turned by its potential
+  hop_pair.py       hop_pair (Warp func): one exact pair rotation between two boxes of a cell
+  substeps.py       substeps: fluid substeps per cell from its own steepest face
+  later_substeps.py later_substeps: the substeps after the first, over the listed boxes only
   jiggle.py         jiggle: the fluid's own motion per quantum in each volume
   cross.py          cross: drift down the pull and diffusion through a joint, heat
   quantum_store.py  quantum_store: the moving energies tracked whole and how they ended (axiom 7)
@@ -88,11 +92,15 @@ from physics.engine.cell_laws import cell_laws
 from physics.engine.cell_upload import cell_upload
 from physics.engine.cell_room import cell_room
 from physics.engine.settle_counts import settle_counts
+from physics.engine.swing_table import swing_table
 from physics.engine.joint_swing import joint_swing
 from physics.engine.pull_wave import pull_wave
+from physics.engine.site_turn import site_turn
+from physics.engine.hop_pair import hop_pair
 from physics.engine.on_site import on_site
 from physics.engine.hop import hop
 from physics.engine.substeps import substeps
+from physics.engine.later_substeps import later_substeps
 from physics.engine.cross import cross
 from physics.engine.jiggle import jiggle
 from physics.engine.quantum_store import quantum_store
@@ -124,8 +132,8 @@ from physics.engine.stats import stats
 from physics.engine.view_source import view_source
 
 __all__ = ["Settings", "State", "uneven_field", "new_universe", "reach", "face_step", "near", "clock_rate",
-           "pass_seed", "pair_rotation", "box_potential", "fluid_potential", "cell_count", "cell_laws", "cell_upload", "cell_room", "settle_counts", "joint_swing",
-           "pull_wave", "on_site", "hop", "substeps", "jiggle", "cross", "quantum_store", "quantum_packet", "quantum_joints", "quantum_move", "quantum_hand",
+           "pass_seed", "pair_rotation", "box_potential", "fluid_potential", "cell_count", "cell_laws", "cell_upload", "cell_room", "settle_counts", "swing_table", "joint_swing",
+           "pull_wave", "site_turn", "hop_pair", "on_site", "hop", "substeps", "later_substeps", "jiggle", "cross", "quantum_store", "quantum_packet", "quantum_joints", "quantum_move", "quantum_hand",
            "quantum_settle", "quantum_react", "quantum", "exchange", "mortar_shift", "group_label", "one_group", "block_adjacency",
            "collapse", "volume_split", "wall_press", "tick_clocks", "totals", "attach_ladder", "ladder_sync", "step",
            "host_boxes", "lattice_of", "ENERGY_VOLUME", "JOINT", "cells", "seams", "stats", "view_source"]

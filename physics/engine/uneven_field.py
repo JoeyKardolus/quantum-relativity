@@ -29,14 +29,19 @@ def uneven_field(side: int, seed, slope: float, unevenness: float) -> np.ndarray
         raise ValueError(f"unevenness must be finite and >= 0, got {unevenness}")
     noise = np.random.default_rng(seed).standard_normal((side, side, side))
     modes = np.fft.rfftn(noise)
+    del noise
     full = np.fft.fftfreq(side) * side
     half = np.fft.rfftfreq(side) * side
     wavenumber = np.sqrt(full[:, None, None] ** 2 + full[None, :, None] ** 2 + half[None, None, :] ** 2)
     wavenumber[0, 0, 0] = 1.0
-    modes *= wavenumber ** (slope / 2.0)
+    np.power(wavenumber, slope / 2.0, out=wavenumber)
+    modes *= wavenumber
+    del wavenumber
     modes[0, 0, 0] = 0.0
-    field = np.fft.irfftn(modes, s=noise.shape, axes=(0, 1, 2))
+    field = np.fft.irfftn(modes, s=(side, side, side), axes=(0, 1, 2))
+    del modes
     spread = float(np.sqrt(np.mean(field ** 2)))
     if spread == 0.0:
         return field
-    return field * (unevenness / spread)
+    field *= unevenness / spread
+    return field

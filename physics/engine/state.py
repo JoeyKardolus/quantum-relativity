@@ -55,10 +55,13 @@ volumes it touches) or a dict, or one dict per universe, with "owner" (the box a
 match its owner's kind (ValueError otherwise). `seed` is an int (universe u gets seed +
 u) or one int per universe; `keys` hash them for the rounding (a universe steps the same
 alone as side by side). `start` holds per universe the start's amounts and boxes.
-`ladder` is None or the detail ladder's store (ladder_sync.py); `quantum` is None or the
-moving energies tracked whole (quantum_store.py). Raises ValueError on a
+`substeps` and `later` are the fluid's substep plan per cell (substeps.py). `ladder` is
+None or the detail ladder's store (ladder_sync.py); `quantum` is None or the moving
+energies tracked whole (quantum_store.py); `swing` is None or the joint swing's table of
+each volume's joints (swing_table.py). Raises ValueError on a
 non-cubic or mismatched start, a seed count that is not one per universe, a box of 2**30
-quanta or more, or an odd side with wrap.
+quanta or more, or an odd side with wrap. `State.from_device(quanta, owner, graphs, seed,
+wrap)` builds the same state round boxes that are already on the GPU.
 """
 from __future__ import annotations
 
@@ -101,6 +104,7 @@ class State:
     step: int = 0
     ladder: object = None
     substeps: object = None
+    later: object = None
     capped: object = None
     splits: object = None
     torn: object = None
@@ -113,6 +117,7 @@ class State:
     crossed: object = None
     device: object = None
     quantum: object = None
+    swing: object = None
     cells_d: dict = field(default_factory=dict)
 
     @property
@@ -160,6 +165,7 @@ class State:
         self.place = widen(self.place, -1)
         for name in ("size", "speed", "cell_clock"):
             setattr(self, name, widen(getattr(self, name), 0.0))
+        self.substeps = wp.ones(self.kind.shape, dtype=wp.int32, device=self.quanta.device)
         self.cells_d = {}
 
     @classmethod
@@ -203,13 +209,73 @@ class State:
                     speed=_table(graphs, "speed", capacity, 0.0, np.float64),
                     cell_clock=_table(graphs, "cell_clock", capacity, 0.0, np.float64),
                     start=tuple(_start(cube) for cube in quanta),
-                    substeps=wp.array(np.ones(universes, dtype=np.int32), dtype=wp.int32, device=device),
+                    substeps=wp.ones((universes, capacity), dtype=wp.int32, device=device),
                     capped=np.zeros(universes, dtype=np.int64), splits=np.zeros(universes, dtype=np.int64),
                     torn=np.zeros(universes, dtype=np.int64), collapses=np.zeros(universes, dtype=np.int64),
                     device=device)
         for index, graph in enumerate(graphs):
             state.start[index]["cells"] = int((graph["kind"] != 0).sum())
         return state
+
+
+    @classmethod
+    def from_device(cls, quanta, owner, graphs: list, seed=1, wrap: bool = False) -> "State":
+        """A state round boxes already on the GPU (new_universe.py): no box is copied to the host.
+
+        `quanta` and `owner` are Warp int32 arrays (universes * side, side, side), kept, not
+        copied; `graphs` holds one dict per universe with "kind", "between", "place" and
+        "size_energy" per cell id (and optionally "size", "speed", "cell_clock", else 0),
+        which the caller vouches match the boxes. Phase, pull, clocks and tallies start at 0.
+        """
+        universes = len(graphs)
+        side = int(quanta.shape[1])
+        device = quanta.device
+        if wrap and side % 2:
+            raise ValueError("a universe that wraps round needs an even side")
+        seeds = _seeds(seed, universes)
+        for graph in graphs:
+            for name in ("size", "speed", "cell_clock"):
+                graph.setdefault(name, np.zeros(graph["kind"].size))
+        capacity = max(graph["kind"].size for graph in graphs) + _HEADROOM
+        stacked = (universes * side, side, side)
+        keys = np.array([(value * 2654435761 + 12345) & 0x7FFFFFFF for value in seeds], dtype=np.int32)
+        sums = wp.zeros((universes, 4), dtype=wp.int64, device=device)
+        wp.launch(_start_count, dim=stacked, device=device, inputs=[quanta, side, sums])
+        start = tuple({"amount": int(row[0] + row[1]), "plus": int(row[0]), "minus": int(row[1]),
+                       "boxes": int(row[2] + row[3]), "plus_boxes": int(row[2]),
+                       "cells": int((graph["kind"] != 0).sum())} for row, graph in zip(sums.numpy(), graphs))
+        return cls(side=side, universes=universes, wrap=bool(wrap), quanta=quanta,
+                   phase=wp.zeros(stacked, dtype=wp.float32, device=device),
+                   pull=wp.zeros(stacked, dtype=wp.float32, device=device),
+                   pull_rate=wp.zeros(stacked, dtype=wp.float32, device=device),
+                   clock=wp.zeros(stacked, dtype=wp.float32, device=device), owner=owner,
+                   marks=wp.zeros(stacked, dtype=wp.uint8, device=device),
+                   tallies=wp.zeros((universes, 4), dtype=wp.int64, device=device),
+                   seeds=seeds, keys=wp.array(keys, dtype=wp.int32, device=device),
+                   kind=_table(graphs, "kind", capacity, 0, np.int8),
+                   between=_table(graphs, "between", capacity, -1, np.int32),
+                   place=_table(graphs, "place", capacity, -1, np.int32),
+                   size_energy=np.stack([graph["size_energy"] for graph in graphs]),
+                   size=_table(graphs, "size", capacity, 0.0, np.float64),
+                   speed=_table(graphs, "speed", capacity, 0.0, np.float64),
+                   cell_clock=_table(graphs, "cell_clock", capacity, 0.0, np.float64), start=start,
+                   substeps=wp.ones((universes, capacity), dtype=wp.int32, device=device),
+                   capped=np.zeros(universes, dtype=np.int64), splits=np.zeros(universes, dtype=np.int64),
+                   torn=np.zeros(universes, dtype=np.int64), collapses=np.zeros(universes, dtype=np.int64),
+                   device=device)
+
+
+@wp.kernel
+def _start_count(quanta: wp.array3d(dtype=wp.int32), side: int, sums: wp.array2d(dtype=wp.int64)):
+    ti, tj, tk = wp.tid()
+    amount = quanta[ti, tj, tk]
+    home = ti // side
+    if amount > 0:
+        wp.atomic_add(sums, home, 0, wp.int64(amount))
+        wp.atomic_add(sums, home, 2, wp.int64(1))
+    elif amount < 0:
+        wp.atomic_add(sums, home, 1, wp.int64(-amount))
+        wp.atomic_add(sums, home, 3, wp.int64(1))
 
 
 def _one(lattice, index: int):

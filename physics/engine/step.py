@@ -10,8 +10,10 @@ every part runs on the local clock of the cell it acts in (owner, 2026-11-16):
                    each universe tears in two (volume_split.py); the cells are counted
                    again when either happened
   3. pull_wave     the pull moves one leapfrog step at light speed (pull_wave.py)
-  4. fluid         cut into equal substeps per universe, as many as its steepest face
-                   inside a cell needs (substeps.py; numerics), each a Strang splitting:
+  4. fluid         cut into equal substeps per cell, as many as the cell's own steepest
+                   face needs (substeps.py; numerics; the substeps after the first run
+                   only over the boxes of the cells that need them, later_substeps.py),
+                   each a Strang splitting:
                    on_site for half a step, the hops along x, y, z (parity 0 then 1) for
                    half a step each, the hops in reverse order, on_site for half a step
                    (on_site.py, hop.py: whole quanta inside one cell, frictionless)
@@ -46,6 +48,7 @@ from physics.engine.cross import cross
 from physics.engine.exchange import exchange
 from physics.engine.hop import hop
 from physics.engine.joint_swing import joint_swing
+from physics.engine.later_substeps import later_substeps
 from physics.engine.ladder_sync import ladder_sync
 from physics.engine.mortar_shift import mortar_shift
 from physics.engine.on_site import on_site
@@ -72,8 +75,10 @@ def step(state: State, settings: Settings) -> None:
     cell_upload(state)
     pull_wave(state, settings)
     half = 0.5 * settings.step_time
-    for sub_index in range(int(substeps(state, settings).max())):
+    substeps(state, settings)
+    for sub_index in range(state.later["dense"]):
         _fluid(state, settings, half, sub_index)
+    later_substeps(state, settings, half)
     cross(state, settings, squeeze, pull)
     quantum(state, settings, pull)
     pull = cell_count(state)
@@ -91,7 +96,7 @@ def step(state: State, settings: Settings) -> None:
 
 
 def _fluid(state: State, settings: Settings, half: float, sub_index: int) -> None:
-    """One fluid substep, Strang split; each kernel divides `half` by its universe's substep count."""
+    """One fluid substep over all boxes, Strang split; each kernel divides `half` by the cell's own substep count."""
     on_site(state, settings, half, sub_index)
     for pass_index, (axis, parity) in enumerate(_ORDER):
         hop(state, settings, axis, parity, half, pass_index, sub_index)

@@ -47,7 +47,11 @@ its fluid, which has its own pressure (fluid_potential.py), starts flowing at on
 presses its joints unevenly (wall_press.py; axiom 1, owner 2026-11-16: energy is always
 moving). Raises ValueError when boxes_per_cell_side ** 3 is below
 Settings().least_cell_boxes (a cell too small to hold a whirl). With universes > 1 the
-batch holds that many universes, universe u built from seed + u. Raises ValueError for cells_per_side < 3, k < 2, a negative margin, box_quanta
+batch holds that many universes, universe u built from seed + u. Only the uneven field
+and the per-cell tables are made on the host; every per-box step runs on the GPU
+(_start.py; 2026-11-17, before which a start of 18 million boxes took 128 s and tens of
+bytes of host memory a box), with the same operations in the same order, so a seed
+gives the same universe as before, to the last quantum. Raises ValueError for cells_per_side < 3, k < 2, a negative margin, box_quanta
 < 1, a negative joint_unevenness and the uneven field's errors (filled side under 8).
 """
 from __future__ import annotations
@@ -57,6 +61,7 @@ import itertools
 import numpy as np
 import warp as wp
 
+from physics.engine._start import OUTER, PLUS, cell_ids, face_partner, fill_cells, held_boxes
 from physics.engine.cell_count import cell_count
 from physics.engine.cell_laws import cell_laws
 from physics.engine.settings import Settings
@@ -70,13 +75,14 @@ _NONE = 2147483647
 
 @wp.kernel
 def _assign(centres: wp.array(dtype=wp.vec3), weights: wp.array(dtype=wp.float32), count: int, period: float,
-            origin: float, filled: int, wrap: int, owner: wp.array3d(dtype=wp.int32)):
+            origin: float, filled: int, wrap: int, far: int, owner: wp.array3d(dtype=wp.int32)):
     ti, tj, tk = wp.tid()
     here = wp.vec3(float(ti), float(tj), float(tk))
     best = float(1.0e30)
     chosen = int(-1)
-    for index in range(125):
-        offset = wp.vec3i(index // 25 - 2, index // 5 % 5 - 2, index % 5 - 2)
+    width = 2 * far + 1
+    for index in range(width * width * width):
+        offset = wp.vec3i(index // (width * width) - far, index // width % width - far, index % width - far)
         grid = wp.vec3i(0, 0, 0)
         valid = True
         for axis in range(3):
@@ -157,38 +163,69 @@ def new_universe(cells_per_side: int = 16, boxes_per_cell_side: int = 10, seed: 
     count = cells_per_side // 2 if wrap else (cells_per_side - 1) // 2
     filled = count * period + (0 if wrap else 1)
     side = filled if margin == 0 else -(-(filled + 2 * margin) // 8) * 8
-    low = (side - filled) // 2
-    origin = (0.0 if wrap else 1.0) + 0.5 * (boxes_per_cell_side - 1)
-    extent = cells_per_side + 2
-    grid = np.array(list(itertools.product(range(count), repeat=3)))
-    lattice_ids = ((2 + 2 * grid[:, 0]) * extent + 2 + 2 * grid[:, 1]) * extent + 2 + 2 * grid[:, 2]
-    quanta = np.zeros((universes, side, side, side), dtype=np.int32)
+    lattice = {"count": count, "period": period, "filled": filled, "wrap": wrap, "low": (side - filled) // 2,
+               "origin": (0.0 if wrap else 1.0) + 0.5 * (boxes_per_cell_side - 1), "extent": cells_per_side + 2,
+               "cells_per_side": cells_per_side, "boxes": boxes_per_cell_side}
+    stacked = (universes * side, side, side)
+    quanta = wp.zeros(stacked, dtype=wp.int32, device=device)
+    owner = wp.full(stacked, -1, dtype=wp.int32, device=device)
     graphs = []
     for number in range(universes):
-        raw = np.exp(uneven_field(filled, seed + number, slope, unevenness))
-        field = box_quanta * raw / raw.mean()
+        field = uneven_field(filled, seed + number, slope, unevenness)
+        np.exp(field, out=field)
+        mean = field.mean()
+        field *= box_quanta
+        field /= mean
         energy = _block_energy(field, count, period, boxes_per_cell_side, wrap)
+        field_d = wp.array(field, dtype=wp.float64, device=device)
+        del field
         wanted = (count * boxes_per_cell_side) ** 3 * energy ** -3.0 / (energy ** -3.0).sum()
-        volume_of, partner = _diagram(wanted, count, period, origin, filled, wrap, device)
-        partner = _face_partner(volume_of, partner, grid, count, period, origin, filled, wrap)
-        energy = _settled(energy, np.bincount(volume_of[partner == -2], minlength=energy.size))
-        graph, owner = _graph(volume_of, partner, lattice_ids, grid, count, extent, cells_per_side, wrap)
-        inner = (slice(low, low + filled),) * 3
-        quanta[number][inner] = _fill(owner, graph["kind"], field, volume_of, partner, energy, box_quanta,
-                                      joint_unevenness, (seed + number, 1))
-        full = np.full((side,) * 3, -1, dtype=np.int32)
-        full[inner] = owner
-        graph["owner"] = full
-        held = np.bincount(volume_of[partner == -2], minlength=energy.size).astype(np.float64)
-        graph["size_energy"] = np.array([float(np.cbrt(held.sum() / (energy ** -3.0).sum())),
-                                         _joint_constant(quanta[number], full, graph["kind"])])
-        graphs.append(graph)
-    state = State.from_host(quanta, np.zeros(quanta.shape, dtype=np.float32), seed=seed, device=device,
-                            lattice=graphs, wrap=wrap)
+        graphs.append(_one_universe(lattice, wanted, energy, field_d, box_quanta, joint_unevenness, (seed + number, 1),
+                                    number * side, owner, quanta))
+        del field_d
+    state = State.from_device(quanta, owner, graphs, seed=seed, wrap=wrap)
     cell_count(state)
     cell_laws(state, Settings())
     state.size = np.where(state.kind == -1, state.wanted, state.size)
     return state
+
+
+def _one_universe(lattice: dict, wanted: np.ndarray, energy: np.ndarray, field, box_quanta: int,
+                  joint_unevenness: float, rng_seed, first: int, owner, quanta) -> dict:
+    """Cut, carve and fill one universe's boxes on the GPU; returns its cell graph (kind, between, place, size_energy)."""
+    device = owner.device
+    count, filled, wrap = lattice["count"], lattice["filled"], int(lattice["wrap"])
+    raw, partner = _diagram(wanted, lattice, device)
+    outer = wp.zeros(count ** 3, dtype=wp.int32, device=device)
+    wp.launch(face_partner, dim=(filled,) * 3, device=device,
+              inputs=[raw, count, wp.float64(lattice["period"]), wp.float64(lattice["origin"]), filled, wrap, partner,
+                      outer])
+    graph, lattice_ids, outer_id = _tables(lattice, outer.numpy() > 0)
+    cells = graph["kind"].size
+    boxes = wp.zeros(cells, dtype=wp.int32, device=device)
+    spans = wp.array(np.tile(np.array([filled, -1, filled, -1], dtype=np.int32), (cells, 3)), dtype=wp.int32,
+                     device=device)
+    wp.launch(cell_ids, dim=(filled,) * 3, device=device,
+              inputs=[raw, partner, count, lattice["extent"], lattice["cells_per_side"], filled, wrap,
+                      wp.array(outer_id, dtype=wp.int32, device=device), first, lattice["low"], owner, boxes, spans])
+    del raw, partner
+    held = boxes.numpy().astype(np.float64)
+    _joints_from(graph, lattice, held)
+    energy = _settled(energy, held[lattice_ids].astype(np.int64))
+    totals = np.zeros(cells)
+    totals[lattice_ids] = energy
+    joints = np.flatnonzero(graph["kind"] == -1)
+    totals[joints] = _joint_amounts(held[joints], box_quanta, joint_unevenness, rng_seed)
+    wp.launch(fill_cells, dim=cells, device=device,
+              inputs=[wp.array(graph["kind"].astype(np.int32), dtype=wp.int32, device=device),
+                      wp.array(totals, dtype=wp.float64, device=device), spans, filled, wrap, first, lattice["low"],
+                      owner, field, quanta])
+    graph["size"] = held
+    lasting = joints[totals[joints] > 0]
+    graph["size_energy"] = np.array([
+        float(np.cbrt(held[lattice_ids].sum() / (energy ** -3.0).sum())),
+        float(np.cbrt(held[lasting].sum() / (totals[lasting] ** -3.0).sum()))])
+    return graph
 
 
 def _block_energy(field: np.ndarray, count: int, period: int, boxes: int, wrap: bool) -> np.ndarray:
@@ -211,146 +248,81 @@ def _settled(energy: np.ndarray, held: np.ndarray) -> np.ndarray:
     return whole
 
 
-def _diagram(wanted: np.ndarray, count: int, period: int, origin: float, filled: int, wrap: bool, device) -> tuple:
-    """The power diagram's volume per box and each box's carve partner (-2 a plus box), weights fitted to the wanted sizes."""
-    axis = np.arange(count) * period + origin
+def _diagram(wanted: np.ndarray, lattice: dict, device) -> tuple:
+    """The power diagram's volume per box and each box's carve partner (PLUS a plus box), weights fitted to the wanted sizes.
+
+    A volume two lattice places off can only take a box from one a place nearer when its
+    weight is more than 2 * period**2 higher, so while the weights lie closer together
+    than that the 27 nearest places are searched, not 125: the same diagram.
+    """
+    count, period, filled = lattice["count"], lattice["period"], lattice["filled"]
+    axis = np.arange(count) * period + lattice["origin"]
     centres = np.stack(np.meshgrid(axis, axis, axis, indexing="ij"), axis=-1).reshape(-1, 3).astype(np.float32)
     weights = np.zeros(len(wanted))
     centre_array = wp.array(centres, dtype=wp.vec3, device=device)
     raw = wp.zeros((filled,) * 3, dtype=wp.int32, device=device)
     partner = wp.zeros((filled,) * 3, dtype=wp.int32, device=device)
+    counted = wp.zeros(len(wanted), dtype=wp.int32, device=device)
     for _ in range(_ROUNDS):
+        near_enough = count >= 6 and float(np.ptp(weights.astype(np.float32))) < 2.0 * period * period - 1.0
         wp.launch(_assign, dim=(filled,) * 3, device=device,
                   inputs=[centre_array, wp.array(weights.astype(np.float32), dtype=wp.float32, device=device), count,
-                          float(period), float(origin), filled, int(wrap), raw])
-        wp.launch(_carve, dim=(filled,) * 3, device=device, inputs=[raw, filled, int(wrap), partner])
-        volume_of, sides = raw.numpy(), partner.numpy()
-        held = np.bincount(volume_of[sides == -2], minlength=len(wanted)).astype(np.float64)
+                          float(period), float(lattice["origin"]), filled, int(lattice["wrap"]),
+                          1 if near_enough else 2, raw])
+        wp.launch(_carve, dim=(filled,) * 3, device=device, inputs=[raw, filled, int(lattice["wrap"]), partner])
+        counted.zero_()
+        wp.launch(held_boxes, dim=(filled,) * 3, device=device, inputs=[raw, partner, counted])
+        held = counted.numpy().astype(np.float64)
         if np.all(np.abs(held - wanted) <= _CLOSE * wanted):
             break
         weights += 0.4 * (np.cbrt(wanted) ** 2 - np.cbrt(np.maximum(held, 1.0)) ** 2)
-    return volume_of, sides
+    return raw, partner
 
 
-def _face_partner(volume_of: np.ndarray, partner: np.ndarray, grid: np.ndarray, count: int, period: int,
-                  origin: float, filled: int, wrap: bool) -> np.ndarray:
-    """Each joint box's partner made a lattice face neighbour of its volume: the nearest one when the lowest volume beside it is not."""
-    carved = partner >= 0
-    own = volume_of[carved]
-    lower = partner[carved]
-    apart = grid[lower] - grid[own]
-    if wrap and count > 2:
-        apart = (apart + count // 2) % count - count // 2
-    face = np.abs(apart).sum(axis=1) == 1
-    places = np.argwhere(carved)[~face].astype(np.float64)
-    own_far = own[~face]
-    best = np.full(own_far.size, -1, dtype=np.int64)
-    nearest = np.full(own_far.size, np.inf)
-    for axis in range(3):
-        for step in (-1, 1):
-            neighbour = grid[own_far].copy()
-            neighbour[:, axis] += step
-            if wrap:
-                neighbour %= count
-            valid = (neighbour >= 0).all(axis=1) & (neighbour < count).all(axis=1)
-            index = (neighbour[:, 0] * count + neighbour[:, 1]) * count + neighbour[:, 2]
-            gap = places - (np.clip(neighbour, 0, count - 1) * period + origin)
-            if wrap:
-                gap -= filled * np.round(gap / filled)
-            distance = np.where(valid, (gap ** 2).sum(axis=1), np.inf)
-            closer = distance < nearest
-            nearest[closer] = distance[closer]
-            best[closer] = index[closer]
-    lower = lower.copy()
-    lower[~face] = best
-    fixed = partner.copy()
-    fixed[carved] = lower
-    return fixed
+def _tables(lattice: dict, has_outer: np.ndarray) -> tuple:
+    """The cell table before its joints are known: volumes at their lattice ids, outer joints after all lattice ids.
 
-
-def _graph(volume_of: np.ndarray, partner: np.ndarray, lattice_ids: np.ndarray, grid: np.ndarray, count: int,
-           extent: int, cells_per_side: int, wrap: bool) -> tuple:
-    """Kind, between and place per cell id, and the owner of every filled box."""
-    plus = partner == -2
-    pairs = np.stack([volume_of[~plus], partner[~plus]], axis=1)
-    unique, inverse = np.unique(pairs, axis=0, return_inverse=True)
-    lattice_count = extent ** 3
-    joint_ids = np.zeros(len(unique), dtype=np.int64)
-    extra = lattice_count
-    for row, (one, two) in enumerate(unique):
-        place = _between_place(grid, one, two, count, cells_per_side, wrap) if two >= 0 else None
-        if place is None:
-            joint_ids[row] = extra
-            extra += 1
-        else:
-            joint_ids[row] = (place[0] * extent + place[1]) * extent + place[2]
-    kind = np.zeros(extra, dtype=np.int8)
-    between = np.full((extra, 2), -1, dtype=np.int32)
-    places = np.full((extra, 3), -1, dtype=np.int32)
+    Returns (graph, each volume's lattice id, each volume's outer joint id or -1).
+    """
+    count, extent = lattice["count"], lattice["extent"]
+    grid = np.array(list(itertools.product(range(count), repeat=3)))
+    lattice_ids = ((2 + 2 * grid[:, 0]) * extent + 2 + 2 * grid[:, 1]) * extent + 2 + 2 * grid[:, 2]
+    with_outer = np.flatnonzero(has_outer)
+    cells = extent ** 3 + with_outer.size
+    outer_id = np.full(count ** 3, -1, dtype=np.int32)
+    outer_id[with_outer] = extent ** 3 + np.arange(with_outer.size)
+    kind = np.zeros(cells, dtype=np.int8)
+    between = np.full((cells, 2), -1, dtype=np.int32)
+    places = np.full((cells, 3), -1, dtype=np.int32)
     kind[lattice_ids] = 1
     places[lattice_ids] = 2 + 2 * grid
-    for row, (one, two) in enumerate(unique):
-        cell = joint_ids[row]
-        kind[cell] = -1
-        ends = sorted([int(lattice_ids[one])] + ([int(lattice_ids[two])] if two >= 0 else []))
-        between[cell, :len(ends)] = ends
-        if cell < lattice_count:
-            places[cell] = np.unravel_index(cell, (extent,) * 3)
-    owner = np.where(plus, lattice_ids[volume_of], 0).astype(np.int32)
-    owner[~plus] = joint_ids[inverse.ravel()]
-    return {"kind": kind, "between": between, "place": places}, owner
+    kind[outer_id[with_outer]] = -1
+    between[outer_id[with_outer], 0] = lattice_ids[with_outer]
+    return {"kind": kind, "between": between, "place": places}, lattice_ids, outer_id
 
 
-def _between_place(grid: np.ndarray, one: int, two: int, count: int, cells_per_side: int, wrap: bool):
-    """The lattice place halfway between two volumes that are face neighbours on the lattice, else None."""
-    apart = grid[two] - grid[one]
-    if wrap and count > 2:
-        apart = (apart + count // 2) % count - count // 2
-    if np.abs(apart).sum() != 1:
-        return None
-    place = 2 + 2 * grid[one] + apart
-    if wrap:
-        place = (place - 1) % cells_per_side + 1
-    return place
+def _joints_from(graph: dict, lattice: dict, held: np.ndarray) -> None:
+    """Enter every joint that got boxes at a lattice place between two volumes: its kind, its two volumes, its place."""
+    extent, cells_per_side = lattice["extent"], lattice["cells_per_side"]
+    lattice_count = extent ** 3
+    cells = np.flatnonzero((held[:lattice_count] > 0) & (graph["kind"][:lattice_count] == 0))
+    place = np.stack(np.unravel_index(cells, (extent,) * 3), axis=1)
+    odd = place % 2 == 1
+    ends = []
+    for way in (-1, 1):
+        end = place + way * odd
+        if lattice["wrap"]:
+            end = (end - 1) % cells_per_side + 1
+        ends.append((end[:, 0] * extent + end[:, 1]) * extent + end[:, 2])
+    graph["kind"][cells] = -1
+    graph["between"][cells] = np.sort(np.stack(ends, axis=1), axis=1)
+    graph["place"][cells] = place
 
 
-def _fill(owner: np.ndarray, kind: np.ndarray, field: np.ndarray, volume_of: np.ndarray, partner: np.ndarray,
-          energy: np.ndarray, box_quanta: int, joint_unevenness: float, rng_seed) -> np.ndarray:
-    """Signed whole quanta per filled box: volumes their energy over their plus boxes, joints the energy their size wants."""
-    cube = np.zeros(owner.shape, dtype=np.int64)
-    plus = partner == -2
-    volume_whole = _share(volume_of[plus], field[plus], energy)
-    cube[plus] = volume_whole
-    joints = np.flatnonzero(kind == -1)
-    held = np.bincount(owner[~plus], minlength=kind.size)[joints].astype(np.float64)
+def _joint_amounts(held: np.ndarray, box_quanta: int, joint_unevenness: float, rng_seed) -> np.ndarray:
+    """Each joint's whole quanta: the energy whose wanted size is its box count, box_quanta per box on average."""
     amounts = box_quanta * held.sum() * held ** (-1.0 / 3.0) / (held ** (-1.0 / 3.0)).sum()
     if joint_unevenness > 0.0:
-        factor = np.exp(np.random.default_rng(rng_seed).normal(0.0, joint_unevenness, joints.size))
+        factor = np.exp(np.random.default_rng(rng_seed).normal(0.0, joint_unevenness, held.size))
         amounts = amounts * factor / factor.mean()
-    per_joint = np.zeros(kind.size)
-    per_joint[joints] = np.maximum(np.rint(amounts), held)
-    ids = owner[~plus]
-    cube[~plus] = -_share(ids, np.ones(ids.size), per_joint)
-    return cube.astype(np.int32)
-
-
-def _share(groups: np.ndarray, weights: np.ndarray, totals: np.ndarray) -> np.ndarray:
-    """Whole numbers per member, each group's total shared in proportion to the weights, largest remainders, at least 1."""
-    sums = np.bincount(groups, weights=weights, minlength=totals.size)
-    exact = weights / sums[groups] * totals[groups]
-    whole = np.maximum(np.floor(exact), 1.0)
-    rest = np.rint(totals - np.bincount(groups, weights=whole, minlength=totals.size)).astype(np.int64)
-    order = np.lexsort((-(exact - np.floor(exact)), groups))
-    starts = np.searchsorted(groups[order], np.arange(totals.size))
-    rank = np.empty(order.size, dtype=np.int64)
-    rank[order] = np.arange(order.size) - starts[groups[order]]
-    return (whole + (rank < rest[groups])).astype(np.int64)
-
-
-def _joint_constant(cube: np.ndarray, owner: np.ndarray, kind: np.ndarray) -> float:
-    """The joints' constant C of length = C / energy with which their wanted sizes add up to the boxes they hold."""
-    held = owner >= 0
-    amounts = np.bincount(owner[held], weights=np.abs(cube[held]).astype(np.float64), minlength=kind.size)
-    boxes = np.bincount(owner[held], minlength=kind.size).astype(np.float64)
-    joints = (kind == -1) & (amounts > 0)
-    return float(np.cbrt(boxes[joints].sum() / (amounts[joints] ** -3.0).sum()))
+    return np.maximum(np.rint(amounts), held)

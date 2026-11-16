@@ -12,41 +12,29 @@ formula (1987): one exact pair rotation (pair_rotation.py) with turn -tau, tau =
 duration * rate (the cell's local clock, state.rate), handing over whole quanta; the
 rounding's uniform comes from a hash of the box's place in its universe, the universe's
 key (state.py), the step, the substep and the pass, so a universe steps the same alone
-or in a batch. With fluid substeps (substeps.py) universe u's pairs turn for duration /
-state.substeps[u], only while `sub_index` is below that count. No box drops below 1
+or in a batch. With fluid substeps (substeps.py) a cell's pairs turn for duration / its
+own count, only while `sub_index` is below that count, and after the first substep only
+in the cells whose later substeps run here rather than cell by cell (later_substeps.py;
+the pair's step itself is hop_pair.py, the same in both). No box drops below 1
 quantum by flow and no box changes sign. The amount is kept exactly. Returns None.
 """
 from __future__ import annotations
 
 import warp as wp
 
-from physics.engine.pair_rotation import pair_rotation
+from physics.engine.hop_pair import hop_pair
 from physics.engine.pass_seed import pass_seed
 from physics.engine.reach import reach
 from physics.engine.settings import Settings
 from physics.engine.state import State
 
-PI = 3.14159265358979
-
-
-@wp.func
-def _wrap(angle: float) -> float:
-    """The angle brought into (-pi, pi]."""
-    return angle - 2.0 * PI * wp.floor((angle + PI) / (2.0 * PI))
-
-
-@wp.func
-def _signed(sign_of: int, amount: int) -> int:
-    """`amount` quanta with the sign of `sign_of`."""
-    if sign_of < 0:
-        return -amount
-    return amount
+wp.set_module_options({"fuse_fp": False})
 
 
 @wp.kernel
 def _hop(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32), owner: wp.array3d(dtype=wp.int32),
          rates: wp.array2d(dtype=wp.float32), side: int, wrap: int, axis: int, parity: int, duration: float,
-         seed: int, keys: wp.array(dtype=wp.int32), counts: wp.array(dtype=wp.int32), sub_index: int, pairs: int):
+         seed: int, keys: wp.array(dtype=wp.int32), plans: wp.array2d(dtype=wp.int32), sub_index: int, pairs: int):
     ti, tj, tk = wp.tid()
     home = ti // side
     here = wp.vec3i(ti, tj, tk)
@@ -55,30 +43,23 @@ def _hop(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32)
         here[0] = home * side + parity + 2 * (ti - home * pairs)
     else:
         here[axis] = parity + 2 * here[axis]
-    count = counts[home]
-    if sub_index >= count:
-        return
     step = wp.vec3i(0, 0, 0)
     step[axis] = 1
     there, valid = reach(here, step, home, side, wrap)
     if not valid:
         return
-    near = quanta[here[0], here[1], here[2]]
-    far = quanta[there[0], there[1], there[2]]
-    if near == 0 or far == 0:
+    if quanta[here[0], here[1], here[2]] == 0 or quanta[there[0], there[1], there[2]] == 0:
         return
     cell = owner[here[0], here[1], here[2]]
     if owner[there[0], there[1], there[2]] != cell:
         return
+    plan = plans[home, cell]
+    count = wp.abs(plan)
+    if sub_index >= count or (sub_index > 0 and plan < 0):
+        return
     tau = duration / float(count) * rates[home, cell]
     box_index = ((here[0] - home * side) * side + here[1]) * side + here[2]
-    rng = wp.rand_init(seed ^ keys[home], box_index)
-    moved, near_new, far_new = pair_rotation(wp.abs(near), wp.abs(far), phase[here[0], here[1], here[2]],
-                                             phase[there[0], there[1], there[2]], -tau, wp.randf(rng))
-    quanta[here[0], here[1], here[2]] = _signed(near, wp.abs(near) - moved)
-    quanta[there[0], there[1], there[2]] = _signed(far, wp.abs(far) + moved)
-    phase[here[0], here[1], here[2]] = _wrap(near_new)
-    phase[there[0], there[1], there[2]] = _wrap(far_new)
+    hop_pair(quanta, phase, here, there, tau, seed ^ keys[home], box_index)
 
 
 def hop(state: State, settings: Settings, axis: int, parity: int, duration: float, pass_index: int,

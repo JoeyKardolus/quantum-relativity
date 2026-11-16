@@ -15,8 +15,15 @@ only friction is energy crossing a joint), so the step must neither gain nor los
 energy: it is the discrete-gradient (Itoh-Abe) step of the Hamiltonian
   E = 1/2 v^T M^+ v + sum_i U_i(s_i),  U_i(s) = push * wanted_i^6 / (5 s^5) - pull_i * s
 (M the clock-weighted graph Laplacian, -dU_i/ds = load_i), which keeps E exactly at any
-step length; it is implicit and solved by Newton's method (numerics, not a rule: an
-explicit step gained energy at the steep wall and crushed joints to nothing). The step
+step length; it is implicit (numerics, not a rule: an explicit step gained energy at the
+steep wall and crushed joints to nothing) and solved on the GPU, every joint at once, by
+Newton's method with the Jacobian's diagonal (each joint's own spring; the neighbours'
+come in through the next round), in float64, until the step's equation holds to
+TOLERANCE in every joint; nothing is solved on the host, so the cost grows only with the
+number of joints (before 2026-11-17 a sparse direct solve on the host: 3 s a step at
+10,000 joints, and a 32-place universe did not finish its first step). Sums over a
+volume's joints run in one fixed order (swing_table.py), so one seed gives one run and a
+universe swings the same alone as in a batch. The step
 is cut into as many equal substeps as the stiffest joint needs for accuracy
 (omega * substep <= 1/2), at most MOST_SUBSTEPS. A joint whose size falls to the
 collapse packing (its minus quanta over its size reach collapse_packing, size <= quanta /
@@ -35,152 +42,243 @@ from __future__ import annotations
 import math
 
 import numpy as np
-import scipy.sparse as sparse
-import scipy.sparse.linalg as sparse_linalg
+import warp as wp
 
 from physics.engine.settings import Settings
 from physics.engine.state import State
+from physics.engine.swing_table import swing_table
 
 MOST_SUBSTEPS = 64
-NEWTON_ROUNDS = 100
-HALVINGS = 60
-ROUNDOFF = 1e-7
-TOLERANCE = 1e-10
+ROUNDS = 400
+TOLERANCE = 1e-12
+_ACTIVE, _PAIRED, _HELD, _BORN = 1, 2, 4, 8
+
+
+@wp.func
+def _secant(before: wp.float64, after: wp.float64, hardness: wp.float64, load: wp.float64) -> wp.vec2d:
+    """(U(after) - U(before)) / (after - before) and its derivative in `after`, written without cancellation."""
+    slope = -load
+    bend = wp.float64(0.0)
+    low = wp.float64(1.0)
+    for power in range(1, 6):
+        low = low * before
+        high = wp.float64(1.0)
+        for fold in range(6 - power):
+            high = high * after
+        term = hardness / (low * high)
+        slope = slope - term
+        bend = bend + wp.float64(float(6 - power)) * term / after
+    return wp.vec2d(slope, bend)
+
+
+@wp.func
+def _moving(flag: int) -> bool:
+    """True for a joint that swings this substep: it is a live joint and not held at its limit."""
+    return (flag & _ACTIVE) != 0 and (flag & _HELD) == 0
+
+
+@wp.kernel
+def _begin(flags: wp.array2d(dtype=wp.int32), counts: wp.array(dtype=wp.int32), spans: wp.array(dtype=wp.float64),
+           sub_index: int, size: wp.array2d(dtype=wp.float64), speed: wp.array2d(dtype=wp.float64),
+           hardness: wp.array2d(dtype=wp.float64), load: wp.array2d(dtype=wp.float64),
+           start: wp.array2d(dtype=wp.float64), target: wp.array2d(dtype=wp.float64),
+           slope: wp.array2d(dtype=wp.float64)):
+    home, cell = wp.tid()
+    slope[home, cell] = wp.float64(0.0)
+    if sub_index >= counts[home] or (flags[home, cell] & _ACTIVE) == 0:
+        return
+    own = size[home, cell]
+    start[home, cell] = own
+    target[home, cell] = own + spans[home] * speed[home, cell]
+    if _moving(flags[home, cell]):
+        slope[home, cell] = _secant(own, own, hardness[home, cell], load[home, cell])[0]
+
+
+@wp.kernel
+def _gather(offsets: wp.array2d(dtype=wp.int32), members: wp.array2d(dtype=wp.int32),
+            rate: wp.array2d(dtype=wp.float64), slope: wp.array2d(dtype=wp.float64),
+            pulled: wp.array2d(dtype=wp.float64)):
+    home, volume = wp.tid()
+    total = wp.float64(0.0)
+    for index in range(offsets[home, volume], offsets[home, volume + 1]):
+        joint = members[home, index]
+        total = total + rate[home, joint] * slope[home, joint]
+    pulled[home, volume] = total
+
+
+@wp.func
+def _spring(home: int, cell: int, sides: wp.vec2i, own_rate: wp.float64, own_slope: wp.float64,
+            rates: wp.array2d(dtype=wp.float64), pulled: wp.array2d(dtype=wp.float64)) -> wp.float64:
+    """Row `cell` of the clock-weighted graph Laplacian applied to the slopes (inertia not yet divided out)."""
+    total = wp.float64(0.0)
+    for pick in range(2):
+        volume = sides[pick]
+        if volume >= 0:
+            total = total + (rates[home, volume] * own_slope - pulled[home, volume])
+    return own_rate * total
+
+
+@wp.kernel
+def _miss(flags: wp.array2d(dtype=wp.int32), live: wp.array(dtype=wp.int32), spans: wp.array(dtype=wp.float64),
+          between: wp.array2d(dtype=wp.vec2i), rate: wp.array2d(dtype=wp.float64),
+          rates: wp.array2d(dtype=wp.float64), pulled: wp.array2d(dtype=wp.float64),
+          size: wp.array2d(dtype=wp.float64), target: wp.array2d(dtype=wp.float64),
+          slope: wp.array2d(dtype=wp.float64), inertia: wp.float64, missed: wp.array2d(dtype=wp.float64),
+          worst: wp.array(dtype=wp.float64)):
+    home, cell = wp.tid()
+    if live[home] == 0 or not _moving(flags[home, cell]):
+        return
+    scale = wp.float64(0.5) * spans[home] * spans[home] / inertia
+    spring = _spring(home, cell, between[home, cell], rate[home, cell], slope[home, cell], rates, pulled)
+    miss = size[home, cell] - target[home, cell] + scale * spring
+    missed[home, cell] = miss
+    wp.atomic_max(worst, home, wp.abs(miss))
+
+
+@wp.kernel
+def _improve(flags: wp.array2d(dtype=wp.int32), live: wp.array(dtype=wp.int32), spans: wp.array(dtype=wp.float64),
+             between: wp.array2d(dtype=wp.vec2i), rate: wp.array2d(dtype=wp.float64),
+             rates: wp.array2d(dtype=wp.float64), hardness: wp.array2d(dtype=wp.float64),
+             load: wp.array2d(dtype=wp.float64), start: wp.array2d(dtype=wp.float64),
+             missed: wp.array2d(dtype=wp.float64), inertia: wp.float64, size: wp.array2d(dtype=wp.float64),
+             slope: wp.array2d(dtype=wp.float64)):
+    home, cell = wp.tid()
+    if live[home] == 0 or not _moving(flags[home, cell]):
+        return
+    scale = wp.float64(0.5) * spans[home] * spans[home] / inertia
+    own_rate = rate[home, cell]
+    sides = between[home, cell]
+    others = wp.float64(0.0)
+    for pick in range(2):
+        if sides[pick] >= 0:
+            others = others + (rates[home, sides[pick]] - own_rate)
+    guess = size[home, cell]
+    bend = _secant(start[home, cell], guess, hardness[home, cell], load[home, cell])[1]
+    better = guess - missed[home, cell] / (wp.float64(1.0) + scale * own_rate * others * bend)
+    if better <= wp.float64(0.0):
+        better = wp.float64(0.5) * guess
+    size[home, cell] = better
+    slope[home, cell] = _secant(start[home, cell], better, hardness[home, cell], load[home, cell])[0]
+
+
+@wp.kernel
+def _finish(flags: wp.array2d(dtype=wp.int32), counts: wp.array(dtype=wp.int32), spans: wp.array(dtype=wp.float64),
+            sub_index: int, between: wp.array2d(dtype=wp.vec2i), rate: wp.array2d(dtype=wp.float64),
+            rates: wp.array2d(dtype=wp.float64), pulled: wp.array2d(dtype=wp.float64),
+            slope: wp.array2d(dtype=wp.float64), floor: wp.array2d(dtype=wp.float64), inertia: wp.float64,
+            size: wp.array2d(dtype=wp.float64), speed: wp.array2d(dtype=wp.float64)):
+    home, cell = wp.tid()
+    flag = flags[home, cell]
+    if sub_index >= counts[home] or (flag & _ACTIVE) == 0:
+        return
+    if _moving(flag):
+        spring = _spring(home, cell, between[home, cell], rate[home, cell], slope[home, cell], rates, pulled)
+        speed[home, cell] = speed[home, cell] - spans[home] * spring / inertia
+    if size[home, cell] <= floor[home, cell] and (flag & _PAIRED) != 0:
+        flag = flag | _HELD
+    if (flag & _HELD) != 0:
+        if (flag & _BORN) == 0:
+            size[home, cell] = wp.max(size[home, cell], floor[home, cell])
+        speed[home, cell] = wp.float64(0.0)
+    flags[home, cell] = flag
 
 
 def joint_swing(state: State, settings: Settings, pull: np.ndarray) -> np.ndarray:
     """Swing every joint's size one step, energy kept; returns the joints pressed to the collapse limit."""
+    table = swing_table(state)
+    joints = table["joints"]
     pressed = np.zeros(state.kind.shape, dtype=bool)
-    for universe in range(state.universes):
-        joints = np.flatnonzero((state.kind[universe] == -1) & (state.wanted[universe] > 0.0))
-        if joints.size < 2:
-            continue
-        pressed[universe, joints] = _swing_universe(state, settings, universe, joints, pull[universe, joints])
+    if not joints.any():
+        state.cell_push = np.where(state.kind == -1, _push(state, settings), 0.0)
+        return pressed
+    device = state.quanta.device
+    rate = np.where(joints, state.rate, 0.0)
+    hardness = np.where(joints, settings.push * state.wanted ** 6 / 5.0, 0.0)
+    floor = np.where(joints, state.cell_quanta / settings.collapse_packing, 0.0)
+    size = np.where(joints, state.size, 1.0)
+    born = joints & (size < floor)
+    speed = np.where(joints & ~born, state.speed, 0.0)
+    rates = _volume_rates(table, rate)
+    counts = _counts(settings, joints, rate, rates, state.between, hardness, np.maximum(size, floor))
+    flags = (joints * _ACTIVE + (joints & table["paired"]) * _PAIRED + born * (_HELD | _BORN)).astype(np.int32)
+    on = {name: wp.array(values, dtype=wp.float64, device=device)
+          for name, values in (("rate", rate), ("rates", rates), ("hardness", hardness), ("floor", floor),
+                               ("size", size), ("speed", speed), ("load", np.where(joints, pull, 0.0)),
+                               ("spans", settings.step_time / np.maximum(counts, 1)))}
+    for name in ("start", "target", "slope", "pulled", "missed"):
+        on[name] = wp.zeros(state.kind.shape, dtype=wp.float64, device=device)
+    on["flags"] = wp.array(flags, dtype=wp.int32, device=device)
+    on["counts"] = wp.array(counts.astype(np.int32), dtype=wp.int32, device=device)
+    inertia = wp.float64(settings.joint_inertia)
+    limit = TOLERANCE * np.maximum(1.0, np.abs(size).max(axis=1, where=joints, initial=0.0))
+    for sub_index in range(int(counts.max())):
+        _substep(state, table, on, inertia, sub_index, counts, limit)
+    after = on["flags"].numpy()
+    state.size = np.where(joints, on["size"].numpy(), state.size)
+    state.speed = np.where(joints, on["speed"].numpy(), state.speed)
+    pressed = joints & table["paired"] & ((after & _HELD) != 0) & ~born
     state.cell_push = np.where(state.kind == -1, _push(state, settings), 0.0)
     return pressed
 
 
-def _swing_universe(state: State, settings: Settings, universe: int, joints: np.ndarray,
-                    load_pull: np.ndarray) -> np.ndarray:
-    """One universe's joints swung one step; returns which of them reached the collapse limit."""
-    rate = state.rate[universe, joints]
-    wanted = state.wanted[universe, joints]
-    laplacian = _laplacian(state, universe, joints, rate) / settings.joint_inertia
-    hardness = settings.push * wanted ** 6 / 5.0
-    floor = state.cell_quanta[universe, joints].astype(np.float64) / settings.collapse_packing
-    size = state.size[universe, joints].astype(np.float64)
-    speed = state.speed[universe, joints].astype(np.float64)
-    stiffness = 30.0 * hardness / np.maximum(size, floor) ** 7
-    largest = float(sparse_linalg.norm(laplacian, ord=1)) if laplacian.nnz else 0.0
-    omega = math.sqrt(largest * float(stiffness.max()))
-    count = min(MOST_SUBSTEPS, max(1, math.ceil(settings.step_time * omega / 0.5)))
-    span = settings.step_time / count
-    paired = (state.between[universe, joints] >= 0).all(axis=1)
-    born = size < floor
-    held = born.copy()
-    speed = np.where(born, 0.0, speed)
-    for _ in range(count):
-        size, speed = _substep(size, speed, span, laplacian, hardness, load_pull, held)
-        held |= (size <= floor) & paired
-        size = np.where(held & ~born, np.maximum(size, floor), size)
-        speed = np.where(held, 0.0, speed)
-    state.size[universe, joints] = size
-    state.speed[universe, joints] = speed
-    return held & ~born & paired
-
-
-def _substep(size: np.ndarray, speed: np.ndarray, span: float, laplacian, hardness: np.ndarray,
-             load_pull: np.ndarray, held: np.ndarray) -> tuple:
-    """One discrete-gradient substep: (size, speed) after `span`, swing energy kept exactly."""
-    moving = ~held
-    scale = 0.5 * span * span
-    start = size
-    target = start + span * speed
-    guess = start.copy()
-    residual = _residual(start, guess, target, scale, laplacian, hardness, load_pull, moving)
-    for _ in range(NEWTON_ROUNDS):
-        if np.abs(residual).max() <= TOLERANCE * max(1.0, float(np.abs(start).max())):
+def _substep(state: State, table: dict, on: dict, inertia, sub_index: int, counts: np.ndarray,
+             limit: np.ndarray) -> None:
+    """One discrete-gradient substep of every universe still swinging, solved to TOLERANCE, swing energy kept."""
+    device = state.quanta.device
+    shape = state.kind.shape
+    wp.launch(_begin, dim=shape, device=device,
+              inputs=[on["flags"], on["counts"], on["spans"], sub_index, on["size"], on["speed"], on["hardness"],
+                      on["load"], on["start"], on["target"], on["slope"]])
+    live = (counts > sub_index).astype(np.int32)
+    worst = wp.zeros(state.universes, dtype=wp.float64, device=device)
+    for _ in range(ROUNDS):
+        live_d = wp.array(live, dtype=wp.int32, device=device)
+        wp.launch(_gather, dim=shape, device=device,
+                  inputs=[table["offsets"], table["members"], on["rate"], on["slope"], on["pulled"]])
+        worst.zero_()
+        wp.launch(_miss, dim=shape, device=device,
+                  inputs=[on["flags"], live_d, on["spans"], table["between"], on["rate"], on["rates"], on["pulled"],
+                          on["size"], on["target"], on["slope"], inertia, on["missed"], worst])
+        live = live * (worst.numpy() > limit)
+        if not live.any():
             break
-        _, bend = _secant(start, guess, hardness, load_pull)
-        jacobian = sparse.identity(size.size, format="csr") + scale * (laplacian @ sparse.diags(np.where(moving, bend, 0.0)))
-        change = sparse_linalg.spsolve(jacobian.tocsc(), -residual)
-        found = _backtrack(start, guess, change, residual, target, scale, laplacian, hardness, load_pull, moving)
-        if found is None:
-            if np.abs(residual).max() <= ROUNDOFF * max(1.0, float(np.abs(start).max())):
-                break
-            raise RuntimeError(f"joint swing: no Newton step shrinks the residual {np.abs(residual).max():.3e}")
-        guess, residual = found
+        wp.launch(_improve, dim=shape, device=device,
+                  inputs=[on["flags"], wp.array(live, dtype=wp.int32, device=device), on["spans"], table["between"],
+                          on["rate"], on["rates"], on["hardness"], on["load"], on["start"], on["missed"], inertia,
+                          on["size"], on["slope"]])
     else:
-        raise RuntimeError(f"joint swing: Newton did not converge in {NEWTON_ROUNDS} rounds "
-                           f"(residual {np.abs(residual).max():.3e})")
-    slope, _ = _secant(start, guess, hardness, load_pull)
-    slope = np.where(moving, slope, 0.0)
-    after = speed - span * (laplacian @ slope)
-    return np.where(moving, guess, start), np.where(moving, after, speed)
+        raise RuntimeError(f"joint swing: not solved in {ROUNDS} rounds (largest miss {worst.numpy().max():.3e})")
+    wp.launch(_finish, dim=shape, device=device,
+              inputs=[on["flags"], on["counts"], on["spans"], sub_index, table["between"], on["rate"], on["rates"],
+                      on["pulled"], on["slope"], on["floor"], inertia, on["size"], on["speed"]])
 
 
-def _residual(start: np.ndarray, guess: np.ndarray, target: np.ndarray, scale: float, laplacian, hardness: np.ndarray,
-              load_pull: np.ndarray, moving: np.ndarray) -> np.ndarray:
-    """The implicit step's equation, guess - (start + span * speed) + span^2 / 2 * M * secant; 0 for held joints."""
-    slope, _ = _secant(start, guess, hardness, load_pull)
-    return np.where(moving, guess - target + scale * (laplacian @ np.where(moving, slope, 0.0)), 0.0)
+def _volume_rates(table: dict, rate: np.ndarray) -> np.ndarray:
+    """Per energy volume the summed clock rate of its swinging joints, added in the table's order."""
+    rates = np.zeros(rate.shape)
+    for universe in range(rate.shape[0]):
+        used = table["used"][universe]
+        rates[universe] = np.bincount(table["volumes_host"][universe, :used],
+                                      weights=rate[universe, table["members_host"][universe, :used]],
+                                      minlength=rate.shape[1])
+    return rates
 
 
-def _backtrack(start: np.ndarray, guess: np.ndarray, change: np.ndarray, residual: np.ndarray, target: np.ndarray,
-               scale: float, laplacian, hardness: np.ndarray, load_pull: np.ndarray, moving: np.ndarray):
-    """The Newton step cut in half until every size stays positive and the residual shrinks (at most HALVINGS times); None when none does."""
-    norm = float(np.linalg.norm(residual))
-    fraction = 1.0
-    for _ in range(HALVINGS):
-        trial = guess + fraction * change
-        if np.all(trial > 0.0):
-            after = _residual(start, trial, target, scale, laplacian, hardness, load_pull, moving)
-            if float(np.linalg.norm(after)) <= (1.0 - 1e-4 * fraction) * norm:
-                return trial, after
-        fraction *= 0.5
-    return None
-
-
-def _secant(before: np.ndarray, after: np.ndarray, hardness: np.ndarray, load_pull: np.ndarray) -> tuple:
-    """(U(after) - U(before)) / (after - before) per joint and its derivative in `after`, written without cancellation."""
-    slope = -load_pull.astype(np.float64)
-    bend = np.zeros(before.shape)
-    for power in range(1, 6):
-        term = 1.0 / (before ** power * after ** (6 - power))
-        slope = slope - hardness * term
-        bend = bend + hardness * (6 - power) * term / after
-    return slope, bend
-
-
-def _laplacian(state: State, universe: int, joints: np.ndarray, rate: np.ndarray):
-    """Graph Laplacian over the joints of one universe, edge i-j weighted rate_i * rate_j (two joints sharing a volume)."""
-    index = np.full(state.kind.shape[1], -1, dtype=np.int64)
-    index[joints] = np.arange(joints.size)
-    sides = state.between[universe, joints]
-    member = np.concatenate([np.arange(joints.size), np.arange(joints.size)])
-    volume = np.concatenate([sides[:, 0], sides[:, 1]])
-    keep = volume >= 0
-    member, volume = member[keep], volume[keep]
-    order = np.argsort(volume, kind="stable")
-    member, volume = member[order], volume[order]
-    starts = np.flatnonzero(np.r_[True, volume[1:] != volume[:-1]])
-    ends = np.r_[starts[1:], volume.size]
-    rows, columns = [], []
-    for first, last in zip(starts, ends):
-        group = member[first:last]
-        if group.size > 1:
-            one, two = np.meshgrid(group, group, indexing="ij")
-            off = one != two
-            rows.append(one[off])
-            columns.append(two[off])
-    if not rows:
-        return sparse.csr_matrix((joints.size, joints.size))
-    row, column = np.concatenate(rows), np.concatenate(columns)
-    weight = rate[row] * rate[column]
-    adjacency = sparse.csr_matrix((weight, (row, column)), shape=(joints.size, joints.size))
-    adjacency.sum_duplicates()
-    degree = np.asarray(adjacency.sum(axis=1)).ravel()
-    return (sparse.diags(degree) - adjacency).tocsr()
+def _counts(settings: Settings, joints: np.ndarray, rate: np.ndarray, rates: np.ndarray, between: np.ndarray,
+            hardness: np.ndarray, size: np.ndarray) -> np.ndarray:
+    """Per universe the substeps its stiffest joint needs (omega * substep <= 1/2), 0 with fewer than 2 joints."""
+    others = np.zeros(rate.shape)
+    for pick in range(2):
+        volume = between[..., pick]
+        others += np.where(volume >= 0, np.take_along_axis(rates, np.maximum(volume, 0), axis=1) - rate, 0.0)
+    largest = 2.0 * np.max(rate * others, axis=1, where=joints, initial=0.0) / settings.joint_inertia
+    stiffness = np.max(30.0 * hardness / np.where(joints, size, 1.0) ** 7, axis=1, where=joints, initial=0.0)
+    counts = np.zeros(rate.shape[0], dtype=np.int64)
+    for universe in range(rate.shape[0]):
+        if joints[universe].sum() >= 2:
+            omega = math.sqrt(largest[universe] * stiffness[universe])
+            counts[universe] = min(MOST_SUBSTEPS, max(1, math.ceil(settings.step_time * omega / 0.5)))
+    return counts
 
 
 def _push(state: State, settings: Settings) -> np.ndarray:
