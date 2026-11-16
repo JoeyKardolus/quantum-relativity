@@ -14,6 +14,8 @@ Contract: `stats(state, settings=None, universe=0)` copies that universe's boxes
   collapses, collapsed_quanta, spread, rehomes  joint boxes collapsed and the minus quanta
                     they turned plus, quanta spread by drift and boxes that changed
                     cell since the start (state tallies)
+  splits, torn      volume splits so far and the plus quanta their tears turned minus
+                    (volume_split.py)
   occupied          boxes holding space; occupied_growth occupied / the start's
   radius            root mean square distance of the occupied boxes from the cube's
                     centre, in boxes
@@ -82,6 +84,7 @@ def stats(state: State, settings: Settings | None = None, universe: int = 0) -> 
         "cell_count_growth": found["kind"].size / start["cells"] if start.get("cells") else float("nan"),
         "seam_faces": meeting["faces"], "seam_pairs": int(len(meeting["pairs"])),
         "collapses": collapsed, "collapsed_quanta": collapsed_quanta, "spread": spread, "rehomes": rehomes,
+        "splits": int(state.splits[universe]), "torn": int(state.torn[universe]),
         "occupied": int(occupied.sum()),
         "occupied_growth": float(occupied.sum() / start["boxes"]) if start["boxes"] else 0.0,
         "radius": float(np.sqrt((places ** 2).sum(axis=1).mean())) if places.size else 0.0,

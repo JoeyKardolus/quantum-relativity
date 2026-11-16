@@ -13,7 +13,7 @@ boxes (owner, 2026-11-16): a line is a crossing only when its two plus boxes bel
 two face-neighbouring energy volumes and every minus box on it belongs to the one joint
 they share (shared_joint.py); any other line (through another joint, or between volumes
 that are not face neighbours) carries nothing. A state without a cell lattice
-(state.cells_per_side 0) leaks nothing. One
+(not state.has_lattice) leaks nothing. One
 thread walks each line of its universe and counts the crossings on it from the low
 end; it takes the crossings whose count has parity `group` (0 or 1), so the crossings
 of one pass share no box and the two groups cover them all. Each crossing takes one
@@ -110,7 +110,7 @@ def _leak(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32
           group: int, duration: float, joint_rest: float, seal_squeeze: float, clock_packing: float,
           friction: float, spread_share: float, seed: int, keys: wp.array(dtype=wp.int32),
           tallies: wp.array2d(dtype=wp.int64), counts: wp.array(dtype=wp.int32), sub_index: int,
-          owner: wp.array3d(dtype=wp.int32), cells_per_side: int):
+          owner: wp.array3d(dtype=wp.int32), extent: wp.vec3i, lattice_counts: wp.array(dtype=wp.vec3i)):
     home, first, second = wp.tid()
     count = counts[home]
     if sub_index >= count:
@@ -139,7 +139,7 @@ def _leak(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32
                 joint_quanta += float(-held)
         else:
             near = _place(home, side, axis, first, second, wp.max(last_plus, 0))
-            shared = shared_joint(owner[near[0], near[1], near[2]], cell, cells_per_side)
+            shared = shared_joint(owner[near[0], near[1], near[2]], cell, extent, lattice_counts[home])
             if last_plus >= 0 and joint_boxes > 0 and shared >= 0 and joint_cell == shared:
                 if crossings % 2 == group:
                     _cross(quanta, phase, _place(home, side, axis, first, second, last_plus), place,
@@ -154,11 +154,11 @@ def _leak(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32
 def leak(state: State, settings: Settings, axis: int, group: int, duration: float, pass_index: int,
          sub_index: int = 0) -> None:
     """Move whole plus quanta between plus boxes across their shared joint along `axis`, the crossings of `group`."""
-    if state.cells_per_side == 0:
+    if not state.has_lattice:
         return
     seed = pass_seed(state.step, sub_index, pass_index)
     wp.launch(_leak, dim=(state.universes, state.side, state.side), device=state.quanta.device,
               inputs=[state.quanta, state.phase, state.side, int(axis), int(group), float(duration),
                       settings.joint_rest, settings.seal_squeeze, settings.clock_packing, settings.friction,
                       settings.spread_share, int(seed), state.keys, state.tallies, state.substeps, int(sub_index),
-                      state.owner, state.cells_per_side])
+                      state.owner, wp.vec3i(*state.extent), state.counts])

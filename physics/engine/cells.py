@@ -1,7 +1,7 @@
 """Cells: the energy volumes and joints of the forced cell lattice, read off each box's owner, on the host.
 
 Contract: `cells(boxes)` takes host_boxes() of one universe (quanta, clock, owner,
-cells_per_side; host_boxes.py) and returns a dict of numpy arrays describing its cells:
+cells, corners; host_boxes.py) and returns a dict of numpy arrays describing its cells:
   owner     int32 (side, side, side): the cell each box belongs to, -1 for empty space
   kind      int32 per cell: ENERGY_VOLUME (0) or JOINT (1)
   between   int32 (cells, 2): for a joint the two energy volumes it lies between, lower
@@ -22,7 +22,7 @@ The cells are the forced cell lattice's real cells (owner, 2026-11-16): a cell's
 and its neighbours are fixed by its lattice index (cell_kind.py), so two
 face-neighbouring volumes share exactly one joint, every volume is wrapped by joints on
 all 26 sides and the joints are one web, whatever the boxes hold. Ids are the same at
-every call. Without a cell lattice (cells_per_side 0, hand-built starts) the plus boxes
+every call. Without a cell lattice (cells (0, 0, 0), hand-built starts) the plus boxes
 are one energy volume and the minus boxes one joint beside it.
 """
 from __future__ import annotations
@@ -38,11 +38,11 @@ JOINT = 1
 def cells(boxes: dict) -> dict:
     """Owner per box and kind, the volumes each joint lies between, size, quanta, centre and mean clock per cell."""
     quanta = boxes["quanta"]
-    cells_per_side = int(boxes.get("cells_per_side", 0))
-    if cells_per_side == 0:
+    counts = tuple(boxes.get("cells", (0, 0, 0)))
+    if not any(counts):
         return _signed_cells(boxes)
-    kinds = lattice_kinds(cells_per_side)
-    extent = cells_per_side + 2
+    kinds = lattice_kinds(counts)
+    extent = kinds.shape
     places = np.argwhere(np.ones(kinds.shape, dtype=bool))
     flat = kinds.ravel()
     order = np.concatenate([np.flatnonzero(flat == 1), np.flatnonzero(flat == -1)])
@@ -62,15 +62,15 @@ def cells(boxes: dict) -> dict:
             "volumes": volumes}
 
 
-def _between(place: np.ndarray, kinds: np.ndarray, renumber: np.ndarray, extent: int) -> tuple:
+def _between(place: np.ndarray, kinds: np.ndarray, renumber: np.ndarray, extent: tuple) -> tuple:
     """The (new) ids of the volumes on either side of a joint along the first axis that has one, lower first."""
     for axis in range(3):
         sides = []
         for step in (-1, 1):
             near = place.copy()
             near[axis] += step
-            volume = 0 <= near[axis] < extent and kinds[tuple(near)] == 1
-            sides.append(int(renumber[(near[0] * extent + near[1]) * extent + near[2]]) if volume else -1)
+            volume = 0 <= near[axis] < extent[axis] and kinds[tuple(near)] == 1
+            sides.append(int(renumber[np.ravel_multi_index(tuple(near), extent)]) if volume else -1)
         if max(sides) >= 0:
             return tuple(sorted(sides))
     return (-1, -1)

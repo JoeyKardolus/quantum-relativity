@@ -23,13 +23,16 @@ Contract: `step(state, settings)` advances the state by one step_time of the cou
                    over (the emptied box joins the covering cell, hand_over.py): space
                    grows where outer joints take empty boxes
   5. collapse      joint boxes past the limit turn plus (collapse.py)
+  5b. volume_split the largest energy volume grown past split_across in each universe
+                   tears in two, new lattice planes, the tear a new joint
+                   (volume_split.py)
   6. tick_clocks   every box's clock advances by its own proper time (tick_clocks.py)
 then counts the step and, when a detail ladder is attached (attach_ladder.py), writes the
 changed blocks into it and switches every block's level (ladder_sync.py). The amount
 ignoring sign is exact through every part, and quanta keep their sign except in collapse.
 `marks` is zeroed first; owner changes mark their boxes (2) and collapse its flipped
-boxes (1), so after a step `marks` says which boxes changed cell or sign and by which
-rule.
+boxes (1), a split its relabelled and torn boxes (8), so after a step `marks` says
+which boxes changed cell or sign and by which rule.
 Returns None.
 """
 from __future__ import annotations
@@ -50,6 +53,7 @@ from physics.engine.settings import Settings
 from physics.engine.state import State
 from physics.engine.substeps import substeps
 from physics.engine.tick_clocks import tick_clocks
+from physics.engine.volume_split import volume_split
 
 _ORDER = [(axis, parity) for axis in range(3) for parity in range(2)]
 _REHOME_ORDER_SEED = 27
@@ -69,6 +73,7 @@ def step(state: State, settings: Settings) -> None:
         drain(state, phase_index)
         hand_over(state, phase_index)
     collapse(state, settings)
+    volume_split(state, settings)
     tick_clocks(state, settings)
     state.step += 1
     ladder_sync(state)
@@ -89,7 +94,7 @@ def _fluid(state: State, settings: Settings, half: float, sub_index: int) -> Non
 def _rehome_phases(state: State, settings: Settings) -> list:
     """The rehome phases this step runs: a slice of a fresh shuffle of the 27, one shuffle per sweep."""
     per_step = settings.rehomes_per_step
-    if per_step == 0 or state.cells_per_side == 0:
+    if per_step == 0 or not state.has_lattice:
         return []
     steps_per_sweep = -(-_PHASES // per_step)
     sweep, place = divmod(state.step, steps_per_sweep)

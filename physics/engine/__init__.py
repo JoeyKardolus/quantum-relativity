@@ -13,7 +13,8 @@ form a forced cell lattice (owner, 2026-11-16): a cell's kind and neighbours are
 by its lattice index (an energy volume when all three are even, else a joint, so two
 face-neighbouring volumes share exactly one joint), its corners move so its size
 follows its energy, and each box belongs to the cell covering it, changing owner only
-once its quanta flowed out. Quanta never change sign except in joint collapse.
+once its quanta flowed out. Quanta change sign only in joint collapse (minus to plus)
+and in a volume split's tear (plus to minus).
 
 Module map:
   settings.py       Settings: every rule's strength, all on by default
@@ -50,11 +51,12 @@ Module map:
   drain.py          drain: a leaving box empties into its own cell first
   hand_over.py      hand_over: the emptied box joins the cell covering it
   collapse.py       collapse: joint boxes past the limit turn plus, amount kept
+  volume_split.py   volume_split: a too-big volume tears in two, new lattice planes
   tick_clocks.py    tick_clocks: each box's own proper time
   totals.py         totals: exact plus, minus and total quanta, overall and per universe
   attach_ladder.py  attach_ladder: a detail ladder store beside the boxes
   ladder_sync.py    ladder_sync: write changed blocks, switch levels (once a step)
-  step.py           step: pull wave, corners, fluid, rehoming, collapse, clocks, ladder
+  step.py           step: pull wave, corners, fluid, rehoming, collapse, split, clocks, ladder
   host_boxes.py     host_boxes: one universe's arrays on the host
   lattice_of.py     lattice_of: one universe's cell lattice, to start a new State on it
   cells.py          cells: the lattice's energy volumes and joints, read off the box owners
@@ -95,6 +97,7 @@ from physics.engine.block_adjacency import block_adjacency
 from physics.engine.drain import drain
 from physics.engine.hand_over import hand_over
 from physics.engine.collapse import collapse
+from physics.engine.volume_split import volume_split
 from physics.engine.tick_clocks import tick_clocks
 from physics.engine.totals import totals
 from physics.engine.attach_ladder import attach_ladder
@@ -110,6 +113,6 @@ from physics.engine.view_source import view_source
 __all__ = ["Settings", "State", "uneven_field", "new_universe", "lattice_kinds", "cell_place", "cell_kind",
            "shared_joint", "kuhn_corner", "kuhn_tet", "cell_score", "face_step", "inside", "clock_rate", "squeeze", "openness",
            "leak_openness", "pass_seed", "pair_rotation", "box_potential", "pull_wave", "on_site", "hop", "leak", "substeps",
-           "move_corners", "box_targets", "rehome_dims", "rehome_site", "one_group", "block_adjacency", "drain", "hand_over", "collapse", "tick_clocks", "totals",
+           "move_corners", "box_targets", "rehome_dims", "rehome_site", "one_group", "block_adjacency", "drain", "hand_over", "collapse", "volume_split", "tick_clocks", "totals",
            "attach_ladder", "ladder_sync", "step", "host_boxes", "lattice_of", "ENERGY_VOLUME", "JOINT", "cells", "seams", "stats",
            "view_source"]

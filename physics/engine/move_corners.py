@@ -1,7 +1,7 @@
 """Move corners: the forced cell lattice's corners move so each cell's size follows its energy.
 
 Contract: `move_corners(state, settings)` does, for a state with a cell lattice
-(state.cells_per_side > 0; without one it returns at once):
+(state.has_lattice; without one it returns at once):
   1. counts every cell's whole quanta ignoring sign into state.cell_quanta (int64
      atomics, exact) and writes its volume in boxes into state.cell_size
   2. gives every real cell a pressure from how much smaller or larger it is than its
@@ -18,9 +18,15 @@ Contract: `move_corners(state, settings)` does, for a state with a cell lattice
      over its eight cells of pressure * d(cell size)/d(corner) plus the pull's shares,
      at most max_corner_step boxes, kept inside the universe (0 .. side); the ring's
      corners follow the outer real corners, flat against the walls
-  4. keeps every real cell right side out: a cell whose tets (kuhn_tet.py) would fall
-     below MIN_TET boxes of volume puts its corners back where they were, repeated
-     until no cell is inside out (at most CHECKS rounds, then no corner moves this step)
+  4. keeps every real cell right side out and every joint at least a box thick: a
+     cell whose tets (kuhn_tet.py) would fall below MIN_TET boxes of volume, or a
+     joint that would get thinner than MIN_JOINT_ACROSS (1 box) across an axis on
+     which its lattice index is odd (the axes it lies between volumes on; each of its
+     four edges along it, measured across its low face) and thinner than it was, puts
+     its corners back where they were, repeated until no cell is bad (at most CHECKS
+     rounds, then no corner moves this step). Owner, 2026-11-16: between two energy
+     volumes there is always a joint box, on faces, edges and corners; a joint thinner
+     than a box left its boxes lagging behind its corners
 So a cell's size is set by its own energy pressing against its neighbours' (no set
 size, no minimum): more energy makes a cell want less room, so it presses less and its
 neighbours take room from it, and it ends smaller and denser (owner, 2026-11-16: "more
@@ -38,7 +44,7 @@ from __future__ import annotations
 import warp as wp
 
 from physics.engine.cell_kind import cell_kind
-from physics.engine.cell_place import cell_place
+from physics.engine.cell_place import cell_id, cell_place
 from physics.engine.inside import inside
 from physics.engine.kuhn_corner import kuhn_corner
 from physics.engine.kuhn_tet import kuhn_tet
@@ -46,6 +52,7 @@ from physics.engine.settings import Settings
 from physics.engine.state import State
 
 MIN_TET = 1.0e-3
+MIN_JOINT_ACROSS = 1.0
 CHECKS = 8
 
 wp.set_module_options({"max_unroll": 1})
@@ -79,22 +86,23 @@ def _slope(pull: wp.array3d(dtype=wp.float32), home: int, side: int, box: wp.vec
 
 @wp.kernel
 def _press(corners: wp.array3d(dtype=wp.vec3), cell_quanta: wp.array2d(dtype=wp.int64),
-           pull: wp.array3d(dtype=wp.float32), side: int, cells_per_side: int, size_energy: float,
+           pull: wp.array3d(dtype=wp.float32), side: int, extent: wp.vec3i, counts: wp.array(dtype=wp.vec3i),
+           size_energy: float,
            volume_rest: float, volume_stiffness: float, joint_rest: float, push: float, push_steepness: float,
            pressure: wp.array2d(dtype=wp.float64), drawn: wp.array2d(dtype=wp.vec3),
            cell_size: wp.array2d(dtype=wp.float32)):
     home, cell = wp.tid()
-    kind = cell_kind(cell, cells_per_side)
+    kind = cell_kind(cell, extent, counts[home])
     pressure[home, cell] = wp.float64(0.0)
     cell_size[home, cell] = 0.0
     drawn[home, cell] = wp.vec3(0.0, 0.0, 0.0)
     if kind == 0:
         return
-    place = cell_place(cell, cells_per_side)
+    place = cell_place(cell, extent)
     size = float(0.0)
     centre = wp.vec3(0.0, 0.0, 0.0)
     for tet in range(6):
-        start, one, two, end = kuhn_tet(corners, home, place, tet, cells_per_side)
+        start, one, two, end = kuhn_tet(corners, home, place, tet, extent)
         size += _tet_volume(start, one, two, end)
         if tet == 0:
             centre = 0.5 * (start + end)
@@ -118,29 +126,28 @@ def _press(corners: wp.array3d(dtype=wp.vec3), cell_quanta: wp.array2d(dtype=wp.
 
 @wp.kernel
 def _propose(corners: wp.array3d(dtype=wp.vec3), pressure: wp.array2d(dtype=wp.float64),
-             drawn: wp.array2d(dtype=wp.vec3), side: int, cells_per_side: int, scale: float, max_step: float,
-             proposal: wp.array3d(dtype=wp.vec3)):
+             drawn: wp.array2d(dtype=wp.vec3), side: int, extent: wp.vec3i, counts: wp.array(dtype=wp.vec3i),
+             scale: float, max_step: float, proposal: wp.array3d(dtype=wp.vec3)):
     ti, tj, tk = wp.tid()
-    rows = cells_per_side + 3
+    rows = extent[0] + 1
     home = ti // rows
     vertex = wp.vec3i(ti - home * rows, tj, tk)
     old = corners[ti, tj, tk]
     proposal[ti, tj, tk] = old
-    last = rows - 1
+    cells = counts[home]
     for axis in range(3):
-        if vertex[axis] == 0 or vertex[axis] == last:
+        if vertex[axis] == 0 or vertex[axis] >= cells[axis] + 2:
             return
-    extent = cells_per_side + 2
     force = wp.vec3d(0.0, 0.0, 0.0)
     for around in range(8):
         bits = wp.vec3i(around // 4, around // 2 % 2, around % 2)
         place = vertex - bits
-        cell = (place[0] * extent + place[1]) * extent + place[2]
+        cell = cell_id(place, extent)
         squeeze = pressure[home, cell]
         force += wp.vec3d(drawn[home, cell] / 8.0)
         if squeeze != wp.float64(0.0):
             for tet in range(6):
-                start, one, two, end = kuhn_tet(corners, home, place, tet, cells_per_side)
+                start, one, two, end = kuhn_tet(corners, home, place, tet, extent)
                 for slot in range(4):
                     if kuhn_corner(tet, slot) == bits:
                         grad = wp.vec3(0.0, 0.0, 0.0)
@@ -165,16 +172,17 @@ def _propose(corners: wp.array3d(dtype=wp.vec3), pressure: wp.array2d(dtype=wp.f
 
 
 @wp.kernel
-def _ring(proposal: wp.array3d(dtype=wp.vec3), side: int, cells_per_side: int):
+def _ring(proposal: wp.array3d(dtype=wp.vec3), side: int, extent: wp.vec3i, counts: wp.array(dtype=wp.vec3i)):
     ti, tj, tk = wp.tid()
-    rows = cells_per_side + 3
+    rows = extent[0] + 1
     home = ti // rows
     vertex = wp.vec3i(ti - home * rows, tj, tk)
-    last = rows - 1
+    cells = counts[home]
     on_ring = int(0)
     nearest = vertex
     for axis in range(3):
-        if vertex[axis] == 0 or vertex[axis] == last:
+        last = cells[axis] + 2
+        if vertex[axis] == 0 or vertex[axis] >= last:
             on_ring = 1
         nearest[axis] = wp.clamp(vertex[axis], 1, last - 1)
     if on_ring == 0:
@@ -183,25 +191,67 @@ def _ring(proposal: wp.array3d(dtype=wp.vec3), side: int, cells_per_side: int):
     for axis in range(3):
         if vertex[axis] == 0:
             position[axis] = 0.0
-        elif vertex[axis] == last:
+        elif vertex[axis] >= cells[axis] + 2:
             position[axis] = float(side)
     proposal[ti, tj, tk] = position
 
 
+@wp.func
+def _across(corners: wp.array3d(dtype=wp.vec3), home: int, place: wp.vec3i, axis: int, extent: wp.vec3i) -> float:
+    """The cell's least thickness along `axis`: its four edges along it, each measured across its low face."""
+    rows = extent[0] + 1
+    first = (axis + 1) % 3
+    second = (axis + 2) % 3
+    low = wp.vec3i(home * rows + place[0], place[1], place[2])
+    step = wp.vec3i(0, 0, 0)
+    step[axis] = 1
+    one = wp.vec3i(0, 0, 0)
+    one[first] = 1
+    two = wp.vec3i(0, 0, 0)
+    two[second] = 1
+    both = one + two
+    normal = wp.cross(corners[low[0] + both[0], low[1] + both[1], low[2] + both[2]] - corners[low[0], low[1], low[2]],
+                      corners[low[0] + two[0], low[1] + two[1], low[2] + two[2]]
+                      - corners[low[0] + one[0], low[1] + one[1], low[2] + one[2]])
+    if wp.length(normal) <= 0.0:
+        return 0.0
+    normal = wp.normalize(normal)
+    thinnest = float(1.0e30)
+    for edge in range(4):
+        at = low + one * (edge // 2) + two * (edge % 2)
+        top = at + step
+        span = corners[top[0], top[1], top[2]] - corners[at[0], at[1], at[2]]
+        thinnest = wp.min(thinnest, wp.abs(wp.dot(span, normal)))
+    return thinnest
+
+
+@wp.func
+def _thinned(corners: wp.array3d(dtype=wp.vec3), proposal: wp.array3d(dtype=wp.vec3), home: int, place: wp.vec3i,
+             extent: wp.vec3i) -> bool:
+    """True when the move leaves the joint thinner than MIN_JOINT_ACROSS along an axis it lies across, and thinner than it was."""
+    for axis in range(3):
+        if place[axis] % 2 == 1:
+            after = _across(proposal, home, place, axis, extent)
+            if after < MIN_JOINT_ACROSS and after < _across(corners, home, place, axis, extent):
+                return True
+    return False
+
+
 @wp.kernel
-def _check(proposal: wp.array3d(dtype=wp.vec3), cells_per_side: int, flags: wp.array3d(dtype=wp.int32),
-           bad: wp.array(dtype=wp.int32)):
+def _check(corners: wp.array3d(dtype=wp.vec3), proposal: wp.array3d(dtype=wp.vec3), extent: wp.vec3i,
+           counts: wp.array(dtype=wp.vec3i), flags: wp.array3d(dtype=wp.int32), bad: wp.array(dtype=wp.int32)):
     home, cell = wp.tid()
-    if cell_kind(cell, cells_per_side) == 0:
+    kind = cell_kind(cell, extent, counts[home])
+    if kind == 0:
         return
-    place = cell_place(cell, cells_per_side)
+    place = cell_place(cell, extent)
     smallest = float(1.0e30)
     for tet in range(6):
-        start, one, two, end = kuhn_tet(proposal, home, place, tet, cells_per_side)
+        start, one, two, end = kuhn_tet(proposal, home, place, tet, extent)
         smallest = wp.min(smallest, _tet_volume(start, one, two, end))
-    if smallest > MIN_TET:
+    if smallest > MIN_TET and not (kind == -1 and _thinned(corners, proposal, home, place, extent)):
         return
-    rows = cells_per_side + 3
+    rows = extent[0] + 1
     wp.atomic_add(bad, 0, 1)
     for around in range(8):
         flags[home * rows + place[0] + around // 4, place[1] + around // 2 % 2, place[2] + around % 2] = 1
@@ -218,29 +268,30 @@ def _revert(corners: wp.array3d(dtype=wp.vec3), proposal: wp.array3d(dtype=wp.ve
 
 def move_corners(state: State, settings: Settings) -> None:
     """Count each cell's quanta and move the lattice corners by the cells' pressures and the pull."""
-    if state.cells_per_side == 0:
+    if not state.has_lattice:
         return
     device = state.quanta.device
+    extent = wp.vec3i(*state.extent)
     count = state.cell_quanta.shape[1]
     state.cell_quanta.zero_()
     wp.launch(_count, dim=state.shape, device=device, inputs=[state.quanta, state.owner, state.side, state.cell_quanta])
     pressure = wp.zeros((state.universes, count), dtype=wp.float64, device=device)
     drawn = wp.zeros((state.universes, count), dtype=wp.vec3, device=device)
     wp.launch(_press, dim=(state.universes, count), device=device,
-              inputs=[state.corners, state.cell_quanta, state.pull, state.side, state.cells_per_side,
+              inputs=[state.corners, state.cell_quanta, state.pull, state.side, extent, state.counts,
                       settings.size_energy, settings.volume_rest, settings.volume_stiffness, settings.joint_rest, settings.push,
                       settings.push_steepness, pressure, drawn, state.cell_size])
     proposal = wp.empty_like(state.corners)
     wp.launch(_propose, dim=state.corners.shape, device=device,
-              inputs=[state.corners, pressure, drawn, state.side, state.cells_per_side,
+              inputs=[state.corners, pressure, drawn, state.side, extent, state.counts,
                       settings.corner_mobility * settings.step_time, settings.max_corner_step, proposal])
     flags = wp.zeros(state.corners.shape, dtype=wp.int32, device=device)
     bad = wp.zeros(1, dtype=wp.int32, device=device)
     for _ in range(CHECKS):
-        wp.launch(_ring, dim=state.corners.shape, device=device, inputs=[proposal, state.side, state.cells_per_side])
+        wp.launch(_ring, dim=state.corners.shape, device=device, inputs=[proposal, state.side, extent, state.counts])
         bad.zero_()
         wp.launch(_check, dim=(state.universes, count), device=device,
-                  inputs=[proposal, state.cells_per_side, flags, bad])
+                  inputs=[state.corners, proposal, extent, state.counts, flags, bad])
         if int(bad.numpy()[0]) == 0:
             wp.copy(state.corners, proposal)
             return

@@ -48,11 +48,11 @@ def _room(level: int, held: int) -> int:
 
 @wp.func
 def _keeps_shape(quanta: wp.array3d(dtype=wp.int32), owner: wp.array3d(dtype=wp.int32), site: wp.vec3i,
-                 home: int, side: int, own: int, goal: int, cells_per_side: int,
+                 home: int, side: int, own: int, goal: int, extent: wp.vec3i, cells: wp.vec3i,
                  adjacency: wp.array(dtype=wp.int32), face_adjacency: wp.array(dtype=wp.int32)) -> bool:
     """True when the site can leave `own` for `goal` without tearing a cell or the web, or unwrapping a volume."""
-    own_kind = cell_kind(own, cells_per_side)
-    goal_kind = cell_kind(goal, cells_per_side)
+    own_kind = cell_kind(own, extent, cells)
+    goal_kind = cell_kind(goal, extent, cells)
     same = int(0)
     minus = int(0)
     for index in range(27):
@@ -82,7 +82,7 @@ def _keeps_shape(quanta: wp.array3d(dtype=wp.int32), owner: wp.array3d(dtype=wp.
 def _drain(quanta: wp.array3d(dtype=wp.int32), owner: wp.array3d(dtype=wp.int32),
            target: wp.array3d(dtype=wp.int32), marks: wp.array3d(dtype=wp.uint8),
            cell_quanta: wp.array2d(dtype=wp.int64), cell_size: wp.array2d(dtype=wp.float32), side: int,
-           cells_per_side: int, phase_index: int, adjacency: wp.array(dtype=wp.int32),
+           extent: wp.vec3i, counts: wp.array(dtype=wp.vec3i), phase_index: int, adjacency: wp.array(dtype=wp.int32),
            face_adjacency: wp.array(dtype=wp.int32)):
     home, ti, tj, tk = wp.tid()
     site, valid = rehome_site(home, ti, tj, tk, phase_index, side)
@@ -100,9 +100,10 @@ def _drain(quanta: wp.array3d(dtype=wp.int32), owner: wp.array3d(dtype=wp.int32)
         if inside(there, home, side):
             if owner[there[0], there[1], there[2]] == goal and wp.abs(quanta[there[0], there[1], there[2]]) >= 2:
                 giver = 1
-    if giver == 0 and cell_kind(goal, cells_per_side) != 0:
+    cells = counts[home]
+    if giver == 0 and cell_kind(goal, extent, cells) != 0:
         return
-    if not _keeps_shape(quanta, owner, site, home, side, own, goal, cells_per_side, adjacency, face_adjacency):
+    if not _keeps_shape(quanta, owner, site, home, side, own, goal, extent, cells, adjacency, face_adjacency):
         return
     if amount > 0:
         size = cell_size[home, own]
@@ -153,9 +154,9 @@ def _drain(quanta: wp.array3d(dtype=wp.int32), owner: wp.array3d(dtype=wp.int32)
 
 def drain(state: State, phase_index: int) -> None:
     """Empty the leaving boxes of rehome phase `phase_index` into their own cell's face neighbours."""
-    if state.cells_per_side == 0:
+    if not state.has_lattice:
         return
     wp.launch(_drain, dim=rehome_dims(state, phase_index), device=state.quanta.device,
               inputs=[state.quanta, state.owner, state.target, state.marks, state.cell_quanta, state.cell_size,
-                      state.side, state.cells_per_side, int(phase_index), block_adjacency(state.quanta.device),
+                      state.side, wp.vec3i(*state.extent), state.counts, int(phase_index), block_adjacency(state.quanta.device),
                       block_adjacency(state.quanta.device, faces_only=True)])

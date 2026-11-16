@@ -46,6 +46,12 @@ never changed to make a result pass.
                    coarse step, for side-by-side comparisons)
   max_substeps     the most substeps one step may take; a step that needs more takes
                    this many and is counted in state.capped
+  split_across     the size across, in boxes (cube root of its corner volume), at which
+                   an energy volume tears in two and the tear becomes a new joint
+                   (volume_split.py, bible rule 8: the trigger is size); default 20,
+                   twice the start's 10-box volumes, so the halves start at the
+                   start's size; set before any run; 0 switches splits off
+                   (side-by-side comparisons only)
 """
 from __future__ import annotations
 
@@ -75,6 +81,7 @@ class Settings:
     rehomes_per_step: int = 27
     max_turn: float = 0.25
     max_substeps: int = 64
+    split_across: float = 20.0
 
     def __post_init__(self) -> None:
         if self.light_speed * self.step_time >= 3.0 ** -0.5:
@@ -87,5 +94,7 @@ class Settings:
             raise ValueError("size_energy must be > 0")
         if self.corner_mobility < 0.0 or not 0.0 <= self.max_corner_step < 1.0:
             raise ValueError("corner_mobility must be >= 0 and max_corner_step in 0 .. 1 box")
+        if self.split_across < 0.0:
+            raise ValueError("split_across must be >= 0 (0: no splits)")
         if self.max_turn < 0.0 or not 1 <= self.max_substeps <= 1024:
             raise ValueError("max_turn must be >= 0 and max_substeps between 1 and 1024")

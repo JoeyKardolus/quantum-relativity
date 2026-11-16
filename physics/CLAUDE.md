@@ -23,7 +23,7 @@ scenes share (dimension, whirl winding), CPU only.
   frictionless inside one sign; A leaks to A across exactly one joint (any thickness),
   with friction, less when squeezed, none past the seal; one shared joint between two
   neighbouring volumes, every A wrapped on all 26 sides, joints one web meeting at seams;
-  cells a forced moving lattice; a box changes cell only once emptied, sign only by collapse. The amount ignoring sign is exact to the quantum (bible rule 4). `engine/CLAUDE.md` says how.
+  cells a forced moving lattice; a box changes cell only once emptied or split, sign only by collapse or a split's tear. The amount ignoring sign is exact to the quantum (bible rule 4). `engine/CLAUDE.md` says how.
 - **Open space**: the start is a block of wrapped cells with uneven energy (ripples at every size,
   `engine/uneven_field.py`) inside an empty margin; space grows as outer joints take empty boxes.
   Cells reaching the closed walls (`stats()["edge_share"]`) end open space; report it.

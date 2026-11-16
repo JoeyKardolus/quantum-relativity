@@ -60,7 +60,7 @@ def _signed(sign_of: int, amount: int) -> int:
 def _hop(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32), side: int, axis: int,
          parity: int, duration: float, clock_packing: float, seed: int, keys: wp.array(dtype=wp.int32),
          counts: wp.array(dtype=wp.int32), sub_index: int, owner: wp.array3d(dtype=wp.int32),
-         cell_quanta: wp.array2d(dtype=wp.int64), cells_per_side: int):
+         cell_quanta: wp.array2d(dtype=wp.int64), extent: wp.vec3i, lattice_counts: wp.array(dtype=wp.vec3i)):
     ti, tj, tk = wp.tid()
     pairs = (side - parity) // 2
     home = ti // side
@@ -84,7 +84,7 @@ def _hop(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32)
     own = owner[here[0], here[1], here[2]]
     other = owner[there[0], there[1], there[2]]
     if near > 0 and own != other:
-        shared = shared_joint(own, other, cells_per_side)
+        shared = shared_joint(own, other, extent, lattice_counts[home])
         if shared < 0:
             return
         if cell_quanta[home, shared] != wp.int64(0):
@@ -113,4 +113,4 @@ def hop(state: State, settings: Settings, axis: int, parity: int, duration: floa
     wp.launch(_hop, dim=tuple(dims), device=state.quanta.device,
               inputs=[state.quanta, state.phase, state.side, int(axis), int(parity), float(duration),
                       settings.clock_packing, int(seed), state.keys, state.substeps, int(sub_index),
-                      state.owner, state.cell_quanta, state.cells_per_side])
+                      state.owner, state.cell_quanta, wp.vec3i(*state.extent), state.counts])

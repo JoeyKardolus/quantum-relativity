@@ -61,7 +61,7 @@ def _hand_over(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.fl
 
 def hand_over(state: State, phase_index: int) -> None:
     """Give the emptied boxes of rehome phase `phase_index` to the cells that cover them."""
-    if state.cells_per_side == 0:
+    if not state.has_lattice:
         return
     wp.launch(_hand_over, dim=rehome_dims(state, phase_index), device=state.quanta.device,
               inputs=[state.quanta, state.phase, state.clock, state.owner, state.target, state.marks, state.side,
