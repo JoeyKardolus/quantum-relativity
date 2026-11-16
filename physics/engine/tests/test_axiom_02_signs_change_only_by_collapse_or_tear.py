@@ -10,10 +10,12 @@ minus never cancel: no other rule changes the plus total). Staged trigger: the 8
 even start of axiom 10 (new_universe(5, 10, seed=1, unevenness=0, margin=8)) with joint
 J between volumes (2, 2, 2) and (4, 2, 2) left with 100 quanta per box, so it wants a
 thousand times its room and is squeezed past the collapse limit; one full step():
-every box that turned minus to plus is marked as collapse, none turned plus to minus,
-and the plus gain equals the collapsed quanta, the amount exact. A box that changed cell
-in the same step (emptied and refilled by its new cell, owner-change mark 2) is counted
-apart as in the default run: its quanta did not turn.
+every box that turned minus to plus is marked as collapse, none turned plus to minus
+and nothing tore, and the plus gain equals the collapsed quanta, the amount exact. A box
+that changed cell in the same step (emptied and refilled by its new cell, owner-change
+mark 2) is counted apart in both directions, as in the default run: its quanta did not
+turn (until 2026-11-16 the plus-to-minus count forgot this, against this docstring; the
+plus total, which only a turned quantum can change, is checked exactly).
 """
 import numpy as np
 
@@ -54,13 +56,14 @@ def test_a_staged_collapse_is_the_only_minus_to_plus_and_keeps_the_amount():
     now, marks = state.quanta.numpy(), state.marks.numpy()
     turned_plus = (quanta < 0) & (now > 0)
     turned_minus = (quanta > 0) & (now < 0)
+    rehomed_minus = int((turned_minus & ((marks & 2) == 2)).sum())
     collapsed = int(state.tallies.numpy()[0, 3])
     collapsed_boxes = int((turned_plus & ((marks & 1) == 1)).sum())
     unmarked = int((turned_plus & ((marks & 3) == 0)).sum())
     print(f"minus->plus {int(turned_plus.sum())} boxes: collapse-marked {collapsed_boxes}, changed cell "
           f"{int(turned_plus.sum()) - collapsed_boxes - unmarked}, neither {unmarked}; "
-          f"plus->minus {int(turned_minus.sum())}; plus gain {after['plus'] - before['plus']}, collapsed quanta "
+          f"plus->minus {int(turned_minus.sum())} (changed cell {rehomed_minus}); plus gain {after['plus'] - before['plus']}, collapsed quanta "
           f"{collapsed}; amount {before['amount']} -> {after['amount']}")
     assert collapsed_boxes > 0 and unmarked == 0
-    assert turned_minus.sum() == 0
+    assert turned_minus.sum() == rehomed_minus and int(state.torn[0]) == 0
     assert after["plus"] - before["plus"] == collapsed and after["amount"] == before["amount"]

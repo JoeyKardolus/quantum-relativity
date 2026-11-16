@@ -32,7 +32,9 @@ Module map:
   cell_count.py     cell_count: every cell's quanta, boxes and mean pull
   cell_laws.py      cell_laws: clock rate, wanted size, volume size, joint push and squeeze
   cell_upload.py    cell_upload: the cell table on the GPU for the box kernels
-  joint_swing.py    joint_swing: joints' sizes swing like springs against their neighbours
+  cell_room.py      cell_room: (Warp func) the share of a cell's size its boxes lack
+  settle_counts.py  settle_counts: a phase's box-count changes applied at once, order-free
+  joint_swing.py    joint_swing: joints' sizes swing like frictionless springs, energy kept
   pull_wave.py      pull_wave: the pull's wave equation, leapfrog, light speed, local clocks
   on_site.py        on_site: exact phase turns by the box potential on local clocks
   hop.py            hop: exact pair rotations moving whole quanta inside one cell
@@ -71,6 +73,8 @@ from physics.engine.box_potential import box_potential
 from physics.engine.cell_count import cell_count
 from physics.engine.cell_laws import cell_laws
 from physics.engine.cell_upload import cell_upload
+from physics.engine.cell_room import cell_room
+from physics.engine.settle_counts import settle_counts
 from physics.engine.joint_swing import joint_swing
 from physics.engine.pull_wave import pull_wave
 from physics.engine.on_site import on_site
@@ -97,7 +101,7 @@ from physics.engine.stats import stats
 from physics.engine.view_source import view_source
 
 __all__ = ["Settings", "State", "uneven_field", "new_universe", "reach", "face_step", "near", "clock_rate",
-           "pass_seed", "pair_rotation", "box_potential", "cell_count", "cell_laws", "cell_upload", "joint_swing",
+           "pass_seed", "pair_rotation", "box_potential", "cell_count", "cell_laws", "cell_upload", "cell_room", "settle_counts", "joint_swing",
            "pull_wave", "on_site", "hop", "substeps", "cross", "exchange", "mortar_shift", "group_label", "one_group", "block_adjacency",
            "collapse", "volume_split", "tick_clocks", "totals", "attach_ladder", "ladder_sync", "step",
            "host_boxes", "lattice_of", "ENERGY_VOLUME", "JOINT", "cells", "seams", "stats", "view_source"]

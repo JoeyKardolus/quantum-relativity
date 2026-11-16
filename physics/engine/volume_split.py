@@ -13,7 +13,9 @@ Each joint V had keeps its boxes and lies between its other volume and the half 
 touches; a joint touching both halves is shared out along the plane, its boxes past the
 plane becoming a joint of the new half (marks bit 2, no sign change; its boxes in the
 plane that touch both halves join the tear's joint), so two neighbouring volumes still
-share exactly one joint. ABAB holds after: the two halves' plus boxes lie two boxes
+share exactly one joint; the shared joint's size is shared out with its boxes, each piece
+keeping the stretch the whole had (joint sizes are their own swing, never box counts,
+joint_swing.py). ABAB holds after: the two halves' plus boxes lie two boxes
 apart across the tear. A cut that leaves a half without boxes is not made.
 state.splits and state.torn count splits and the quanta turned minus. Returns the
 number of splits.
@@ -126,10 +128,11 @@ def _share_joint(state: State, universe: int, joint: int, volume: int, half: int
     marks[beyond] |= 2
     owner[both] = tear
     marks[both] |= 2
-    moved = int(beyond.sum())
-    state.size[universe, twin] = float(moved)
-    state.size[universe, joint] = max(float(state.size[universe, joint]) - moved - int(both.sum()), 1.0)
-    state.size[universe, tear] += float(both.sum())
+    total = max(int(boxes.sum()), 1)
+    whole = float(state.size[universe, joint])
+    state.size[universe, twin] = whole * int(beyond.sum()) / total
+    state.size[universe, tear] += whole * int(both.sum()) / total
+    state.size[universe, joint] = whole - state.size[universe, twin] - whole * int(both.sum()) / total
     state.cell_clock[universe, twin] = state.cell_clock[universe, joint]
 
 

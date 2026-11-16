@@ -30,7 +30,8 @@ kind 0), on the host (numpy, the cell rules run there, cell_laws.py):
               its wanted size (size_energy[0] / quanta) ** 3 (bible rule 4, length =
               constant / energy), a joint's swings round the size its energy wants
               (joint_swing.py); the boxes follow it (exchange.py)
-  speed       float64 a joint's size change per unit of its local time
+  speed       float64 a joint's size change per unit of counter time (its clock enters
+              through its springs, joint_swing.py, so the summed size is kept)
   wanted      float64 the size the cell's energy wants, (size_energy[k] / quanta) ** 3
   cell_push   float64 a joint's push per quantum, push * (wanted / size) ** steepness;
               0 for a volume (a volume only pulls)

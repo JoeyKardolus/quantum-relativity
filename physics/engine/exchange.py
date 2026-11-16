@@ -3,10 +3,12 @@
 Contract: `exchange(state, settings)` runs every exchange phase once
 (state.side split into sites `stride` apart on each axis, stride**3 phases, in an order
 shuffled afresh each step; sites of one phase share no box of their 3 x 3 x 3 blocks).
-Each cell has a deficit, its size (state.size: an energy volume's is the size its energy
-wants, a joint's its swinging size) minus its boxes. A site box of cell X moves to the
-face-neighbouring cell Y with the largest deficit when Y's deficit exceeds X's by at
-least 2 (so the move never turns the order round) (where a joint is one box thick a
+Each cell has a room, its size (state.size: an energy volume's is the size its energy
+wants, a joint's its swinging size) minus its boxes, over its size: boxes follow sizes,
+so where there is more or less space than the cells want every cell is stretched or
+pressed by the same share, and a thin joint never soaks up the room a volume gives
+off. A site box of cell X moves to the face-neighbouring cell Y with the largest room
+when Y's room still exceeds X's after the move (so the move never turns the order round) (where a joint is one box thick a
 volume cannot take its boxes; mortar_shift.py moves such a wall); with chance the slower of
 the two cells' clock rates (the boxes follow on local clocks, at most one box a step),
 when all of these hold:
@@ -26,12 +28,11 @@ evenly, sign kept), joins Y and takes half the quanta of the fullest giver with 
 no box ever holds two signs and no quantum changes sign; the amount is exact. An empty
 box beside a joint is taken by that joint the same way, with its clock rate as chance and no
 deficit asked (a joint only pushes and empty space does nothing; not in the
-correction): this is how space grows where joints meet empty space. Box counts are
-updated with atomics as boxes move, and a move that would break the deficit order is
-put back. Every move marks its box (2) and adds to tallies[u, 2]. A joint's size
-follows the boxes it took from energy volumes or empty space and the boxes it gave to
-energy volumes out of its own size (not out of boxes it held beyond its size)
-(state.size), so only the joints' own swing moves boxes between joints. state.cell_boxes is updated.
+correction): this is how space grows where joints meet empty space. Each phase first proposes every move, then commits only those that keep the
+order even if every proposal of the phase went through (settle_counts.py), so the boxes
+move the same whatever order the GPU runs the sites in. Every move marks its box (2) and adds to tallies[u, 2]. No size follows the
+boxes: a joint's size is its own swing (joint_swing.py), a volume's its energy's.
+state.cell_boxes is updated.
 Returns the number of boxes moved.
 """
 from __future__ import annotations
@@ -40,9 +41,11 @@ import numpy as np
 import warp as wp
 
 from physics.engine.block_adjacency import block_adjacency
+from physics.engine.cell_room import cell_room
 from physics.engine.face_step import face_step
 from physics.engine.one_group import one_group
 from physics.engine.reach import reach
+from physics.engine.settle_counts import settle_counts
 from physics.engine.settings import Settings
 from physics.engine.state import State
 
@@ -97,7 +100,8 @@ def _exchange(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.flo
               clock: wp.array3d(dtype=wp.float32), owner: wp.array3d(dtype=wp.int32),
               marks: wp.array3d(dtype=wp.uint8), kinds: wp.array2d(dtype=wp.int32),
               between: wp.array2d(dtype=wp.vec2i), sizes: wp.array2d(dtype=wp.float32),
-              rates: wp.array2d(dtype=wp.float32), boxes: wp.array2d(dtype=wp.int32), sync: wp.array2d(dtype=wp.int32),
+              rates: wp.array2d(dtype=wp.float32), boxes: wp.array2d(dtype=wp.int32), ins: wp.array2d(dtype=wp.int32),
+              outs: wp.array2d(dtype=wp.int32), delta: wp.array2d(dtype=wp.int32), mode: int,
               tallies: wp.array2d(dtype=wp.int64), side: int, wrap: int, stride: int, offset: wp.vec3i, chance: float,
               seed: int, keys: wp.array(dtype=wp.int32), adjacency: wp.array(dtype=wp.int32),
               face_adjacency: wp.array(dtype=wp.int32)):
@@ -113,7 +117,7 @@ def _exchange(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.flo
     own_room = float(0.0)
     if own >= 0:
         own_kind = kinds[home, own]
-        own_room = sizes[home, own] - float(boxes[home, own])
+        own_room = cell_room(sizes[home, own], boxes[home, own])
     goal = int(-1)
     best = float(-1.0e30)
     for face in range(6):
@@ -123,7 +127,7 @@ def _exchange(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.flo
             if cell >= 0 and cell != own:
                 cell_kind = kinds[home, cell]
                 allowed = True
-                room = sizes[home, cell] - float(boxes[home, cell])
+                room = cell_room(sizes[home, cell], boxes[home, cell])
                 if own < 0:
                     allowed = cell_kind == -1
                     room = float(1.0e20)
@@ -133,7 +137,7 @@ def _exchange(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.flo
                     allowed = False
                 elif cell_kind == 1 and own_kind == -1 and not _holds(between[home, own], cell):
                     allowed = False
-                elif room - own_room < 2.0:
+                elif room - own_room < 1.0 / wp.max(sizes[home, cell], 1.0) + 1.0 / wp.max(sizes[home, own], 1.0):
                     allowed = False
                 if allowed and room > best:
                     best = room
@@ -171,16 +175,18 @@ def _exchange(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.flo
         return
     if not _fits(quanta, owner, kinds, between, site, home, side, wrap, own, goal, adjacency, face_adjacency):
         return
+    if mode == 0:
+        wp.atomic_add(ins, home, goal, 1)
+        if own >= 0:
+            wp.atomic_add(outs, home, own, 1)
+        return
     if own >= 0:
-        left = wp.atomic_add(boxes, home, own, -1)
-        taken = wp.atomic_add(boxes, home, goal, 1)
-        order = (sizes[home, goal] - float(taken)) - (sizes[home, own] - float(left))
-        if left < 2 or order < 2.0:
-            wp.atomic_add(boxes, home, own, 1)
-            wp.atomic_add(boxes, home, goal, -1)
+        left = boxes[home, own] - outs[home, own]
+        taken = boxes[home, goal] + ins[home, goal]
+        if left < 1 or cell_room(sizes[home, goal], taken) - cell_room(sizes[home, own], left) < 0.0:
             return
-    else:
-        wp.atomic_add(boxes, home, goal, 1)
+        wp.atomic_add(delta, home, own, -1)
+    wp.atomic_add(delta, home, goal, 1)
     held = quanta[site[0], site[1], site[2]]
     amount = wp.abs(held)
     if own >= 0:
@@ -210,11 +216,6 @@ def _exchange(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.flo
     owner[site[0], site[1], site[2]] = goal
     marks[site[0], site[1], site[2]] = marks[site[0], site[1], site[2]] | wp.uint8(2)
     wp.atomic_add(tallies, home, 2, wp.int64(1))
-    goal_kind = kinds[home, goal]
-    if goal_kind == -1 and own_kind != -1:
-        wp.atomic_add(sync, home, goal, 1)
-    if own_kind == -1 and goal_kind != -1 and float(left - 1) < sizes[home, own] - 0.5:
-        wp.atomic_add(sync, home, own, -1)
 
 
 def _stride(state: State) -> int:
@@ -229,22 +230,23 @@ def exchange(state: State, settings: Settings) -> int:
     device = state.quanta.device
     stride = _stride(state)
     boxes = wp.array(state.cell_boxes.astype(np.int32), dtype=wp.int32, device=device)
-    sync = wp.zeros(state.kind.shape, dtype=wp.int32, device=device)
     before = int(state.tallies.numpy()[:, 2].sum())
     chance = 1.0
     order = np.random.default_rng((_ORDER_SEED, state.step)).permutation(stride ** 3)
     dims = (state.universes,) + (-(-state.side // stride),) * 3
     adjacency = block_adjacency(device)
     faces = block_adjacency(device, faces_only=True)
+    counts = [wp.zeros(state.kind.shape, dtype=wp.int32, device=device) for _ in range(3)]
     for phase_index in order:
         offset = wp.vec3i(int(phase_index) // (stride * stride), int(phase_index) // stride % stride,
                           int(phase_index) % stride)
         seed = (state.step * 4099 + int(phase_index) * 131 + 7) & 0x7FFFFFFF
-        wp.launch(_exchange, dim=dims, device=device,
-                  inputs=[state.quanta, state.phase, state.clock, state.owner, state.marks, state.cells_d["kind"],
-                          state.cells_d["between"], state.cells_d["size"], state.cells_d["rate"], boxes, sync,
-                          state.tallies, state.side, int(state.wrap), stride, offset, float(chance),
-                          int(seed), state.keys, adjacency, faces])
+        for mode in (0, 1):
+            wp.launch(_exchange, dim=dims, device=device,
+                      inputs=[state.quanta, state.phase, state.clock, state.owner, state.marks, state.cells_d["kind"],
+                              state.cells_d["between"], state.cells_d["size"], state.cells_d["rate"], boxes, *counts,
+                              mode, state.tallies, state.side, int(state.wrap), stride, offset, float(chance),
+                              int(seed), state.keys, adjacency, faces])
+        settle_counts(boxes, counts)
     state.cell_boxes = boxes.numpy().astype(np.int64)
-    state.size = np.where(state.kind == -1, state.size + sync.numpy(), state.size)
     return int(state.tallies.numpy()[:, 2].sum()) - before

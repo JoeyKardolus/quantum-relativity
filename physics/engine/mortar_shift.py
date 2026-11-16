@@ -8,7 +8,9 @@ grid of sites moved by a fresh offset each step, so the 3 x 3 x 3 blocks round t
 sites and the boxes they drain into never overlap). A site box j of J that touches A
 across a face, has plus boxes of B among its 26 neighbours (the set S, n boxes) and no
 other volume's, no empty space or wall, and every joint box on its faces a joint of A,
-moves when A's deficit (state.size minus boxes) exceeds B's by at least n + 1, with
+moves when A's room (state.size minus boxes, over state.size, cell_room.py) still
+exceeds B's after the move even if every shift proposed in the same phase went through
+(propose, then commit; settle_counts.py), with
 chance the slowest clock rate of A, B and J (on local clocks): j joins A and the boxes of S join J, so A grows by one box, B gives n,
 J holds n - 1 more boxes than before, and its size (state.size) does not change: the
 wall was moved, not grown, so J gives the extra boxes back to whichever volume wants
@@ -28,9 +30,11 @@ import numpy as np
 import warp as wp
 
 from physics.engine.block_adjacency import block_adjacency
+from physics.engine.cell_room import cell_room
 from physics.engine.face_step import face_step
 from physics.engine.one_group import one_group
 from physics.engine.reach import reach
+from physics.engine.settle_counts import settle_counts
 from physics.engine.settings import Settings
 from physics.engine.state import State
 
@@ -95,7 +99,8 @@ def _scan(quanta: wp.array3d(dtype=wp.int32), owner: wp.array3d(dtype=wp.int32),
 def _shift(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32),
            clock: wp.array3d(dtype=wp.float32), owner: wp.array3d(dtype=wp.int32), marks: wp.array3d(dtype=wp.uint8),
            kinds: wp.array2d(dtype=wp.int32), between: wp.array2d(dtype=wp.vec2i), sizes: wp.array2d(dtype=wp.float32),
-           rates: wp.array2d(dtype=wp.float32), boxes: wp.array2d(dtype=wp.int32),
+           rates: wp.array2d(dtype=wp.float32), boxes: wp.array2d(dtype=wp.int32), ins: wp.array2d(dtype=wp.int32),
+           outs: wp.array2d(dtype=wp.int32), delta: wp.array2d(dtype=wp.int32), mode: int,
            tallies: wp.array2d(dtype=wp.int64), side: int, wrap: int, span: int, offset: wp.vec3i, chance: float,
            seed: int, keys: wp.array(dtype=wp.int32), adjacency: wp.array(dtype=wp.int32),
            face_adjacency: wp.array(dtype=wp.int32)):
@@ -123,8 +128,9 @@ def _shift(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float3
         second = sides[1 - pick]
         found = _scan(quanta, owner, between, site, home, side, wrap, first, second)
         if found > 0:
-            lead = (sizes[home, first] - float(boxes[home, first])) - (sizes[home, second] - float(boxes[home, second]))
-            if lead >= float(found + 1):
+            lead = cell_room(sizes[home, first], boxes[home, first] + 1) - cell_room(sizes[home, second],
+                                                                             boxes[home, second] - found)
+            if lead >= 0.0:
                 grower = first
                 shrinker = second
                 count = found
@@ -178,14 +184,17 @@ def _shift(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float3
                                 receivers += 1
                 if receivers == 0 or not one_group(stays, adjacency):
                     return
-    taken = wp.atomic_add(boxes, home, grower, 1)
-    left = wp.atomic_add(boxes, home, shrinker, -count)
-    lead = (sizes[home, grower] - float(taken)) - (sizes[home, shrinker] - float(left))
-    if left - count < 2 or lead < float(count + 1):
-        wp.atomic_add(boxes, home, grower, -1)
-        wp.atomic_add(boxes, home, shrinker, count)
+    if mode == 0:
+        wp.atomic_add(ins, home, grower, 1)
+        wp.atomic_add(outs, home, shrinker, count)
         return
-    wp.atomic_add(boxes, home, joint, count - 1)
+    taken = boxes[home, grower] + ins[home, grower]
+    left = boxes[home, shrinker] - outs[home, shrinker]
+    if left < 2 or cell_room(sizes[home, grower], taken) - cell_room(sizes[home, shrinker], left) < 0.0:
+        return
+    wp.atomic_add(delta, home, grower, 1)
+    wp.atomic_add(delta, home, shrinker, -count)
+    wp.atomic_add(delta, home, joint, count - 1)
     each = held // count
     rest = held - each * count
     for index_place in range(27):
@@ -241,13 +250,16 @@ def mortar_shift(state: State, settings: Settings) -> int:
     dims = (state.universes,) + (span // _STRIDE + 1,) * 3
     adjacency = block_adjacency(device)
     faces = block_adjacency(device, faces_only=True)
+    counts = [wp.zeros(state.kind.shape, dtype=wp.int32, device=device) for _ in range(3)]
     for phase_index in order:
         place = np.array([phase_index // 25, phase_index // 5 % 5, phase_index % 5]) + shift
         seed = (state.step * 7919 + int(phase_index) * 197 + 3) & 0x7FFFFFFF
-        wp.launch(_shift, dim=dims, device=device,
-                  inputs=[state.quanta, state.phase, state.clock, state.owner, state.marks, state.cells_d["kind"],
-                          state.cells_d["between"], state.cells_d["size"], state.cells_d["rate"], boxes,
-                          state.tallies, state.side, int(state.wrap), int(span), wp.vec3i(*[int(v) for v in place]),
-                          1.0, int(seed), state.keys, adjacency, faces])
+        for mode in (0, 1):
+            wp.launch(_shift, dim=dims, device=device,
+                      inputs=[state.quanta, state.phase, state.clock, state.owner, state.marks, state.cells_d["kind"],
+                              state.cells_d["between"], state.cells_d["size"], state.cells_d["rate"], boxes, *counts,
+                              mode, state.tallies, state.side, int(state.wrap), int(span),
+                              wp.vec3i(*[int(v) for v in place]), 1.0, int(seed), state.keys, adjacency, faces])
+        settle_counts(boxes, counts)
     state.cell_boxes = boxes.numpy().astype(np.int64)
     return int(state.tallies.numpy()[:, 2].sum()) - before

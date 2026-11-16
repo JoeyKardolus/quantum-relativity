@@ -16,9 +16,11 @@ every part runs on the local clock of the cell it acts in (owner, 2026-11-16):
                    half a step each, the hops in reverse order, on_site for half a step
                    (on_site.py, hop.py: whole quanta inside one cell, frictionless)
   5. cross         energy diffuses across every joint between two volumes, the arriving
-                   quanta turned to heat (cross.py)
-  6. joint_swing   every joint's size swings, pushed against its neighbours'
-                   (joint_swing.py)
+                   quanta turned to heat (cross.py); the cells are counted again and every
+                   volume's size follows its new energy at once (cell_laws.py)
+  6. joint_swing   every joint's size swings, pushed against its neighbours', the swing
+                   energy kept (joint_swing.py); a joint pressed to the collapse limit
+                   within the step collapses at once (collapse.py)
   7. exchange      the boxes follow the cells' sizes, at most at light speed
                    (exchange.py); mortar_shift: a growing volume pushes a one-box-thick
                    joint wall on into its neighbour (mortar_shift.py)
@@ -30,6 +32,8 @@ collapse and a tear. `marks` is zeroed first; after a step it says which boxes c
 cell or sign and by which rule (1 collapse, 2 owner change, 8 split). Returns None.
 """
 from __future__ import annotations
+
+import numpy as np
 
 from physics.engine.cell_count import cell_count
 from physics.engine.cell_laws import cell_laws
@@ -66,7 +70,12 @@ def step(state: State, settings: Settings) -> None:
     for sub_index in range(int(substeps(state, settings).max())):
         _fluid(state, settings, half, sub_index)
     cross(state, settings, squeeze)
-    joint_swing(state, settings, cell_count(state))
+    pull = cell_count(state)
+    cell_laws(state, settings)
+    pressed = joint_swing(state, settings, pull)
+    if collapse(state, settings, np.where(pressed, settings.collapse_squeeze, 0.0)):
+        cell_count(state)
+        cell_laws(state, settings)
     cell_upload(state)
     exchange(state, settings)
     mortar_shift(state, settings)

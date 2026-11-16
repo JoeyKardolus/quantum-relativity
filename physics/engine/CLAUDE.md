@@ -19,9 +19,14 @@ side; the detail ladder (`physics/ladder`) sits beside the boxes once attached.
 - **No size at rest, no drift setting.** A cell wants (size_energy / quanta)**3 boxes
   (`cell_laws`), the constant fixed once by `new_universe`'s correction. Volumes only
   pull, joints only push, empty space does nothing.
-- **Joints swing, volumes follow.** `joint_swing` moves joint sizes like springs with
-  inertia (summed size kept); `exchange` and `mortar_shift` move boxes toward the sizes,
-  a box changing cell only once emptied, every volume wrapped on all 26 sides.
+- **Joints swing, volumes follow.** `joint_swing` is a frictionless spring step
+  (implicit, discrete gradient) keeping swing energy and summed size exactly; an
+  explicit step pumped energy in at the steep wall. A joint pressed to the collapse
+  limit in the swing collapses that step. Boxes follow sizes by relative room
+  (`exchange`, `mortar_shift`, `cell_room`), never sizes boxes; a box changes cell only
+  once emptied, every volume wrapped on all 26 sides.
+- **Deterministic.** Box moves are proposed, then committed against their phase's worst
+  case (`settle_counts`): one seed, one run. No put-back on a racing atomic.
 - **Local clocks**: every per-cell rule runs at its cell's rate (`clock_rate`).
 - **Wrapping**: `new_universe` with margin 0 wraps round when its side is even, else has
   walls. Open-space scenes pass a margin (`physics/scenes/open_margin.py`).
@@ -30,11 +35,13 @@ side; the detail ladder (`physics/ladder`) sits beside the boxes once attached.
 
 ## Measured (2026-11-16, RTX 5080, defaults, seed 1)
 
-Default universe (16 places of 10 boxes, wraps, 88^3, 512 volumes): the 1000-step run
-is on issue #1. Axiom tests red at landing:
-02 (a staged collapse turns 631 plus boxes minus), 05 (joints reach 34% of the boxes,
-at most 33% allowed), 12 (11 of 1,536 joints never swing back), and the 500-step whirl
-(one winding flips by step 500).
+Default universe (16 places of 10 boxes, wraps, 88^3, 512 volumes), 2000 steps at ~12
+steps/s: no stall, amount exact, 0 collapses, 0 splits, lumps 82 -> 4, joints' share of
+boxes 25% -> 32% (diffusion evens the volumes' energy, so their summed wanted size
+shrinks and the closed universe's room goes to every cell by share). Red: axiom 12
+(joints swing slowly, median 1 reversal in 300 steps; the old reversals were the
+explicit step's energy pump) and the 500-step whirl (the free fluid empties the core;
+whole quanta in boxes of 1-20 scramble the small loops).
 
 ## Run
 
