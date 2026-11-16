@@ -941,7 +941,7 @@ The owner's eight axioms (2026-11-16); the rules below spell them out, and the e
 4. **Crossing**: energy diffuses between plus swirls only through minus; that is the only friction, and it becomes heat.
 5. **Packing**: more packed is smaller, slower and pulls harder; pull spreads at a finite speed, weaker with distance; squeezed minus pushes back steeply.
 6. **Limits**: squeezed minus collapses into a merge of its two volumes; overstretched plus tears, and only that cell splits.
-7. **Quantum**: each box's fluid also carries a phase, so waves add and cancel; moving energy can split over several routes at once and settles whole in one cell when something reacts with it or it loses its momentum; the halves of a split share a direct pull, private to that pair, and a pointer flipping on the pair's own clock, weighted by each cell's share, picks where it settles.
+7. **Quantum**: each box's fluid also carries a phase, so waves add and cancel. Moving energy can split over several routes at once. Every split gets a direct pull between its halves, private to them, and its own clock, starting at the split with a speed set at that split that nobody can know. At each tick a pointer jumps to one of the halves' cells, with that cell's share of the energy as its chance. When something reacts with a half, or the energy loses its momentum, it settles whole in the cell the pointer is on.
 8. **Nothing else.**
 
 ### The rules
