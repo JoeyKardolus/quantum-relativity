@@ -1,7 +1,7 @@
 """Box points: the occupied Planck boxes as drawable points, gathered on the GPU.
 
 Contract: `BoxPoints()` keeps GPU buffers between calls. `boxes(view, reference,
-shown=SHOW_BOTH, look=GLOW, slice_offset=None)` takes the source's view
+shown=SHOW_BOTH, look=GLOW, slice_offset=None, slice_boxes=SLICE_BOXES)` takes the source's view
 (`cells_source.py`: `positions` (n, 3) box centres in box units, as an (n, 3)
 array of numbers or an (n,) array of 3-vectors; `density` (n,) energy per box;
 `kind` (n,) the kind of the cell owning the box, ENERGY_VOLUME or JOINT; `border`
@@ -9,9 +9,10 @@ array of numbers or an (n,) array of 3-vectors; `density` (n,) energy per box;
 device or numpy, which is read on the CPU), the start reference
 (`start_reference`: the energy volumes' mean density, the joints' mean density,
 boxes deep), `shown`, which kinds to draw (SHOW_ENERGY_VOLUMES, SHOW_JOINTS or
-SHOW_BOTH), `look`, how they are lit (GLOW or NEAREST), and `slice_offset`, None
+SHOW_BOTH), `look`, how they are lit (GLOW, NEAREST or SLAB), `slice_offset`, None
 for the whole space or a whole number of boxes from the middle layer along
-SLICE_AXIS (z), and returns a `Gathered`: positions (m, 3) float32, colours
+SLICE_AXIS (z), and `slice_boxes`, the slice's thickness in box layers (SLICE_BOXES,
+1, for the slice; SLAB_BOXES for the slab), and returns a `Gathered`: positions (m, 3) float32, colours
 (m, 4) uint8, negative (boxes with a density below zero), low and high (float32
 (3,), the corners of the occupied boxes' bounding box, for fitting the view, over
 every occupied box whatever is shown or sliced; zeros when there are none),
@@ -21,7 +22,7 @@ None without a slice).
 
 Every occupied box is a candidate; empty boxes are never in the view, so never
 drawn, and a box of a kind not shown is left out. With a slice only boxes whose
-centre lies within SLICE_BOXES / 2 of the slice centre are kept: the slice centre
+centre lies within slice_boxes / 2 of the slice centre are kept: the slice centre
 is the occupied box layer nearest the middle of the bounds along SLICE_AXIS, moved
 by slice_offset layers and held inside the occupied layers.
 
@@ -38,6 +39,12 @@ NEAREST_DIMMEST at contrast 1 / PACKED or below, through the middle at the start
 mean, to 1 at PACKED or above (log-linear, the fixed `opacity.py` PACKED; never
 re-normalised). Alpha is 255. The window draws these depth-tested, the nearest
 box hiding those behind it, so the structure reads.
+
+SLAB: the inside look, for the slab through the middle: like NEAREST but in
+brighter, clearly distinct colours (SLAB_RED energy volumes, SLAB_BLUE joints), a
+cell border box lifted SLAB_BORDER_LIFT of the way to white, and density as a
+visible brightness: SLAB_DIMMEST at or below the kind's start mean, rising
+log-linearly to 1 at PACKED times it, so packed cells stand out. Alpha is 255.
 
 Past MOST_POINTS shown boxes (whole space only) one uniform random share is kept
 (never by order or rank) and in GLOW each kept point's light is divided by that
@@ -69,13 +76,21 @@ SHOW_JOINTS = 2
 SHOW_BOTH = SHOW_ENERGY_VOLUMES | SHOW_JOINTS
 GLOW = 0
 NEAREST = 1
+SLAB = 2
 NEAREST_DIMMEST = 0.35
 SLICE_AXIS = 2
 SLICE_BOXES = 1.0
+SLAB_BOXES = 5.0
+SLAB_DIMMEST = 0.4
+SLAB_BORDER_LIFT = 0.5
+SLAB_RED = (255, 30, 30)
+SLAB_BLUE = (30, 120, 255)
 RED = (255, 64, 38)
 BLUE = (64, 115, 255)
 _RED = wp.constant(wp.vec3(*RED))
 _BLUE = wp.constant(wp.vec3(*BLUE))
+_SLAB_RED = wp.constant(wp.vec3(*SLAB_RED))
+_SLAB_BLUE = wp.constant(wp.vec3(*SLAB_BLUE))
 _THINNING_SEED = 104729
 _HUGE = 3.0e38
 
@@ -144,11 +159,19 @@ def _shade(contrast: wp.float32) -> wp.float32:
     return wp.float32(NEAREST_DIMMEST) + (wp.float32(1.0) - wp.float32(NEAREST_DIMMEST)) * place
 
 
+@wp.func
+def _slab_shade(contrast: wp.float32) -> wp.float32:
+    """Brightness of a slab box: SLAB_DIMMEST at or below the start mean, 1 at PACKED times it, log-linear."""
+    place = wp.log(wp.max(contrast, wp.float32(1.0))) / wp.log(wp.float32(PACKED))
+    place = wp.clamp(place, wp.float32(0.0), wp.float32(1.0))
+    return wp.float32(SLAB_DIMMEST) + (wp.float32(1.0) - wp.float32(SLAB_DIMMEST)) * place
+
+
 @wp.kernel
 def _gather(positions: wp.array(dtype=Any, ndim=2), density: wp.array(dtype=Any),
             kind: wp.array(dtype=Any), border: wp.array(dtype=Any), volume_mean: float,
             joint_mean: float, boxes_deep: float, shown: wp.int32, look: wp.int32, kept: float,
-            slicing: wp.int32, slice_centre: float,
+            slicing: wp.int32, slice_centre: float, slice_half: float,
             slots: wp.array(dtype=wp.int32),
             points: wp.array(dtype=wp.vec3), colours: wp.array(dtype=wp.uint8, ndim=2)):
     box = wp.tid()
@@ -156,7 +179,7 @@ def _gather(positions: wp.array(dtype=Any, ndim=2), density: wp.array(dtype=Any)
     if not _is_shown(owner_kind, shown):
         return
     if slicing != 0:
-        if wp.abs(wp.float32(positions[box, SLICE_AXIS]) - wp.float32(slice_centre)) >= wp.float32(0.5 * SLICE_BOXES):
+        if wp.abs(wp.float32(positions[box, SLICE_AXIS]) - wp.float32(slice_centre)) >= wp.float32(slice_half):
             return
     if kept < 1.0:
         state = wp.rand_init(_THINNING_SEED, box)
@@ -170,6 +193,8 @@ def _gather(positions: wp.array(dtype=Any, ndim=2), density: wp.array(dtype=Any)
     code = wp.float32(255.0)
     if look == NEAREST:
         shade = _shade(contrast)
+    elif look == SLAB:
+        shade = _slab_shade(contrast)
     else:
         light = opacity(contrast, wp.float32(boxes_deep)) / kept
         if wp.int32(border[box]) != 0:
@@ -185,9 +210,16 @@ def _gather(positions: wp.array(dtype=Any, ndim=2), density: wp.array(dtype=Any)
     tint = _BLUE
     if owner_kind == ENERGY_VOLUME:
         tint = _RED
-    colours[slot, 0] = wp.uint8(wp.round(tint[0] * shade))
-    colours[slot, 1] = wp.uint8(wp.round(tint[1] * shade))
-    colours[slot, 2] = wp.uint8(wp.round(tint[2] * shade))
+    lift = wp.float32(0.0)
+    if look == SLAB:
+        tint = _SLAB_BLUE
+        if owner_kind == ENERGY_VOLUME:
+            tint = _SLAB_RED
+        if wp.int32(border[box]) != 0:
+            lift = wp.float32(SLAB_BORDER_LIFT)
+    for channel in range(3):
+        shaded = tint[channel] * shade
+        colours[slot, channel] = wp.uint8(wp.round(shaded + (wp.float32(255.0) - shaded) * lift))
     colours[slot, 3] = wp.uint8(code)
 
 
@@ -198,7 +230,7 @@ class BoxPoints:
         self._buffers = None
 
     def boxes(self, view, reference, shown: int = SHOW_BOTH, look: int = GLOW,
-              slice_offset: int | None = None) -> Gathered:
+              slice_offset: int | None = None, slice_boxes: float = SLICE_BOXES) -> Gathered:
         """The drawn boxes' centres and colours, and the occupied bounds, on the host."""
         density = _warp(view.density)
         device = density.device
@@ -213,8 +245,10 @@ class BoxPoints:
         if shown not in (SHOW_ENERGY_VOLUMES, SHOW_JOINTS, SHOW_BOTH):
             raise ValueError(f"shown: {shown}, expected {SHOW_ENERGY_VOLUMES} (energy volumes), "
                              f"{SHOW_JOINTS} (joints) or {SHOW_BOTH} (both)")
-        if look not in (GLOW, NEAREST):
-            raise ValueError(f"look: {look}, expected {GLOW} (glow) or {NEAREST} (nearest)")
+        if look not in (GLOW, NEAREST, SLAB):
+            raise ValueError(f"look: {look}, expected {GLOW} (glow), {NEAREST} (nearest) or {SLAB} (slab)")
+        if not slice_boxes >= 1.0:
+            raise ValueError(f"slice_boxes: {slice_boxes}, expected at least 1 box layer")
         counts, slots, low, high, points, colours = self._buffers_for(min(size, MOST_POINTS), device)
         counts.zero_()
         slots.zero_()
@@ -237,7 +271,7 @@ class BoxPoints:
         wp.launch(_gather, dim=size, device=device,
                   inputs=[positions, density, kind, border, volume_mean, joint_mean, boxes_deep,
                           int(shown), int(look), kept, int(used_offset is not None),
-                          0.0 if used_offset is None else slice_at, slots, points, colours])
+                          0.0 if used_offset is None else slice_at, 0.5 * float(slice_boxes), slots, points, colours])
         drawn = min(int(slots.numpy()[0]), points.shape[0])
         if drawn == 0:
             return _nothing(negative, low_host, high_host, slice_at, used_offset)

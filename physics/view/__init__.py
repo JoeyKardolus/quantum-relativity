@@ -9,7 +9,9 @@ density only a brightness tint, so the structure reads; glow sums light along
 the line of sight, each box lit by its density over the start's mean of its own
 kind on a fixed log scale (an even universe nearly black, only denser zones glow,
 cell borders brighter), summed in a float buffer. Key S draws only a one-box
-slice through the middle (arrows move it); the view refits as space grows (F
+slice through the middle; key C draws only a slab a few boxes thick through the
+middle in brighter colours (red energy volumes, blue joints, lighter cell borders,
+packed cells brighter), to see inside; arrows or [ ] move either; the view refits as space grows (F
 fits by hand). No link lines. A source is anything with reset(), step(), steps,
 view() and stats() (`cells_source.py` has the contract). The shown boxes are
 gathered on the GPU and copied to the host once per frame (CUDA-GL sharing fails
@@ -19,7 +21,7 @@ Module map:
   opacity.py           the light a box adds from its density contrast: fixed log scale (Warp)
   light_code.py        a point's light as one log byte, decoded by the window (Warp)
   start_reference.py   the start's mean density of each kind and boxes deep, the fixed unit
-  box_points.py        BoxPoints: selects (kind, slice) and lights (nearest, glow) drawn boxes on the GPU
+  box_points.py        BoxPoints: selects (kind, slice, slab) and lights (nearest, glow, slab) drawn boxes on the GPU
   orbit_camera.py      view-projection matrix of a camera circling a centre
   view_fit.py          the camera fit to the occupied bounds, and when space has outgrown it
   title_line.py        the window title from a snapshot's stats

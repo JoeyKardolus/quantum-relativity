@@ -17,14 +17,16 @@ squares. Module map in `__init__.py`.
   16x, `AVERAGE_GLOW` / boxes deep at 1x; borders `BORDER_GAIN` (2x). Never rank-based or
   re-normalised per frame. Summed in a half-float buffer through 1 - exp(-sum); alpha carries
   light as a log byte (`light_code.py`). Past `MOST_POINTS` (3M) a uniform share is kept.
-- **Slice (S)**: one box layer along z through the middle of the occupied bounds; arrows move
-  it, held inside the occupied layers; S turns the camera to face it. Never thinned.
+- **Slice (S) and slab (C)**: 1 or `SLAB_BOXES` (5) layers along z through the
+  middle of the occupied bounds, held inside them; arrows or [ ] move it; the camera turns to
+  face it; never thinned. The slab is drawn depth-tested in a bright SLAB look (lighter
+  borders, packed cells brightest).
 - **Camera fit** (`view_fit.py`): on start, reset, F, and when the occupied extent outgrows
   the last fit by `REFIT_GROWTH` (1.5x); turning kept, zoom reset.
 - **GPU under WSL2**: `use_gpu_driver()` sets `GALLIUM_DRIVER=d3d12` and
   `MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA` before pyglet loads, else Mesa draws on the CPU.
   CUDA-GL sharing fails on WSL (error 304): shown boxes are gathered on the GPU, copied to the
-  host once per frame, uploaded.
+  host once per frame.
 - **Source interface** (`cells_source.py` docstring): reset(), step(), steps, stats(), view()
   (positions, density, kind 0 / 1, border; Warp arrays on one device). Stepping and gathers
   run on the stepper thread; a source or gather error stops stepping and shows in the title.
@@ -36,8 +38,7 @@ squares. Module map in `__init__.py`.
 ## Measured
 
 2026-11-15, RTX 5080, WSL2: gather of 884,736 boxes 5.9 ms; 8^3 cells of 6^3, 113 to 118 fps,
-7 to 14 steps/s. 2026-11-16, fake 24^3 checkerboard of 6^3 cells, density 1: nearest 25,115
-red / 25,441 blue lit pixels; glow brightest 2/255; slice 50/50.
+7 to 14 steps/s.
 
 ## Run
 
@@ -45,5 +46,5 @@ red / 25,441 blue lit pixels; glow brightest 2/255; slice 50/50.
 PYTHONPATH=. .venv/bin/python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--joint-unevenness J] [--slope S] [--set name=value ...] [--steps-per-frame F]
 PYTHONPATH=. .venv/bin/pytest -q physics/view
 ```
-Starts paused: space starts / pauses, 1 / 2 / 3 kinds, G look, S slice, up / down move it,
-F fits, drag rotates, wheel zooms, R resets, Esc quits.
+Starts paused: space starts / pauses, 1 / 2 / 3 kinds, G look, S slice, C slab, arrows or
+[ ] move it, F fits, drag rotates, wheel zooms, R resets, Esc quits.
