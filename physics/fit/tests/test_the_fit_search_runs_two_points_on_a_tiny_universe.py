@@ -17,4 +17,7 @@ def test_the_fit_search_runs_two_points_on_a_tiny_universe(tmp_path):
         assert "error" not in record, record.get("trace")
         assert math.isfinite(record["score"]) and math.isfinite(record["E"]) and math.isfinite(record["S"])
         assert record["overrides"]["seal_compression"] < record["overrides"]["collapse_compression"]
+        assert record["observer_ids"] and len(record["local_time"]) == len(record["time"])
+        assert record["local_time"][0] == 0.0
+        assert all(later > earlier for earlier, later in zip(record["local_time"], record["local_time"][1:]))
     assert summarize_search([json.loads(line) for line in results.read_text().splitlines()]).startswith("runs 2 errors 0")

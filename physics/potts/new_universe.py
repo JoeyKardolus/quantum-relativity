@@ -1,7 +1,12 @@
 """New universe: energy volumes wrapped in a web of joints, cells of Planck boxes, uneven energy, in a margin.
 
-Contract: `new_universe(cells_per_side, boxes_per_cell_side=6, seed=1, unevenness=0.3,
-slope=-3, margin=None, device="cuda")` returns a Universe (universe.py) at rest.
+Contract: `new_universe(cells_per_side=7, boxes_per_cell_side=10, seed=1, unevenness=0.3,
+slope=-3, margin=None, device="cuda")` returns a Universe (universe.py) at rest. The
+defaults follow the bible (owner, 2026-11-16: energy volumes start about 10 Planck boxes
+across on average, whirls survive at that size and die in cells of 6); 7 cells a side is
+the smallest cube holding 27 energy volumes (3 a side), so a run stays fast (measured
+2026-11-16, RTX 5080: about 210 ms a step, against 100 for 8 cells of 6). The size
+correction then lets each cell's size follow its own energy, no set size, no minimum.
 The filled cube is cells_per_side**3 cells, each a block of k**3 boxes (k =
 boxes_per_cell_side); cell (cx, cy, cz) is an energy volume (A) when cx, cy and cz are
 all odd and none is n - 1 (the outer layer), else a joint (B). So every energy volume
@@ -37,7 +42,7 @@ from physics.potts.uneven_field import uneven_field
 from physics.potts.universe import ENERGY_VOLUME, JOINT, Universe
 
 
-def new_universe(cells_per_side: int, boxes_per_cell_side: int = 6, seed: int = 1, unevenness: float = 0.3,
+def new_universe(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int = 1, unevenness: float = 0.3,
                  slope: float = -3.0, margin: int | None = None, device: str = "cuda") -> Universe:
     """Seeded energy volumes wrapped in a joint web, uneven energy, at rest, inside an empty margin."""
     if cells_per_side < 3 or boxes_per_cell_side < 2:

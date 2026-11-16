@@ -17,8 +17,8 @@ from physics.fit.summarize_search import summarize_search
 def _parse(argv):
     parser = argparse.ArgumentParser(prog="python -m physics.fit", description="the fit search on expansion shape and structure")
     parser.add_argument("out_dir", type=pathlib.Path)
-    parser.add_argument("--cells", type=int, default=8)
-    parser.add_argument("--boxes", type=int, default=6)
+    parser.add_argument("--cells", type=int, default=7)
+    parser.add_argument("--boxes", type=int, default=10)
     parser.add_argument("--steps", type=int, default=120)
     parser.add_argument("--every", type=int, default=6)
     parser.add_argument("--points", type=int, default=80, help="Latin-hypercube points")

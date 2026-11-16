@@ -11,7 +11,7 @@ energy (Graner and Glazier, 1992). Named `potts`, not `cells`: an earlier
 Module map:
   settings.py         Settings: every rule's strength, all_on() defaults
   universe.py         Universe: boxes (owner, psi, heat), cells (kind, sums, wants, clocks, swing)
-  new_universe.py     new_universe: k**3-box energy volumes wrapped in a web of k**3-box joints, uneven
+  new_universe.py     new_universe: k**3-box (k 10) energy volumes wrapped in a web of k**3-box joints, uneven
   contact_pairs.py    contact_pairs: which cells touch across how many box faces (host)
   touch_pairs.py      touch_pairs: which cells touch at a face, edge or corner, empty space as -1 (host)
   region_host.py      region_host: a box array's active region copied to the host
@@ -27,9 +27,11 @@ Module map:
   pull.py             pull: the A-energy's potential on a cube round the active region (CUDA graph)
   time_levels.py      time_levels: each cell's own substep (local clocks), boxes ordered by level
   on_site.py          on_site: each box's phase turned by the pull and the fluid's push (a joint's stiffer)
-  hop.py              hop: exact two-box rotations across faces; friction at A-B faces, booked as heat; the seal
+  hop.py              hop: exact two-box rotations across faces; friction at A-B faces, heat booked, spread planned
   fluid_energy.py     fluid_energy: the fluid equation's own energy (flow, pull, push), plain or clocked
+  spread_heat.py      spread_heat: the energy friction took spreads into the boxes round the seam, exactly
   energy_flow.py      energy_flow: one step of the fluid on local clocks, Strang-split exact rotations
+  local_time.py       local_time: each cell's clock reading advances by the proper time it lived
   joint_swing.py      joint_swing: each joint a spring with inertia, its aim for the moves
   box_moves.py        box_moves: 64 phases of plate moves (size, pull, push; wrapping, connected)
   size_correction.py  size_correction: the start's one correction, sizes follow energy
@@ -59,7 +61,9 @@ from physics.potts.time_levels import time_levels
 from physics.potts.on_site import on_site
 from physics.potts.hop import hop
 from physics.potts.fluid_energy import fluid_energy
+from physics.potts.spread_heat import spread_heat
 from physics.potts.energy_flow import energy_flow
+from physics.potts.local_time import local_time
 from physics.potts.joint_swing import joint_swing
 from physics.potts.box_moves import box_moves
 from physics.potts.size_correction import size_correction
@@ -72,5 +76,5 @@ from physics.potts.view_source import view_source
 __all__ = ["Settings", "ENERGY_VOLUME", "JOINT", "PAD", "Universe", "uneven_field", "Multigrid", "new_universe",
            "contact_pairs", "touch_pairs", "region_host", "active_region", "box_owner", "direction", "seam_box",
            "seam_flags", "border_openness", "cell_sums", "pull", "time_levels", "on_site", "hop", "fluid_energy",
-           "energy_flow", "joint_swing", "box_moves", "size_correction", "joint_collapse", "volume_split", "step",
+           "spread_heat", "energy_flow", "local_time", "joint_swing", "box_moves", "size_correction", "joint_collapse", "volume_split", "step",
            "stats", "view_source"]

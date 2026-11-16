@@ -1,6 +1,6 @@
 """Expansion scene: does the occupied region grow, and does its growth slow, then speed up?
 
-Contract: `expansion(cells_per_side=8, boxes_per_cell_side=6, seed=1, unevenness=0.3,
+Contract: `expansion(cells_per_side=7, boxes_per_cell_side=10, seed=1, unevenness=0.3,
 steps=60, every=2, settings=None, device="cuda")` builds
 physics.potts.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness), runs
 `steps` steps with settings (default Settings.all_on()), measuring at the start and
@@ -38,7 +38,7 @@ from physics.scenes.rms_radius import rms_radius
 from physics.scenes.sampled_run import sampled_run
 
 
-def expansion(cells_per_side: int = 8, boxes_per_cell_side: int = 6, seed: int = 1, unevenness: float = 0.3,
+def expansion(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int = 1, unevenness: float = 0.3,
               steps: int = 60, every: int = 2, settings: Settings | None = None, device: str = "cuda") -> dict:
     """Occupied and energy radius over time, their growth rates and whether the rate turns."""
     settings = settings or Settings.all_on()

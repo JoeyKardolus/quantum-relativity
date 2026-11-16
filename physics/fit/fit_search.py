@@ -9,6 +9,8 @@ resumes. A run that raises is recorded with score -2 and its error, never droppe
 Settings fitted, ranges fixed before the first search (2026-11-16): attraction, push,
 collapse_compression, friction (log), push_power (linear), seal_compression =
 collapse_compression ** fraction with fraction in 0.4 .. 0.95 (always below collapse).
+No dark-energy or base-push setting is searched (bible rule 8: expansion is drift from
+imperfect transfer, nothing pushes space apart).
 """
 from __future__ import annotations
 
@@ -69,7 +71,7 @@ def _best(records, phases, count):
     return sorted([record for record in records if record["phase"] in phases], key=lambda record: -record["score"])[:count]
 
 
-def fit_search(results, cells=8, boxes=6, steps=120, every=6, default_seeds=(1, 1, 1, 2, 3), random_points=80,
+def fit_search(results, cells=7, boxes=10, steps=120, every=6, default_seeds=(1, 1, 1, 2, 3), random_points=80,
                refine_best=5, refine_count=8, recheck_top=5, recheck_seeds=(1, 2, 3), lattice_seed=20261116):
     """Run the search's phases not yet in `results` and return every record in the file."""
     results = pathlib.Path(results)

@@ -16,10 +16,14 @@ region_host.py; outside it every box is empty):
                     faces, in clocked_fluid_energy's units (the flow energy friction
                     took, hop.py); bookkeeping, not part of total_energy and not
                     comparable with it
+  spread            energy (sum |psi|**2 units) friction has spread into the boxes round
+                    the seams since the start (spread_heat.py): the heat's energy, moved,
+                    not made; work_spread what that spreading did to clocked_fluid_energy
   work_pull, work_compression, work_moves  what the pull's re-solve, the joints' new
                     compression and the box moves did to clocked_fluid_energy since the
                     start (step.py); energy_balance = clocked_fluid_energy + heat - their
-                    sum, which only the flow's splitting between time levels moves
+                    sum and work_spread, which only the flow's splitting between time
+                    levels moves
   cells, joints     living energy volumes (A) and joints (B); cell_count_growth their
                     number over the start's (volume splits raise it, collapses lower it)
   collapses, splits joints that have collapsed and volumes that have torn since the start
@@ -39,6 +43,10 @@ region_host.py; outside it every box is empty):
                     has reached the closed edge and is no longer open space)
   clock_min, clock_mean  over living cells; joint_compression_max, _mean over joints
   size_ratio        mean box count of living joints over that of living energy volumes
+  volume_across     mean over living energy volumes of their box count's cube root: how
+                    many boxes across an energy volume is
+  local_time_min, local_time_mean, local_time_max  the living cells' local clock readings
+                    (proper time lived, local_time.py); each cell's is universe.cell_time
   moves             boxes that changed owner in the last step
   substeps, box_updates  finest substeps and box updates since the start
 `settings` defaults to Settings.all_on().
@@ -58,7 +66,7 @@ from physics.potts.universe import ENERGY_VOLUME, JOINT, Universe
 
 
 def stats(universe: Universe, settings: Settings | None = None) -> dict:
-    """Energy, heat and work, cells and joints, collapses and splits, space, lumps and seals, wrapping, edge, clocks."""
+    """Energy, heat, spread and work, cells and joints, collapses and splits, space, lumps, seals, wrapping, edge, clocks."""
     settings = Settings.all_on() if settings is None else settings
     cell_sums(universe, settings)
     owner = region_host(universe, universe.owner)
@@ -96,7 +104,9 @@ def stats(universe: Universe, settings: Settings | None = None) -> dict:
     fluid = fluid_energy(universe, settings)
     clocked = fluid_energy(universe, settings, clocked=True)
     heat_total = float(heat.sum(dtype=np.float64))
-    work = float(universe.work_pull + universe.work_compression + universe.work_moves)
+    work_spread = float(universe.spread_work.numpy()[0])
+    work = float(universe.work_pull + universe.work_compression + universe.work_moves) + work_spread
+    reading = universe.cell_time.numpy()[living]
     sealed = sum(1 for lump in lumps if _sealed(lump, low, high, kind, compression, settings.seal_compression))
     return {
         "total_energy": total,
@@ -108,6 +118,8 @@ def stats(universe: Universe, settings: Settings | None = None) -> dict:
         "work_pull": float(universe.work_pull),
         "work_compression": float(universe.work_compression),
         "work_moves": float(universe.work_moves),
+        "spread": float(universe.spread_moved.numpy()[0]),
+        "work_spread": work_spread,
         "energy_balance": clocked + heat_total - work,
         "cells": int(volumes.sum()),
         "joints": int(joints.sum()),
@@ -127,6 +139,10 @@ def stats(universe: Universe, settings: Settings | None = None) -> dict:
         "joint_compression_max": float(compression[joints].max()) if joints.any() else 0.0,
         "joint_compression_mean": float(compression[joints].mean()) if joints.any() else 0.0,
         "size_ratio": float(boxes[joints].mean() / boxes[volumes].mean()) if joints.any() and volumes.any() else 0.0,
+        "volume_across": float(np.cbrt(boxes[volumes]).mean()) if volumes.any() else 0.0,
+        "local_time_min": float(reading.min()) if reading.size else 0.0,
+        "local_time_mean": float(reading.mean()) if reading.size else 0.0,
+        "local_time_max": float(reading.max()) if reading.size else 0.0,
         "moves": int(universe.last_moves),
         "substeps": int(universe.substeps),
         "box_updates": int(universe.box_updates),

@@ -1,6 +1,6 @@
 """Structure scene: how the clustering spectrum of the density field changes over time.
 
-Contract: `structure(cells_per_side=8, boxes_per_cell_side=6, seed=1, unevenness=0.3,
+Contract: `structure(cells_per_side=7, boxes_per_cell_side=10, seed=1, unevenness=0.3,
 steps=30, every=5, settings=None, device="cuda")` builds
 physics.potts.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness), runs
 `steps` steps with settings (default Settings.all_on()) and measures the energy per
@@ -28,7 +28,7 @@ from physics.scenes.power_spectrum import power_spectrum
 from physics.scenes.sampled_run import sampled_run
 
 
-def structure(cells_per_side: int = 8, boxes_per_cell_side: int = 6, seed: int = 1, unevenness: float = 0.3,
+def structure(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int = 1, unevenness: float = 0.3,
               steps: int = 30, every: int = 5, settings: Settings | None = None, device: str = "cuda") -> dict:
     """The density contrast's spectrum, RMS and lump count at each sample, and the spectrum's growth."""
     settings = settings or Settings.all_on()

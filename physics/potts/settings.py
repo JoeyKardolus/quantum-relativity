@@ -26,7 +26,8 @@ occupied box is 1 (new_universe.py; energy volumes and joints alike).
   friction              across an A-B face the flow crossing it (the phase difference as far
                         as the flow behind it on both sides carries it) keeps
                         1 / (1 + friction * c * dt) of itself per hop of length dt, the
-                        lost flow energy booked as heat (hop.py); nowhere else is there
+                        lost flow energy booked as heat and that much energy spread
+                        round the seam (hop.py, spread_heat.py); nowhere else is there
                         friction
   sound                 the energy fluid's sound speed at the start's mean density, both
                         kinds: its nonlinear term g = sound**2 / rest (on_site.py);

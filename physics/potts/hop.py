@@ -37,7 +37,15 @@ clock_b) t/2 |psi_b - psi_a|**2 per open face, same t); that drop is worked out
 exactly (no neighbour turns in the same pass) and booked as heat in the pair's joint
 box. A turn that would not lower it is halved, up to three times, then not made:
 friction never books negative heat, and its heat is the flow energy it took, to
-rounding. Returns None.
+rounding. The heat is a tally for the books; the energy itself spreads (bible rule 8,
+drift from imperfect transfer: energy crossing a seam rubs against the joint's push and
+spreads a little). The rub plans that spreading in universe.spread, which
+spread_heat.py applies once per substep: an amount equal to the heat, at most an
+eighth of what the touched boxes hold, is taken from the pair and its face neighbours
+in the pair's two cells (a joint's only where they are seam boxes, so energy still
+enters a joint only at its seams) in proportion to what each holds, and given back
+evenly: every touched box moves towards their mean, so the energy it touches gets less
+concentrated, and some of it crosses the seam. Returns None.
 """
 from __future__ import annotations
 
@@ -161,12 +169,66 @@ def _pair_flow_energy(owner: wp.array3d(dtype=wp.int32), kind: wp.array(dtype=wp
     return energy
 
 
+@wp.func
+def _gathers(owner: wp.array3d(dtype=wp.int32), kind: wp.array(dtype=wp.int32), seam: wp.array3d(dtype=wp.int32),
+             box: wp.vec3i, other: wp.vec3i, near: int, far: int, side: int) -> int:
+    """1 when `box` is a face neighbour of the pair that the spreading reaches (not the other pair box), else 0."""
+    if box[0] < 0 or box[1] < 0 or box[2] < 0 or box[0] >= side or box[1] >= side or box[2] >= side:
+        return 0
+    if box[0] == other[0] and box[1] == other[1] and box[2] == other[2]:
+        return 0
+    cell = owner[box[0], box[1], box[2]]
+    if cell != near and cell != far:
+        return 0
+    if kind[cell] == 1 and seam[box[0], box[1], box[2]] == 0:
+        return 0
+    return 1
+
+
+@wp.func
+def _plan_spread(owner: wp.array3d(dtype=wp.int32), kind: wp.array(dtype=wp.int32), seam: wp.array3d(dtype=wp.int32),
+                 psi: wp.array3d(dtype=wp.vec2d), spread: wp.array3d(dtype=wp.vec2d), here: wp.vec3i,
+                 there: wp.vec3i, near: int, far: int, amount: wp.float64, side: int):
+    """Plan `amount` of energy taken from the pair's neighbourhood by what each box holds, given back evenly."""
+    held = wp.dot(psi[here[0], here[1], here[2]], psi[here[0], here[1], here[2]]) + wp.dot(
+        psi[there[0], there[1], there[2]], psi[there[0], there[1], there[2]])
+    count = wp.float64(2.0)
+    for pick in range(2):
+        box = here
+        other = there
+        if pick == 1:
+            box = there
+            other = here
+        for face in range(6):
+            beside = box + direction(face)
+            if _gathers(owner, kind, seam, beside, other, near, far, side) == 1:
+                held += wp.dot(psi[beside[0], beside[1], beside[2]], psi[beside[0], beside[1], beside[2]])
+                count += wp.float64(1.0)
+    if held <= wp.float64(0.0):
+        return
+    share = wp.min(amount / held, wp.float64(0.125))
+    give = share * held / count
+    for pick in range(2):
+        box = here
+        other = there
+        if pick == 1:
+            box = there
+            other = here
+        energy = wp.dot(psi[box[0], box[1], box[2]], psi[box[0], box[1], box[2]])
+        wp.atomic_add(spread, box[0], box[1], box[2], wp.vec2d(share * energy, give))
+        for face in range(6):
+            beside = box + direction(face)
+            if _gathers(owner, kind, seam, beside, other, near, far, side) == 1:
+                energy = wp.dot(psi[beside[0], beside[1], beside[2]], psi[beside[0], beside[1], beside[2]])
+                wp.atomic_add(spread, beside[0], beside[1], beside[2], wp.vec2d(share * energy, give))
+
+
 @wp.kernel
 def _rub(owner: wp.array3d(dtype=wp.int32), kind: wp.array(dtype=wp.int32), compression: wp.array(dtype=wp.float32),
          seam: wp.array3d(dtype=wp.int32), clock: wp.array(dtype=wp.float32), box_level: wp.array3d(dtype=wp.int32),
          threshold: int, step_time: float, fraction: float, seal: float, friction: float, low: wp.vec3i,
          high: wp.vec3i, axis: int, first: int, side: int, colour: int, psi: wp.array3d(dtype=wp.vec2d),
-         heat: wp.array3d(dtype=wp.float64)):
+         heat: wp.array3d(dtype=wp.float64), spread: wp.array3d(dtype=wp.vec2d)):
     ti, tj, tk = wp.tid()
     here = wp.vec3i(low[0] + ti, low[1] + tj, low[2] + tk)
     if axis == 0:
@@ -217,6 +279,7 @@ def _rub(owner: wp.array3d(dtype=wp.int32), kind: wp.array(dtype=wp.int32), comp
             psi[here[0], here[1], here[2]] = turned_upper
             psi[there[0], there[1], there[2]] = turned_lower
             wp.atomic_add(heat, joint_box[0], joint_box[1], joint_box[2], lost)
+            _plan_spread(owner, kind, seam, psi, spread, here, there, near, far, lost, side)
             return
         shift = shift * wp.float64(0.5)
 
@@ -244,4 +307,4 @@ def hop(universe: Universe, settings: Settings, threshold: int, axis: int, parit
                           universe.cell_clock, universe.box_level, int(threshold), settings.step_time,
                           float(fraction), settings.seal_compression, settings.friction, wp.vec3i(*low),
                           wp.vec3i(*high), int(axis), int(first), universe.side, colour, universe.psi,
-                          universe.heat])
+                          universe.heat, universe.spread])

@@ -12,19 +12,21 @@ scene builds a start, runs the cell engine (`physics.potts`) and returns measure
 - **Only the engine's public face**: `new_universe`, `step`, `stats`, `Settings`,
   `cell_sums`, `contact_pairs` and `Universe.from_host` (with `phase`) for placed blobs and
   whirls; read only the Universe fields its contract lists (owner, psi through
-  `wave_field.py`, kind, alive, labels, cell sums, rest_a). Energy per box is |psi|^2 and
+  `wave_field.py`, kind, alive, labels, cell sums, cell_time, rest_a). Energy per box is |psi|^2 and
   flow is the phase's gradient (blob_start sets velocity as phase). Measures come from
   `physics.measure`, validated there. Kernels must not be reached into. Belt trick alone writes psi (its drive).
+- **Local clocks.** Timescape (unfitted) and the fit time expansion by the densest cells'
+  `cell_time` (`clocked_run.py`).
 - **All rules on.** Scenes take `settings` (default `Settings.all_on()`); a rule switched off
   is only for a side-by-side run.
 - **Box units.** Planck boxes are fixed; cells claim or give up boxes, so the occupied box
   count is the size of space and an energy radius says where the energy is.
 - **Placed starts** (orbit, black hole, isotropy, spin, belt trick) break "nothing placed by hand" on
   purpose: each tests one mechanism. A blob is extra energy in an even start, never a ball in empty
-  space. A blob must cover energy-volume boxes, and
-  those sit only at all-odd cell places. The other scenes start from
+  space. A blob must cover energy-volume boxes (all-odd cell places). The other scenes start from
   `new_universe`'s uneven field only.
-- **Small and quick**: defaults are grids of 56 to 64 boxes a side. Tests run every scene on
+- **Small and quick**: uneven starts default to 7^3 cells of 10 (bible: volumes start ~10
+  across); placed starts keep 40 to 48 boxes a side. Tests run every scene on
   4 or 6 cells of 4 boxes and check only that the numbers are finite.
 
 ## Measured (2026-11-15, defaults, all rules on, cell engine)
@@ -38,8 +40,7 @@ Isotropy: pull differs 2.0% by direction. Flow (speed 0.3 inside radius 16,
 known shift 2.35 boxes), 4 seeds: carried 0.29 / 0.31 / 0.29 axis / face / body, sd up to
 0.03, rest scatter 0.08: direction-free. Spin: winding lost, strength 0.86 to -0.12, tilt 90.
 Belt trick (2026-11-16; own settings: 7^3 cells of 10, host on the pull's centre, 2 seeds):
-the whirl dies before one turn and the web loses its start within 20 steps, so the twist
-after 1 and 2 turns is noise: no spin answer.
+the whirl dies before one turn and the web loses its start within 20 steps: no spin answer.
 
 ## Run
 

@@ -22,8 +22,8 @@ volume's bounding box widened by CROP (3) boxes: no two energy volumes touching 
 edge or corner, touch_pairs.py) and the halves and the tear each one piece; a tear
 that fails is not made and counted in universe.scratch["split_refused"]; that volume
 is tried again only once it holds RETRY (9/8) times the boxes it held then. New cells
-get new ids (add_cells), universe.splits grows by the tears made, and that number is
-returned. Call cell_sums after a split.
+get new ids (add_cells) and the torn volume's local clock reading (cell_time),
+universe.splits grows by the tears made, and that number is returned. Call cell_sums after a split.
 """
 from __future__ import annotations
 
@@ -85,7 +85,9 @@ def volume_split(universe: Universe, settings: Settings) -> int:
     counts = np.bincount(owner[owner >= 0], minlength=universe.cell_count)
     labels = universe.labels.numpy()
     previous = universe.previous_boxes.numpy()
+    clock_time = universe.cell_time.numpy()
     for volume, upper, tear in made:
+        clock_time[upper] = clock_time[tear] = clock_time[volume]
         pieces = counts[volume] + counts[upper] + counts[tear]
         whole = labels[volume]
         for piece in (volume, upper, tear):
@@ -93,6 +95,7 @@ def volume_split(universe: Universe, settings: Settings) -> int:
             previous[piece] = counts[piece]
     universe.labels.assign(labels.astype(np.float32))
     universe.previous_boxes.assign(previous.astype(np.float32))
+    universe.cell_time.assign(clock_time)
     universe.splits += len(made)
     return len(made)
 

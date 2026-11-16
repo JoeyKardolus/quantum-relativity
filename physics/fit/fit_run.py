@@ -1,13 +1,19 @@
 """fit_run: one fit-set universe, stepped and scored on expansion shape and structure.
 
-Contract: fit_run(overrides, seed, cells, boxes, steps, every) -> dict. Builds
-new_universe(cells, boxes, seed), steps it with Settings.all_on(**overrides) and samples every
-`every` steps. The baseline is the first sample after step 0 (the first step's size correction
-is a jump, not the dynamics). score = 0.5 E + 0.5 S:
-  E  expansion dip min(r1 - r2, r3 - r2) / mean |r| over the occupied radius's growth rate in
-     thirds of the run, clipped to +-1; -1 when space does not grow or shrinks; minus 1 when
-     edge_share > 0.01 (the walls are reached, no longer open space). E > 0 only when growth
-     slows, then speeds up.
+Contract: fit_run(overrides, seed, cells, boxes, steps, every, observers=3) -> dict. Builds
+new_universe(cells, boxes, seed), steps it with Settings.all_on(**overrides) keeping every
+cell's elapsed local time (physics.scenes.clocked_run) and samples every `every` steps. The
+expansion is timed as an astronomer times it: by the mean local clock of the `observers` most
+packed energy volumes at the end (physics.scenes.observer_cells; bible: time is local), not by
+the step counter. The baseline is the first sample after step 0 (the first step's size
+correction is a jump, not the dynamics). score = 0.5 E + 0.5 S:
+  E  expansion dip min(r1 - r2, r3 - r2) / mean |r| over the occupied radius's growth rate
+     against the observers' clock, in thirds of the run, clipped to +-1; -1 when space does
+     not grow or shrinks or no observer exists; minus 1 when edge_share > 0.01 (the walls are
+     reached, no longer open space). E > 0 only when growth slows, then speeds up.
+The settings searched hold no dark-energy or base-push term (bible rule 8: expansion is drift
+from imperfect transfer). Whether the observers' clock makes expansion look accelerating is the
+timescape scene's unfitted test, never part of this score.
   S  mean of tanh(ln contrast ratio), tanh(lump gain / 5) and tanh(large-scale minus
      small-scale ln power growth), on the central cube the start fills.
 Only the engine's public face and the scenes' shared measures, as the scenes use them.
@@ -19,8 +25,8 @@ import time
 
 import numpy as np
 
-from physics.potts import Settings, new_universe, step, stats
-from physics.scenes import box_energies, growth_rates, power_spectrum
+from physics.potts import Settings, new_universe, stats
+from physics.scenes import box_energies, clocked_run, growth_rates, observer_cells, power_spectrum
 
 
 def _central_density(universe, lower, upper):
@@ -67,7 +73,7 @@ def _structure_score(first, last):
         "ln_growth_small": float(small)}
 
 
-def fit_run(overrides, seed, cells, boxes, steps, every):
+def fit_run(overrides, seed, cells, boxes, steps, every, observers=3):
     """Run one universe with Settings.all_on(**overrides) and return its scores and series."""
     started = time.time()
     settings = Settings.all_on(**overrides)
@@ -75,19 +81,22 @@ def fit_run(overrides, seed, cells, boxes, steps, every):
     owner = universe.owner.numpy()
     occupied_axis = np.nonzero((owner >= 0).any(axis=(1, 2)))[0]
     lower, upper = int(occupied_axis.min()), int(occupied_axis.max()) + 1
-    samples = [(0.0, _measure(universe, settings, lower, upper))]
-    for taken in range(1, steps + 1):
-        step(universe, settings)
-        if taken % every == 0 or taken == steps:
-            samples.append((taken * settings.step_time, _measure(universe, settings, lower, upper)))
+    samples, local = clocked_run(universe, settings, steps, every,
+                                 lambda sampled: _measure(sampled, settings, lower, upper))
+    picked = observer_cells(universe, observers, local)
     times = [when for when, _ in samples]
+    local_time = local[:, picked].mean(axis=1).tolist() if picked.size else []
     radii = [measured["occupied_radius"] for _, measured in samples]
     first, last = samples[1][1], samples[-1][1]
-    expansion_score, expansion_parts = _expansion_score(times[1:], radii[1:], last)
+    if picked.size:
+        expansion_score, expansion_parts = _expansion_score(local_time[1:], radii[1:], last)
+    else:
+        expansion_score, expansion_parts = -1.0 - float(last["edge_share"] > 0.01), {}
     structure_score, structure_parts = _structure_score(first, last)
     return {"overrides": overrides, "seed": seed, "cells": cells, "boxes": boxes, "steps": steps,
             "score": 0.5 * expansion_score + 0.5 * structure_score, "E": expansion_score,
             "S": structure_score, **expansion_parts, **structure_parts,
+            "observer_ids": picked.tolist(), "time": times, "local_time": local_time,
             "occupied_growth_end": last["occupied_growth"], "edge_share_end": last["edge_share"],
             "lumps": [measured["lumps"] for _, measured in samples],
             "contrast": [measured["contrast"] for _, measured in samples],

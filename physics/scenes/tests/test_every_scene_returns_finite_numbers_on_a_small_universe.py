@@ -8,7 +8,7 @@ import math
 import pytest
 
 from physics.scenes import (belt_trick, black_hole, bound_lump, expansion, hubble_gap, isotropy, orbit,
-                            space_dimension, spin, structure)
+                            space_dimension, spin, structure, timescape)
 from physics.scenes.tests._gpu import needs_gpu
 
 SCENES = {
@@ -24,6 +24,7 @@ SCENES = {
                                   seeds=(1, 2)),
     "spin": lambda: spin(4, 4, drift_speed=0.2, steps=6),
     "belt_trick": lambda: belt_trick(5, 4, margin=6, steps_per_turn=3, web_reach=2),
+    "timescape": lambda: timescape(6, 4, steps=8, every=1, observers=2),
 }
 
 

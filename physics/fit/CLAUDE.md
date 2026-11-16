@@ -6,11 +6,14 @@ fitted on the fit set only, the expansion shape (slowing, then speeding up) and 
 
 ## Must not get wrong
 
-- **Fit set only.** Never put a test scene (orbit, bound lump, black hole, Hubble gap) into
-  the score. A winner is a candidate until it passes those scenes, run unfitted from
+- **Fit set only.** Never put a test scene (orbit, bound lump, black hole, Hubble gap,
+  timescape) into the score. A winner is a candidate until it passes those scenes, run unfitted from
   `physics.scenes` with criteria written before the run, on two runs.
 - **Never change a default from here.** A setting that wins goes to the owner as a
   scorecard on the issue; the owner decides.
+- **Local clocks, no dark energy.** The expansion dip is timed by the mean local clock of the
+  most packed energy volumes (as an astronomer would), not the step counter; searches before
+  2026-11-16's change used the counter. No dark-energy or base-push setting is ever searched.
 - **Fixed before a run**: ranges, score, run size and seeds. Change them only before a new
   search, and say so in its write-up. The start's seed is not fitted.
 - **One GPU run at a time**: the search runs every universe in one process, one after another.

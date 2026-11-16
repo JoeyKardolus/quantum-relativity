@@ -6,7 +6,9 @@ Contract: `step(universe, settings)` changes the universe in place and returns N
   2. pull: the potential of the A-energy (settings.potential_cycles V-cycles)
   3. cell_sums again, so each cell's mean potential is this step's
   4. energy_flow: one step of the energy fluid's equation (Gross-Pitaevskii, one
-     complex number per box) on local clocks, every box at its own time level
+     complex number per box) on local clocks, every box at its own time level, the
+     energy friction takes spreading out (spread_heat.py); local_time: every cell's
+     clock reading advances by the proper time it lived (local_time.py)
   5. cell_sums, joint_swing (each joint's aim), then box_moves: one sweep of plate
      moves in which cell borders, edges and corners shift so sizes follow energy and
      the swing, the pull draws energy volumes towards each other through the joints
@@ -42,6 +44,7 @@ from physics.potts.energy_flow import energy_flow
 from physics.potts.fluid_energy import fluid_energy
 from physics.potts.joint_collapse import joint_collapse
 from physics.potts.joint_swing import joint_swing
+from physics.potts.local_time import local_time
 from physics.potts.pull import pull
 from physics.potts.settings import Settings
 from physics.potts.size_correction import size_correction
@@ -62,6 +65,7 @@ def step(universe: Universe, settings: Settings) -> None:
     _tally(universe, settings, "work_pull", before)
     held = _pull_energy(universe)
     energy_flow(universe, settings)
+    local_time(universe, settings)
     universe.work_pull += held - _pull_energy(universe)
     before = fluid_energy(universe, settings, clocked=True)
     cell_sums(universe, settings)

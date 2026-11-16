@@ -24,6 +24,10 @@ Module map:
   isotropy.py        isotropy: pull and flow along a grid axis against the diagonals
   spin.py            spin: one whole-step whirl carried across a joint; winding, flow, strength, axis per step
   belt_trick.py      belt_trick: a whirl tied into the joint web turned once and twice; the web's twist per step
+  timescape.py       timescape: growth of space timed by the step counter and by clocks in the densest lumps
+  clocked_run.py     clocked_run: sampled_run that also keeps every cell's elapsed local time
+  observer_cells.py  observer_cells: the most packed energy volumes that kept a clock all run
+  deceleration.py    deceleration: q = -a'' a / a'^2 from a quadratic fit (q < 0 speeds up)
 """
 from physics.scenes.expansion import expansion
 from physics.scenes.hubble_gap import hubble_gap
@@ -44,7 +48,12 @@ from physics.scenes.space_dimension import space_dimension
 from physics.scenes.isotropy import isotropy
 from physics.scenes.spin import spin
 from physics.scenes.belt_trick import belt_trick
+from physics.scenes.clocked_run import clocked_run
+from physics.scenes.observer_cells import observer_cells
+from physics.scenes.deceleration import deceleration
+from physics.scenes.timescape import timescape
 
 __all__ = ["expansion", "hubble_gap", "structure", "bound_lump", "orbit", "black_hole", "sampled_run",
            "blob_start", "box_energies", "energy_centre", "rms_radius", "growth_rates", "power_spectrum",
-           "sealed_region", "wave_field", "space_dimension", "isotropy", "spin", "belt_trick"]
+           "sealed_region", "wave_field", "space_dimension", "isotropy", "spin", "belt_trick",
+           "clocked_run", "observer_cells", "deceleration", "timescape"]

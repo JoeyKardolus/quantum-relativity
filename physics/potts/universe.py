@@ -9,7 +9,11 @@ Per Planck box, indexed [x, y, z], 0 <= x, y, z < side:
               its kind, pulling (A) or pushing (B), is its owner's kind; 0 in an empty box
   heat        float64, the undirected jiggling friction made of directed flow (energy
               units, flow energy lost at A-B faces, hop.py); it moves with the boxes
-              and is bookkeeping: total energy is the sum of |psi|**2 alone
+              and is bookkeeping: total energy is the sum of |psi|**2 alone; the
+              energy friction takes is spread out as |psi|**2 (spread_heat.py)
+  spread      vec2d (take, give), float64: the energy friction plans to spread this
+              substep, taken from and given to each box (hop.py); spread_heat.py
+              applies it and clears it, so it is 0 between substeps
   potential   float32, the pull potential, kept to warm-start the next solve
   box_level   int32, the box's time level this step (time_levels.py)
   seam        int32, 1 for a joint's box on a seam this step (seam_flags.py)
@@ -29,6 +33,9 @@ Per cell, indexed by cell id 0 <= id < cell_count:
               its swing's next size (joint_swing.py); previous_boxes float32 its box
               count one step ago (the swing's memory)
   cell_speed  float32, cell_level int32: its fastest flow and its time level (time_levels.py)
+  cell_time   float64, its local clock's reading: the proper time it has lived, its clock
+              times step_time summed over the steps (local_time.py; a split's pieces
+              inherit the torn volume's reading)
   gained, lost int32, the boxes it gained and lost in the current sweep of moves
 Active region: low, high (host int triples), the occupied boxes' bounds widened by
 PAD and clipped to the grid (active_region.py); box kernels run only there.
@@ -43,7 +50,9 @@ updates they made (each box only at its own level), collapses the joints that
 collapsed, splits the volumes that tore, last_moves the boxes that changed owner in
 the last step; corrected is True once the start's size correction ran. work_pull,
 work_compression and work_moves tally what those phases of a step did to the fluid's
-energy (step.py).
+energy (step.py). spread_moved (float64, one entry, on the GPU) is the energy friction
+has spread since the start, spread_work what that spreading did to the clocked fluid
+energy (spread_heat.py).
 `Universe.from_host(owner, energy, kind, boxes_per_cell_side, seed, device, phase=None)`
 builds one from numpy arrays: owner (side, side, side) ints, energy (side, side,
 side) float >= 0 (must be 0 in empty boxes), kind per cell, and an optional phase
@@ -67,7 +76,8 @@ _CELL_FIELDS = {"kind": (wp.int32, 0), "alive": (wp.int32, 1), "labels": (wp.flo
                 "cell_heat": (wp.float32, 0.0), "cell_want": (wp.float32, 0.0), "cell_compression": (wp.float32, 0.0),
                 "cell_clock": (wp.float32, 1.0), "cell_potential_mean": (wp.float32, 0.0),
                 "cell_aim": (wp.float32, 0.0), "previous_boxes": (wp.float32, 0.0), "cell_speed": (wp.float32, 0.0),
-                "cell_level": (wp.int32, 0), "gained": (wp.int32, 0), "lost": (wp.int32, 0)}
+                "cell_level": (wp.int32, 0), "gained": (wp.int32, 0), "lost": (wp.int32, 0),
+                "cell_time": (wp.float64, 0.0)}
 
 
 @dataclass(eq=False)
@@ -102,6 +112,10 @@ class Universe:
     cell_level: wp.array
     gained: wp.array
     lost: wp.array
+    cell_time: wp.array
+    spread: wp.array
+    spread_moved: wp.array
+    spread_work: wp.array
     low: tuple
     high: tuple
     start_total: float
@@ -161,7 +175,9 @@ class Universe:
                    owner=wp.array(owner, dtype=wp.int32, device=device),
                    psi=wp.array(psi, dtype=wp.vec2d, device=device),
                    heat=zeros_box(wp.float64), potential=zeros_box(wp.float32),
-                   box_level=zeros_box(wp.int32), seam=zeros_box(wp.int32),
+                   box_level=zeros_box(wp.int32), seam=zeros_box(wp.int32), spread=zeros_box(wp.vec2d),
+                   spread_moved=wp.zeros(1, dtype=wp.float64, device=device),
+                   spread_work=wp.zeros(1, dtype=wp.float64, device=device),
                    cell_place=wp.zeros(cell_count * 3, dtype=wp.int64, device=device),
                    low=low, high=high,
                    start_total=float((psi ** 2).sum()), start_occupied=int(occupied.sum()),
