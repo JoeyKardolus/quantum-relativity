@@ -113,3 +113,38 @@ def test_a_tear_read_and_written_in_the_volumes_own_room_matches_one_done_on_the
         assert ends[0][0] == ends[1][0] == 3
         for first, second in zip(ends[0][1:], ends[1][1:]):
             assert np.array_equal(first, second)
+
+
+@needs_gpu
+def test_a_collapse_read_and_written_in_its_own_room_matches_one_done_on_the_whole_universe(monkeypatch):
+    """collapse.py reads only the room of the joint, its volumes and their joints when the web provably holds there."""
+    from physics.engine import collapse
+    module = sys.modules["physics.engine.collapse"]
+    for places, margin in ((8, 0), (5, 11)):
+        ends = []
+        for whole in (False, True):
+            if whole:
+                monkeypatch.setattr(module, "cells_span", lambda *args, **kwargs: None)
+            state = new_universe(places, 10, margin=margin)
+            packing = np.sort((state.cell_quanta / np.maximum(state.cell_boxes, 1))[(state.kind == -1)
+                                                                                   & (state.between.min(axis=-1) >= 0)])
+            settings = Settings(collapse_packing=float(packing[-6]))
+            cell_laws(state, settings)
+            in_rooms = []
+            real = module._fall_in
+            monkeypatch.setattr(module, "_fall_in", lambda *args: _counted(real, in_rooms, args))
+            done = collapse(state, settings)
+            ends.append((done, sum(in_rooms), state.quanta.numpy(), state.owner.numpy(), state.marks.numpy(),
+                         state.kind.copy(), state.between.copy(), state.size.copy(), state.tallies.numpy()))
+            monkeypatch.undo()
+        print(f"{places} places, margin {margin}: {ends[0][0]} collapses, {ends[0][1]} of them in their own room")
+        assert ends[0][0] == ends[1][0] >= 3 and ends[0][1] >= 1 and ends[1][1] == 0
+        for first, second in zip(ends[0][2:], ends[1][2:]):
+            assert np.array_equal(first, second)
+
+
+def _counted(real, in_rooms: list, args: tuple):
+    """Run collapse's _fall_in and note whether it finished inside a room."""
+    result = real(*args)
+    in_rooms.append(bool(args[-1]) and result is not None)
+    return result

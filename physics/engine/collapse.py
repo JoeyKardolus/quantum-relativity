@@ -21,16 +21,23 @@ both had a joint with X the two become one joint (the higher id's boxes join the
 lower's, bit 2, sizes and speeds added), so two neighbouring volumes still share exactly
 one joint. A's clock is the box weighted mean of A's and B's. tallies[u, 1] counts the
 boxes turned plus, tallies[u, 3] their quanta, state.collapses the joints collapsed. The
-boxes are changed on the host and copied back. Returns the number of collapses.
+boxes are changed on the host: only the room the joint, its two volumes and their joints
+lie in is read and written back (cells_span.py), when the joint boxes left beside the
+turning ones stay joined inside that room (then no piece of the web can be cut off) and
+every box that stays minus finds a joint on its faces; otherwise the whole universe is
+read, as before 2026-11-17 for every collapse. Returns the number of collapses.
 """
 from __future__ import annotations
 
 import numpy as np
 
+from physics.engine.cells_span import cells_span
 from physics.engine.group_label import group_label
 from physics.engine.near import near
 from physics.engine.settings import Settings
 from physics.engine.state import State
+from physics.engine.window_read import window_read
+from physics.engine.window_write import window_write
 
 
 def collapse(state: State, settings: Settings, pressed: np.ndarray | None = None) -> int:
@@ -44,36 +51,61 @@ def collapse(state: State, settings: Settings, pressed: np.ndarray | None = None
     ready = (state.kind == -1) & over & (state.between.min(axis=-1) >= 0)
     if not ready.any():
         return 0
-    quanta, owner, marks = state.quanta.numpy(), state.owner.numpy(), state.marks.numpy()
     tallies = state.tallies.numpy()
     done = 0
     for universe in np.flatnonzero(ready.any(axis=1)):
-        rows = state.universe(int(universe))
         for joint in sorted(np.flatnonzero(ready[universe]), key=lambda cell: -packing[universe, cell]):
             if state.kind[universe, joint] != -1 or state.between[universe, joint].min() < 0:
                 continue
-            flipped, amount = _fall_in(state, int(universe), int(joint), quanta[rows], owner[rows], marks[rows])
+            flipped, amount = _collapse_one(state, int(universe), int(joint))
             tallies[universe, 1] += flipped
             tallies[universe, 3] += amount
             state.collapses[universe] += 1
             done += 1
-    for name, values in (("quanta", quanta), ("owner", owner), ("marks", marks), ("tallies", tallies)):
-        getattr(state, name).assign(values)
+    state.tallies.assign(tallies)
     return done
 
 
-def _fall_in(state: State, universe: int, joint: int, quanta: np.ndarray, owner: np.ndarray,
-             marks: np.ndarray) -> tuple:
-    """Turn joint `joint` into its lower volume, B into A; returns (boxes turned plus, quanta turned plus)."""
+def _collapse_one(state: State, universe: int, joint: int) -> tuple:
+    """Collapse one joint in the room it, its volumes and their joints lie in; in the whole universe when that cannot be shown to give the same."""
+    keep, gone = (int(cell) for cell in sorted(state.between[universe, joint]))
+    theirs = np.concatenate([state.joints_of(universe, keep), state.joints_of(universe, gone)])
+    room = cells_span(state, universe, [keep, gone, *theirs])
+    if room is not None:
+        quanta, owner, marks = window_read(state, universe, *room)
+        result = _fall_in(state, universe, joint, quanta, owner, marks, False, True)
+        if result is not None:
+            window_write(state, universe, room[0], quanta, owner, marks)
+            return result
+    low, extent = np.zeros(3, dtype=np.int64), np.full(3, state.side)
+    quanta, owner, marks = window_read(state, universe, low, extent)
+    result = _fall_in(state, universe, joint, quanta, owner, marks, state.wrap, False)
+    window_write(state, universe, low, quanta, owner, marks)
+    return result
+
+
+def _fall_in(state: State, universe: int, joint: int, quanta: np.ndarray, owner: np.ndarray, marks: np.ndarray,
+             wrap: bool, room_only: bool):
+    """Turn joint `joint` into its lower volume, B into A; returns (boxes turned plus, quanta turned plus).
+
+    With `room_only` the arrays hold only a room round the cells; returns None, nothing
+    changed but the arrays, when the room cannot show what the whole universe would give.
+    """
     keep, gone = (int(cell) for cell in sorted(state.between[universe, joint]))
     theirs = np.concatenate([state.joints_of(universe, keep), state.joints_of(universe, gone)])
     boxes = owner == joint
     plus = quanta > 0
     foreign = plus & (owner != keep) & (owner != gone)
-    blocked = near(foreign, state.wrap) | near(quanta == 0, state.wrap, wall=True)
-    blocked |= near((quanta < 0) & ~np.isin(owner, theirs), state.wrap, faces_only=True)
-    turned = _keep_web(quanta < 0, boxes & ~blocked, state.wrap)
-    _rehome(state, universe, owner, marks, boxes & ~turned, theirs, joint)
+    blocked = near(foreign, wrap) | near(quanta == 0, wrap, wall=True)
+    blocked |= near((quanta < 0) & ~np.isin(owner, theirs), wrap, faces_only=True)
+    if room_only:
+        turned = boxes & ~blocked
+        if not _web_holds(quanta < 0, turned):
+            return None
+    else:
+        turned = _keep_web(quanta < 0, boxes & ~blocked, wrap)
+    if not _rehome(state, universe, owner, marks, boxes & ~turned, theirs, joint, wrap, room_only):
+        return None
     amount = int(-quanta[turned].astype(np.int64).sum())
     quanta[turned] = -quanta[turned]
     owner[turned] = keep
@@ -96,17 +128,35 @@ def _fall_in(state: State, universe: int, joint: int, quanta: np.ndarray, owner:
     return int(turned.sum()), amount
 
 
+def _web_holds(minus: np.ndarray, turned: np.ndarray) -> bool:
+    """True when the joint boxes left beside the turning ones stay joined inside the room.
+
+    Every path through the web that crossed a turning box entered and left it by such a
+    neighbour, so when those stay joined to each other nothing is cut off anywhere and
+    _keep_web would hand back `turned` unchanged; False sends the collapse to the whole
+    universe, where _keep_web decides.
+    """
+    left = minus & ~turned
+    beside = left & near(turned, False, faces_only=True)
+    labels, _ = group_label(left, False)
+    return np.unique(labels[beside]).size <= 1
+
+
 def _rehome(state: State, universe: int, owner: np.ndarray, marks: np.ndarray, kept: np.ndarray,
-            theirs: np.ndarray, joint: int) -> None:
-    """Give the joint's boxes that stay minus to a face-neighbouring joint of the two volumes, else the nearest joint."""
+            theirs: np.ndarray, joint: int, wrap: bool, room_only: bool) -> bool:
+    """Give the joint's boxes that stay minus to a face-neighbouring joint of the two volumes, else the nearest joint.
+
+    Returns False, with `room_only`, when a box would need the nearest joint looked for
+    (a search the room cannot stand in for); True otherwise.
+    """
     left = kept.copy()
     universe_joints = theirs[theirs != joint]
     for _ in range(owner.shape[0]):
         if not left.any():
-            return
+            return True
         progressed = False
         for target in universe_joints:
-            taking = left & near(owner == target, state.wrap, faces_only=True)
+            taking = left & near(owner == target, wrap, faces_only=True)
             if taking.any():
                 owner[taking] = target
                 marks[taking] |= 2
@@ -114,6 +164,10 @@ def _rehome(state: State, universe: int, owner: np.ndarray, marks: np.ndarray, k
                 progressed = True
         if not progressed:
             break
+    if not left.any():
+        return True
+    if room_only:
+        return False
     others = (owner >= 0) & (owner != joint) & np.isin(owner, np.flatnonzero(state.kind[universe] == -1))
     for place in np.argwhere(left):
         for radius in range(1, owner.shape[0]):
@@ -123,6 +177,7 @@ def _rehome(state: State, universe: int, owner: np.ndarray, marks: np.ndarray, k
                 owner[tuple(place)] = int(found[0])
                 marks[tuple(place)] |= 2
                 break
+    return True
 
 
 def _keep_web(minus: np.ndarray, turned: np.ndarray, wrap: bool) -> np.ndarray:

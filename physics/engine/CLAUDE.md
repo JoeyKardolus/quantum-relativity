@@ -33,8 +33,8 @@ side; the detail ladder (`physics/ladder`) can sit beside the boxes.
   step, on the GPU. Boxes follow sizes (`exchange`, `mortar_shift`, by room order); a
   box changes cell only once emptied, every volume wrapped on 26 sides.
 - **No rule copies every box to the host.** `new_universe` builds on the GPU
-  (`_start.py`), a tear reads only its room (`cells_span`), each cell takes its own
-  fluid substeps (`later_substeps`). Only `collapse` still copies all.
+  (`_start.py`), a tear and a collapse read only their room (`cells_span`), each cell
+  takes its own fluid substeps (`later_substeps`).
 - **Deterministic.** Box moves are proposed, then committed against their phase's worst
   case (`settle_counts`); per-cell sums are whole or in a fixed order.
 - **Local clocks**: every per-cell rule runs at its cell's rate (`clock_rate`).

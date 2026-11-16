@@ -19,23 +19,30 @@ fit, and the largest universe that runs at least 1 step a second. Module map in 
 - **Timing is synchronized** at both ends (`throughput`); warmup covers kernel compiles and a
   first step's set-up. Report every number with its sizes, counts and seed; never tune.
 - **Size search** bisects an ascending list assuming bigger is never faster; a `MemoryError`
-  from build means "does not fit". `new_quanta_batch` raises it before allocating, so a probe
-  never spills into WSL's shared system memory.
+  from build means "does not fit", raised before allocating (30 B a box for the engine), so
+  a probe never spills into WSL's shared system memory.
 - **GPU one job at a time.**
 
-## Measured (2026-11-16, RTX 5080, seed 1, defaults, 3 timed steps from the start)
+## Measured (2026-11-17, RTX 5080, seed 1, defaults, 5 timed steps after 1)
 
-Forced cell lattice, cells of 10 boxes, margin the filled width, budget 33 B a box
-(owner and target per box, collapse's scratch): ladder off 25^3 cells (1,728 energy
-volumes), 425M boxes, 6.2 steps/s; 26^3 does not fit. 17^3: 134M boxes, 19.0 steps/s.
-Memory, not speed, limits it. Before the lattice (21 B a box): 30^3 cells, 739M boxes,
-5.6 steps/s; ladder on 26^3, 482M boxes (not re-measured with the lattice). The cell
-engine (physics.potts): 28.1M boxes, 64 volumes, 1.78 steps/s.
+Engine, every rule on, wrapping, cells of 10 boxes (`size engine --sizes ...`; other
+programs came and went on the card). Places: boxes, steps/s, build time:
+16: 0.68M, 56.6, 0.4 s. 88: 113M, 1.95, 33 s. 96: 147M (110,592 volumes), 1.41, 43 s.
+104: 187M, 0.12 (a collapse read the whole universe inside the timed steps).
+112: 234M, 0.95, 67 s. 120: 287M (216,000 volumes), 0.74, 92 s.
+
+Largest at 1 step a second: 96 places, 147M boxes. 25 B a box held, peak 29.4, or 34
+when a collapse reads the whole universe; an empty card would hold 136 places (418M),
+which did not run to the end beside the other programs. Speed limits it: box exchange,
+mortar shift (strided launches) and per-cell rules in numpy on the host. From 64 places
+up the start has joints past collapse_packing (120 places: 143 collapses in step 1,
+89 s). Before: 3.65M boxes at 16 steps/s; 32 places never finished step 1.
 
 ## Run
 
 ```
 PYTHONPATH=. .venv/bin/pytest -q physics/bench          # GPU tests skip without CUDA
 PYTHONPATH=. .venv/bin/python -m physics.bench throughput diffusion   # or engine; size diffusion|engine
+PYTHONPATH=. .venv/bin/python -m physics.bench size engine --sizes 16 96 120   # these sizes, no search
 PYTHONPATH=. .venv/bin/python -m physics.bench size engine --ladder   # the same with the ladder attached
 ```
