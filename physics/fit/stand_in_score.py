@@ -20,8 +20,8 @@ crossing's friction). A plus box feels only the pull; a minus box pushes
 push * (n / joint packing) ** push_steepness and is squeezed by n / joint packing - 1,
 the joint packing being the start's mean quanta per minus box (fixed once by the start,
 as the engine's size_energy is; no size at rest, no drift setting). Here it differs from
-the engine, which moves no quanta across a plus-minus face, diffuses plus quanta from
-volume to volume across their joint (physics.engine.cross) and sizes cells by their
+the engine, which moves no quanta across a plus-minus face, moves plus quanta from
+volume to volume across their joint, down the pull and by diffusion (physics.engine.cross) and sizes cells by their
 energy, so quanta change sign only in collapse and a tear. What it leaves out, because
 none of it has a gradient: the rounding to whole quanta, the moving cells (space does not
 grow: every box keeps its kind) and the collapse (collapse_squeeze still acts through

@@ -19,10 +19,12 @@ nothing.
   seal_squeeze     squeeze (wanted length / length - 1) at which a joint lets nothing cross
   collapse_squeeze squeeze past which a joint collapses and its two volumes become one;
                    larger than seal_squeeze, so a packed lump seals before it collapses
-  crossing_rate    energy crosses a joint by simple diffusion (owner, 2026-11-16): per
-                   unit of the joint's local time the quanta moved from one volume to the
-                   other are crossing_rate * openness * (difference of their quanta);
-                   default the fluid's own diffusion constant hbar / 2m = 1/2 box^2 per
+  crossing_rate    energy crosses a joint by diffusion bent by the pull (owner,
+                   2026-11-16; cross.py): per unit of the joint's local time the quanta
+                   moved from one volume to the other are crossing_rate * openness *
+                   (B(x) Q0 - B(-x) Q1), plain difference of their quanta when the pulls
+                   are equal; the drift's strength comes from the fluid's own jiggle,
+                   no setting of its own; default the fluid's own diffusion constant hbar / 2m = 1/2 box^2 per
                    time over the start's cell spacing of 11 boxes squared (0.5 / 121)
   joint_inertia    a joint's size accelerates by the push differences with the joints
                    it shares a volume with, over this inertia (natural units: 1)

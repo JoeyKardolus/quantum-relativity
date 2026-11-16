@@ -1,14 +1,25 @@
-"""Axiom 09: energy crosses a joint by simple diffusion; friction only on crossing into a joint; friction becomes heat kept as energy.
+"""Axiom 4, Crossing: energy diffuses between plus swirls only through minus; that is the only friction, and it becomes heat.
 
-Audit answers (owner, 2026-11-16: energy crosses a joint by simple diffusion for now) and
-bible rule 4 (friction only in passing through a joint; friction destroys no energy, it
-turns directed flow into jiggling, which is heat). Staged, Settings() unless named:
-  1. diffusion: new_universe(5, 10, seed=1, unevenness=0, margin=8) (8 energy volumes,
-     every box 1000) with energy volume V (lattice 2, 2, 2) packed to 2000 per box, and a
-     twin at 3000 per box. Simple diffusion (Fick): V's quanta fall at every one of 100
-     steps and never below the mean of the other volumes (no overshoot, no slosh back),
-     and V's loss over the first 5 steps is proportional to its excess: the twin with
-     twice the excess loses 2 times as much, within 1.6 .. 2.4
+The owner's axiom (bible physics/quantum-relativity, "The axioms", 2026-11-16; was axiom
+09). Owner decision 2026-11-16: the moving energy crossing a joint is bent by the pull
+toward packed regions (axiom 1: an always-moving fluid; axiom 5: more packed pulls
+harder); plain diffusion that ignores the pull broke the axioms and made lumps fade.
+cross.py: drift down the pull plus diffusion (Smoluchowski, Einstein's mobility with the
+fluid's own jiggle as the energy scale); with equal pulls it is plain diffusion. Bible
+rule 4: friction only in passing through a joint; friction destroys no energy, it turns
+directed flow into jiggling, which is heat. Staged, Settings() unless named:
+  1. diffusion when the pulls are equal: new_universe(5, 10, seed=1, unevenness=0,
+     margin=8) (8 energy volumes, every box 1000) with energy volume V (lattice 2, 2, 2)
+     packed to 2000 per box, and a twin at 3000 per box, pull_strength 0 (no pull, so no
+     drift; a side-by-side comparison). Simple diffusion (Fick): V's quanta fall at every
+     one of 100 steps and never below the mean of the other volumes (no overshoot, no
+     slosh back), and V's loss over the first 5 steps is proportional to its excess: the
+     twin with twice the excess loses 2 times as much, within 1.6 .. 2.4
+  1b. the pull steers the crossing toward the packed volume: the same start (V at 2000)
+     side by side with pull_strength 0, the default, and 100 times the default (a
+     staged strong pull): after every 20 of 100 steps V holds more quanta the stronger
+     the pull, and with the strong pull V gains over its start in the first 20 steps
+     (energy attracts energy: drift beats diffusion)
   2. no friction inside a cell: an 18-box cube of plus boxes (one energy volume, no
      joints; 18**3 boxes stay below split_across**3, so it does not tear) with a directed flow (phase 0.3 x) steps 20 times with the joint crossing
      on (Settings()) and off (crossing_rate 0): quanta and phases are identical (the
@@ -25,6 +36,7 @@ import numpy as np
 
 from physics.engine import Settings, State, cells, host_boxes, new_universe, step, totals
 from physics.engine.tests._gpu import needs_gpu
+
 
 V = (2 * 7 + 2) * 7 + 2
 
@@ -50,12 +62,12 @@ def _volume_amounts(state: State) -> tuple:
     return int(found["quanta"][mine]), float(others.mean())
 
 
-def _diffusion(packing: int, steps: int) -> list:
+def _diffusion(packing: int, steps: int, settings: Settings = Settings(pull_strength=0.0)) -> list:
     """V's quanta and the others' mean before and after each of `steps` steps."""
     state = _start(packing, 0.0)
     rows = [_volume_amounts(state)]
     for _ in range(steps):
-        step(state, Settings())
+        step(state, settings)
         rows.append(_volume_amounts(state))
     return rows
 
@@ -89,6 +101,20 @@ def test_energy_diffuses_across_joints_without_overshoot_in_proportion_to_the_ex
           f"ratio {ratio:.2f}")
     assert rises == 0 and np.all(amounts >= others)
     assert 1.6 <= ratio <= 2.4
+
+
+@needs_gpu
+def test_the_pull_bends_the_crossing_toward_the_packed_volume():
+    strengths = (0.0, Settings().pull_strength, 100.0 * Settings().pull_strength)
+    held = []
+    for strength in strengths:
+        rows = _diffusion(2000, 100, Settings(pull_strength=strength))
+        held.append([rows[index][0] for index in range(0, 101, 20)])
+    for strength, amounts in zip(strengths, held):
+        print(f"pull_strength {strength:.0e}: V every 20 steps {amounts}")
+    for index in range(1, 6):
+        assert held[0][index] < held[1][index] < held[2][index]
+    assert held[2][1] > held[2][0]
 
 
 @needs_gpu

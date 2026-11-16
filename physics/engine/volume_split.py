@@ -13,9 +13,12 @@ Each joint V had keeps its boxes and lies between its other volume and the half 
 touches; a joint touching both halves is shared out along the plane, its boxes past the
 plane becoming a joint of the new half (marks bit 2, no sign change; its boxes in the
 plane that touch both halves join the tear's joint), so two neighbouring volumes still
-share exactly one joint; the shared joint's size is shared out with its boxes, each piece
-keeping the stretch the whole had (joint sizes are their own swing, never box counts,
-joint_swing.py). ABAB holds after: the two halves' plus boxes lie two boxes
+share exactly one joint; each piece of a shared joint keeps the squeeze the whole had:
+its size is the size its own quanta want times the whole's size over the size the whole's
+quanta wanted (a piece holds less energy, so by length = constant / energy it wants more
+room; sharing size by boxes squeezed every piece past the collapse limit at once). The
+tear's joint gets its plane's share of the whole's size by boxes (joint sizes are their
+own swing, never box counts, joint_swing.py). ABAB holds after: the two halves' plus boxes lie two boxes
 apart across the tear. A cut that leaves a half without boxes is not made.
 state.splits and state.torn count splits and the quanta turned minus. Returns the
 number of splits.
@@ -94,7 +97,7 @@ def _tear(state: State, universe: int, volume: int, quanta: np.ndarray, owner: n
     for joint in state.joints_of(universe, volume):
         if joint == tear:
             continue
-        _share_joint(state, universe, int(joint), volume, half, tear, owner, marks, lower_boxes, upper_boxes,
+        _share_joint(state, universe, int(joint), volume, half, tear, quanta, owner, marks, lower_boxes, upper_boxes,
                      axis, cut, shift[axis])
     state.size[universe, tear] = float(len(middle))
     state.cell_clock[universe, [half, tear]] = state.cell_clock[universe, volume]
@@ -103,7 +106,8 @@ def _tear(state: State, universe: int, volume: int, quanta: np.ndarray, owner: n
     return 1
 
 
-def _share_joint(state: State, universe: int, joint: int, volume: int, half: int, tear: int, owner: np.ndarray,
+def _share_joint(state: State, universe: int, joint: int, volume: int, half: int, tear: int, quanta: np.ndarray,
+                 owner: np.ndarray,
                  marks: np.ndarray, lower_boxes: np.ndarray, upper_boxes: np.ndarray, axis: int, cut: int,
                  shift: int) -> None:
     """Give a joint of the torn volume to the half it touches, or share it out along the plane when it touches both."""
@@ -128,12 +132,19 @@ def _share_joint(state: State, universe: int, joint: int, volume: int, half: int
     marks[beyond] |= 2
     owner[both] = tear
     marks[both] |= 2
+    held = np.abs(quanta.astype(np.int64))
     total = max(int(boxes.sum()), 1)
     whole = float(state.size[universe, joint])
-    state.size[universe, twin] = whole * int(beyond.sum()) / total
+    stretch = whole / _wants(state, universe, int(held[boxes].sum()))
+    state.size[universe, twin] = stretch * _wants(state, universe, int(held[beyond].sum()))
     state.size[universe, tear] += whole * int(both.sum()) / total
-    state.size[universe, joint] = whole - state.size[universe, twin] - whole * int(both.sum()) / total
+    state.size[universe, joint] = stretch * _wants(state, universe, int(held[boxes & ~beyond & ~both].sum()))
     state.cell_clock[universe, twin] = state.cell_clock[universe, joint]
+
+
+def _wants(state: State, universe: int, amount: int) -> float:
+    """The size a joint holding `amount` quanta wants (cell_laws.py: (size_energy / quanta) ** 3)."""
+    return (float(state.size_energy[universe, 1]) / max(amount, 1)) ** 3
 
 
 def _pair(first: int, second: int) -> list:

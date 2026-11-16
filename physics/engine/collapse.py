@@ -4,24 +4,26 @@ Contract: `collapse(state, settings, squeeze)` takes each joint's squeeze (cell_
 its wanted length over its length minus 1) and collapses, most squeezed first, every
 joint that lies between two energy volumes with squeeze >= collapse_squeeze (owner,
 2026-11-16: when a joint collapses its two volumes become one cell at once). Joint J
-between volumes A and B (A the lower id, it stays): every box of J turns plus, its
-minus quanta becoming plus quanta of A, the same amount (bible rule 4: joint collapse
-is the one place where pushing energy becomes pulling energy), marks bit 1; except a
-box of J that has another volume's plus box or empty space or a wall among its 26
-neighbours, or a joint other than A's and B's on a face: that box keeps its minus
-quanta and goes to a neighbouring joint of A or B (marks bit 2), so the merged volume
-stays wrapped on all 26 sides. Every box of B joins A (bit 2): B and J are no more. A
-joint B had with a volume X becomes A's; where A and B both had a joint with X the two
-become one joint (the higher id's boxes join the lower's, bit 2, sizes and speeds
-added), so two neighbouring volumes still share exactly one joint. A's clock is the box
-weighted mean of A's and B's. tallies[u, 1] counts the boxes turned plus, tallies[u, 3]
-their quanta, state.collapses the joints collapsed. The boxes are changed on the host
-and copied back. Returns the number of collapses.
+between volumes A and B (A the lower id, it stays): every box of J turns plus, its minus
+quanta becoming plus quanta of A, the same amount (bible rule 4: joint collapse is the
+one place where pushing energy becomes pulling energy), marks bit 1; except a box of J
+that has another volume's plus box or empty space or a wall among its 26 neighbours, or
+a joint other than A's and B's on a face, or that bridges two parts of the joint web
+(turning it would cut a piece of the web off): that box keeps its minus quanta and goes
+to a neighbouring joint of A or B, else the nearest joint (marks bit 2), so the merged
+volume stays wrapped on all 26 sides and the joints stay one web. Every box of B joins A
+(bit 2): B and J are no more. A joint B had with a volume X becomes A's; where A and B
+both had a joint with X the two become one joint (the higher id's boxes join the
+lower's, bit 2, sizes and speeds added), so two neighbouring volumes still share exactly
+one joint. A's clock is the box weighted mean of A's and B's. tallies[u, 1] counts the
+boxes turned plus, tallies[u, 3] their quanta, state.collapses the joints collapsed. The
+boxes are changed on the host and copied back. Returns the number of collapses.
 """
 from __future__ import annotations
 
 import numpy as np
 
+from physics.engine.group_label import group_label
 from physics.engine.near import near
 from physics.engine.settings import Settings
 from physics.engine.state import State
@@ -60,8 +62,8 @@ def _fall_in(state: State, universe: int, joint: int, quanta: np.ndarray, owner:
     foreign = plus & (owner != keep) & (owner != gone)
     blocked = near(foreign, state.wrap) | near(quanta == 0, state.wrap, wall=True)
     blocked |= near((quanta < 0) & ~np.isin(owner, theirs), state.wrap, faces_only=True)
-    turned = boxes & ~blocked
-    _rehome(state, owner, marks, boxes & blocked, theirs, joint)
+    turned = _keep_web(quanta < 0, boxes & ~blocked, state.wrap)
+    _rehome(state, universe, owner, marks, boxes & ~turned, theirs, joint)
     amount = int(-quanta[turned].astype(np.int64).sum())
     quanta[turned] = -quanta[turned]
     owner[turned] = keep
@@ -84,9 +86,9 @@ def _fall_in(state: State, universe: int, joint: int, quanta: np.ndarray, owner:
     return int(turned.sum()), amount
 
 
-def _rehome(state: State, owner: np.ndarray, marks: np.ndarray, kept: np.ndarray, theirs: np.ndarray,
-            joint: int) -> None:
-    """Give the joint's boxes that stay minus to a face-neighbouring joint of the two volumes."""
+def _rehome(state: State, universe: int, owner: np.ndarray, marks: np.ndarray, kept: np.ndarray,
+            theirs: np.ndarray, joint: int) -> None:
+    """Give the joint's boxes that stay minus to a face-neighbouring joint of the two volumes, else the nearest joint."""
     left = kept.copy()
     universe_joints = theirs[theirs != joint]
     for _ in range(owner.shape[0]):
@@ -102,7 +104,7 @@ def _rehome(state: State, owner: np.ndarray, marks: np.ndarray, kept: np.ndarray
                 progressed = True
         if not progressed:
             break
-    others = (owner >= 0) & (owner != joint)
+    others = (owner >= 0) & (owner != joint) & np.isin(owner, np.flatnonzero(state.kind[universe] == -1))
     for place in np.argwhere(left):
         for radius in range(1, owner.shape[0]):
             window = tuple(slice(max(index - radius, 0), index + radius + 1) for index in place)
@@ -111,6 +113,33 @@ def _rehome(state: State, owner: np.ndarray, marks: np.ndarray, kept: np.ndarray
                 owner[tuple(place)] = int(found[0])
                 marks[tuple(place)] |= 2
                 break
+
+
+def _keep_web(minus: np.ndarray, turned: np.ndarray, wrap: bool) -> np.ndarray:
+    """The joint boxes that may turn plus without cutting a piece off the joint web; the rest stay minus.
+
+    Joint boxes that bridge two parts of the web stay minus: a piece of the web that turning
+    would cut off takes back the turning boxes on its faces, layer by layer, until it is
+    joined again.
+    """
+    before, _ = group_label(minus, wrap)
+    for _ in range(minus.shape[0]):
+        after, _ = group_label(minus & ~turned, wrap)
+        orphans = np.zeros(minus.shape, dtype=bool)
+        for piece in np.unique(before[turned & (before > 0)]):
+            inside = after[(before == piece) & (after > 0)]
+            if inside.size == 0:
+                continue
+            parts, sizes = np.unique(inside, return_counts=True)
+            if parts.size > 1:
+                orphans |= np.isin(after, parts[np.arange(parts.size) != np.argmax(sizes)])
+        if not orphans.any():
+            return turned
+        back = turned & near(orphans, wrap, faces_only=True)
+        if not back.any():
+            return turned
+        turned = turned & ~back
+    return turned
 
 
 def _join_twins(state: State, universe: int, volume: int, owner: np.ndarray, marks: np.ndarray) -> None:

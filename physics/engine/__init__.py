@@ -11,7 +11,8 @@ boxes keep ABAB (every volume wrapped by joints on all 26 sides, two volumes nev
 touching, the joints thin mortar in one web). A cell's size follows its energy (length =
 constant / energy, the constant fixed once by the start's correction); a volume only
 pulls, a joint only pushes and swings like a spring, empty space does nothing; energy
-diffuses from volume to volume through the joint they share and the crossing is the
+crosses from volume to volume through the joint they share, drifting down the pull
+and diffusing by its own jiggle, and the crossing is the
 only friction, making heat; everything in a cell runs on its local clock. Quanta change
 sign only in joint collapse (minus to plus) and in a volume split's tear (plus to
 minus). The detail ladder (physics/ladder) can be kept beside the boxes (attach_ladder.py).
@@ -39,7 +40,8 @@ Module map:
   on_site.py        on_site: exact phase turns by the box potential on local clocks
   hop.py            hop: exact pair rotations moving whole quanta inside one cell
   substeps.py       substeps: fluid substeps per universe from its steepest face in a cell
-  cross.py          cross: diffusion from volume to volume through their joint, heat
+  jiggle.py         jiggle: the fluid's own motion per quantum in each volume
+  cross.py          cross: drift down the pull and diffusion through a joint, heat
   exchange.py       exchange: wall boxes follow the cells' sizes, ABAB kept, light speed
   mortar_shift.py   mortar_shift: a growing volume pushes a thin joint wall into its neighbour
   group_label.py    group_label: connected groups of boxes, joined round wrapping edges
@@ -81,6 +83,7 @@ from physics.engine.on_site import on_site
 from physics.engine.hop import hop
 from physics.engine.substeps import substeps
 from physics.engine.cross import cross
+from physics.engine.jiggle import jiggle
 from physics.engine.exchange import exchange
 from physics.engine.mortar_shift import mortar_shift
 from physics.engine.group_label import group_label
@@ -102,6 +105,6 @@ from physics.engine.view_source import view_source
 
 __all__ = ["Settings", "State", "uneven_field", "new_universe", "reach", "face_step", "near", "clock_rate",
            "pass_seed", "pair_rotation", "box_potential", "cell_count", "cell_laws", "cell_upload", "cell_room", "settle_counts", "joint_swing",
-           "pull_wave", "on_site", "hop", "substeps", "cross", "exchange", "mortar_shift", "group_label", "one_group", "block_adjacency",
+           "pull_wave", "on_site", "hop", "substeps", "jiggle", "cross", "exchange", "mortar_shift", "group_label", "one_group", "block_adjacency",
            "collapse", "volume_split", "tick_clocks", "totals", "attach_ladder", "ladder_sync", "step",
            "host_boxes", "lattice_of", "ENERGY_VOLUME", "JOINT", "cells", "seams", "stats", "view_source"]

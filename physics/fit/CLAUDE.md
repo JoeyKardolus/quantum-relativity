@@ -29,7 +29,7 @@ fitted on the fit set only, the expansion shape (slowing, then speeding up) and 
 
 - **Gradients go through a stand-in**, never the engine: whole quanta, moving cells and collapse
   have no gradient. The stand-in is the engine's fluid in float psi, every box keeping its
-  kind; its quanta still cross plus-minus faces (the engine diffuses volume to volume,
+  kind; its quanta still cross plus-minus faces (the engine moves them volume to volume, drift down the pull plus diffusion,
   `engine/cross.py`), a minus box pushes by its packing over the start's mean joint
   packing, and `crossing_rate` scales the rub there. Scored like `fit_run` without lumps,
   by the counter. A winner is checked on the real `fit_run` score.

@@ -15,8 +15,9 @@ every part runs on the local clock of the cell it acts in (owner, 2026-11-16):
                    on_site for half a step, the hops along x, y, z (parity 0 then 1) for
                    half a step each, the hops in reverse order, on_site for half a step
                    (on_site.py, hop.py: whole quanta inside one cell, frictionless)
-  5. cross         energy diffuses across every joint between two volumes, the arriving
-                   quanta turned to heat (cross.py); the cells are counted again and every
+  5. cross         energy crosses every joint between two volumes, drifting down the
+                   pull (each cell's mean pull as counted in 1 or 2) and diffusing by
+                   the fluid's own jiggle, the arriving quanta turned to heat (cross.py); the cells are counted again and every
                    volume's size follows its new energy at once (cell_laws.py)
   6. joint_swing   every joint's size swings, pushed against its neighbours', the swing
                    energy kept (joint_swing.py); a joint pressed to the collapse limit
@@ -59,17 +60,17 @@ _ORDER = [(axis, parity) for axis in range(3) for parity in range(2)]
 def step(state: State, settings: Settings) -> None:
     """One step: cell laws, collapse and split, pull wave, fluid, crossing, joint swing, boxes follow sizes, clocks."""
     state.marks.zero_()
-    cell_count(state)
+    pull = cell_count(state)
     squeeze = cell_laws(state, settings)
     if collapse(state, settings, squeeze) + volume_split(state, settings):
-        cell_count(state)
+        pull = cell_count(state)
         squeeze = cell_laws(state, settings)
     cell_upload(state)
     pull_wave(state, settings)
     half = 0.5 * settings.step_time
     for sub_index in range(int(substeps(state, settings).max())):
         _fluid(state, settings, half, sub_index)
-    cross(state, settings, squeeze)
+    cross(state, settings, squeeze, pull)
     pull = cell_count(state)
     cell_laws(state, settings)
     pressed = joint_swing(state, settings, pull)

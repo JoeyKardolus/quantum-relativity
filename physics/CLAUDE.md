@@ -20,8 +20,8 @@ scenes share (dimension, whirl winding), CPU only.
 
 - **The rules are the bible's**: A pulls, fading with distance, at light speed; B pushes,
   steeply when squeezed, and collapses past the limit into one cell (the only way minus
-  turns plus); flow frictionless inside a cell; energy diffuses A to A through their one
-  joint, the only friction, making heat, less when squeezed, none past the seal; every A
+  turns plus); flow frictionless inside a cell; energy crosses A to A down the pull (plus
+  diffusion) through their one joint, the only friction, making heat, less when squeezed, none past the seal; every A
   wrapped on all 26 sides, joints thin mortar in one web; only a too-big A tears; no size
   at rest, no drift setting; a box changes cell only once emptied or split, sign only by
   collapse or a split's tear. The amount ignoring sign is exact (bible rule 4).
@@ -33,8 +33,7 @@ scenes share (dimension, whirl winding), CPU only.
   number, seed, settings and miss.
 - **Expansion check before any fit** (seed 1, defaults): the numbers are in
   `scenes/CLAUDE.md`.
-- **GPU**: RTX 5080 under WSL2. CUDA-OpenGL sharing does not work on WSL: copy GPU to host
-  once per frame. Tests that need CUDA skip cleanly without it.
+- **GPU**: RTX 5080, WSL2: no CUDA-OpenGL sharing, copy GPU to host once per frame. Tests that need CUDA skip cleanly without it.
 - **A machine keeps no datasets**: long runs and their results go to object storage or tmp,
   never into the repo.
 - **Layout.** One public function (or type) per file, helpers `_prefixed`, docstring

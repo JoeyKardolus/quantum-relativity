@@ -1,37 +1,50 @@
-"""Cross: energy diffuses from energy volume to energy volume through the one joint they share; the crossing is the only friction and makes heat.
+"""Cross: energy crosses from energy volume to energy volume through the one joint they share, bent by the pull; the crossing is the only friction and makes heat.
 
-Contract: `cross(state, settings, squeeze)` moves plus quanta across every joint that lies
-between two energy volumes (state.between), by simple diffusion (owner, 2026-11-16): in
-one step the joint carries flow = crossing_rate * openness * (quanta of between[0] -
-quanta of between[1]) * step_time * rate quanta from between[0] to between[1], rate the
-joint's own clock (state.rate) and openness 1 - squeeze / seal_squeeze, between 0 and 1
-(`squeeze` per cell from cell_laws.py: the more squeezed the joint, the more it resists,
-and past the seal nothing passes, so packed lumps seal themselves). The flow is spread
-over the joint's crossings: a crossing is a straight line along an axis from a plus box
-of one of its volumes through one or more minus boxes, all of that joint, to a plus box
-of the other (any thickness; round the edge when the universe wraps). Each crossing
-hands floor(|flow| / crossings + uniform) whole quanta from the end box on the giving
-side to the end box on the other side, never leaving the giver below 1 quantum: the
-quanta pass through the joint in one handover and never take the joint's sign, so plus
-and minus never cancel (bible rule 4). Friction: the arriving quanta come without their
-direction, at a random phase (the hash of the box, the universe's key and the step), so
-the box's phase becomes arg(sqrt(n) e^{i phase} + sqrt(m) e^{i random}) for n quanta
-held and m arrived: directed flow turned to jiggling, heat, and no quantum lost. Phases
-inside cells are not touched. state.crossed gets each joint's net quanta from
-between[0] to between[1] this step and tallies[u, 0] every quantum that crossed. Joints
-facing empty space or a wall carry nothing. Returns None.
+Contract: `cross(state, settings, squeeze, pull)` moves plus quanta across every joint
+that lies between two energy volumes (state.between). Energy is an always-moving fluid
+and more packed pulls harder (axioms 1 and 5; owner, 2026-11-16: the crossing is steered
+by the pull), so the crossing is drift and diffusion together, the Smoluchowski law
+J = -D (grad n + n grad(pull) / T), in its exact two-cell (Scharfetter-Gummel) form: in
+one step the joint carries
+  flow = crossing_rate * openness * (B(x) * Q0 - B(-x) * Q1) * step_time * rate
+quanta from between[0] to between[1], Q0 and Q1 the two volumes' quanta, B(x) =
+x / (e**x - 1) (B(0) = 1: equal pulls give plain diffusion), x = (pull1 - pull0) / T
+with pull0, pull1 the volumes' mean pull per quantum (`pull`, cell_count.py; lower is
+deeper, nearer the packed side) and T the energy of the fluid's own motion per quantum
+along one axis, pooled over both volumes (jiggle.py; Einstein's relation, mobility =
+D / T): the moving energy is bent toward the volume that pulls harder, so energy
+attracts energy, and its own heat spreads it. No new setting. `rate` is the joint's own
+clock (state.rate); openness is 1 - squeeze / seal_squeeze, between 0 and 1 (`squeeze`
+per cell from cell_laws.py: the more squeezed the joint, the more it resists, and past
+the seal nothing passes, so packed lumps seal themselves). A joint never carries more
+than its giving volume holds. The flow is spread over the joint's crossings: a crossing
+is a straight line along an axis from a plus box of one of its volumes through one or
+more minus boxes, all of that joint, to a plus box of the other (any thickness; round
+the edge when the universe wraps). Each crossing hands floor(|flow| / crossings +
+uniform) whole quanta from the end box on the giving side to the end box on the other
+side, at most all but 1 of the giver's quanta: the quanta pass through the joint in one
+handover and never take the joint's sign, so plus and minus never cancel (bible rule 4).
+Friction: the arriving quanta come without their direction, at a random phase (the hash
+of the box, the universe's key and the step), so the box's phase becomes
+arg(sqrt(n) e^{i phase} + sqrt(m) e^{i random}) for n quanta held and m arrived: directed
+flow turned to jiggling, heat, and no quantum lost. Phases inside cells are not touched.
+state.crossed gets each joint's net quanta from between[0] to between[1] this step and
+tallies[u, 0] every quantum that crossed. Joints facing empty space or a wall carry
+nothing. Returns None.
 """
 from __future__ import annotations
 
 import numpy as np
 import warp as wp
 
+from physics.engine.jiggle import jiggle
 from physics.engine.pass_seed import pass_seed
 from physics.engine.settings import Settings
 from physics.engine.state import State
 
 PI = 3.14159265358979
 _COUNT, _MOVE = 0, 1
+_EXP_LIMIT = 700.0  # numerics: e**700 is near float64's top; beyond it B is 0 or |x| to the last digit
 
 
 @wp.func
@@ -48,13 +61,14 @@ def _place(home: int, side: int, axis: int, first: int, second: int, along: int)
 @wp.func
 def _hand(quanta: wp.array3d(dtype=wp.int32), arrived: wp.array3d(dtype=wp.int32), giver: wp.vec3i, taker: wp.vec3i,
           moved: int) -> int:
-    """Hand `moved` plus quanta from giver to taker unless the giver would drop below 1; returns what moved."""
+    """Hand up to `moved` plus quanta from giver to taker, leaving the giver at least 1; returns what moved.
+
+    Only this line's thread touches its boxes in one axis pass, so the read is not racing.
+    """
+    moved = wp.min(moved, quanta[giver[0], giver[1], giver[2]] - 1)
     if moved <= 0:
         return 0
-    held = wp.atomic_add(quanta, giver[0], giver[1], giver[2], -moved)
-    if held - moved < 1:
-        wp.atomic_add(quanta, giver[0], giver[1], giver[2], moved)
-        return 0
+    wp.atomic_add(quanta, giver[0], giver[1], giver[2], -moved)
     wp.atomic_add(quanta, taker[0], taker[1], taker[2], moved)
     wp.atomic_add(arrived, taker[0], taker[1], taker[2], moved)
     return moved
@@ -125,7 +139,9 @@ def _heat(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32
     if came <= 0:
         return
     home = ti // side
-    kept = wp.abs(quanta[ti, tj, tk]) - came
+    held = wp.abs(quanta[ti, tj, tk])
+    came = wp.min(came, held)  # a box that took and then gave on another line keeps what it holds
+    kept = held - came
     index = ((ti - home * side) * side + tj) * side + tk
     rng = wp.rand_init(seed ^ keys[home], index)
     angle = 2.0 * PI * wp.randf(rng)
@@ -135,11 +151,11 @@ def _heat(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32
     phase[ti, tj, tk] = wp.atan2(imaginary, real)
 
 
-def cross(state: State, settings: Settings, squeeze: np.ndarray) -> None:
-    """Diffuse plus quanta across every joint between two volumes, by straight crossings; arrivals become heat."""
+def cross(state: State, settings: Settings, squeeze: np.ndarray, pull: np.ndarray) -> None:
+    """Move plus quanta across every joint between two volumes, drift down the pull and diffusion; arrivals become heat."""
     device = state.quanta.device
     state.crossed = np.zeros(state.kind.shape, dtype=np.int64)
-    flow = _flow(state, settings, squeeze)
+    flow = _flow(state, settings, squeeze, pull)
     if not np.any(flow):
         return
     shape = state.kind.shape
@@ -159,7 +175,7 @@ def cross(state: State, settings: Settings, squeeze: np.ndarray) -> None:
     state.crossed = crossed.numpy()
 
 
-def _flow(state: State, settings: Settings, squeeze: np.ndarray) -> np.ndarray:
+def _flow(state: State, settings: Settings, squeeze: np.ndarray, pull: np.ndarray) -> np.ndarray:
     """Quanta each joint carries this step from between[0] to between[1] (float, signed)."""
     rows, columns = np.nonzero((state.kind == -1) & (state.between[..., 1] >= 0) & (state.between[..., 0] >= 0))
     flow = np.zeros(state.kind.shape)
@@ -167,8 +183,31 @@ def _flow(state: State, settings: Settings, squeeze: np.ndarray) -> np.ndarray:
         return flow
     sides = state.between[rows, columns]
     amounts = state.cell_quanta.astype(np.float64)
-    difference = amounts[rows, sides[:, 0]] - amounts[rows, sides[:, 1]]
+    giving, taking = amounts[rows, sides[:, 0]], amounts[rows, sides[:, 1]]
+    lean = _lean(state, pull, rows, sides)
     openness = np.clip(1.0 - np.maximum(squeeze[rows, columns], 0.0) / settings.seal_squeeze, 0.0, 1.0)
-    flow[rows, columns] = (settings.crossing_rate * openness * difference * settings.step_time
-                           * state.rate[rows, columns])
+    carried = (settings.crossing_rate * openness * (_bernoulli(lean) * giving - _bernoulli(-lean) * taking)
+               * settings.step_time * state.rate[rows, columns])
+    flow[rows, columns] = np.clip(carried, -taking, giving)
     return flow
+
+
+def _lean(state: State, pull: np.ndarray, rows: np.ndarray, sides: np.ndarray) -> np.ndarray:
+    """x = (pull of between[1] - pull of between[0]) / T, T the two volumes' pooled jiggle; inf-safe."""
+    spread, weight = jiggle(state)
+    pooled = spread[rows, sides[:, 0]] + spread[rows, sides[:, 1]]
+    weights = weight[rows, sides[:, 0]] + weight[rows, sides[:, 1]]
+    heat = np.where(weights > 0.0, pooled / np.maximum(weights, 1e-300), 0.0)
+    rise = pull[rows, sides[:, 1]] - pull[rows, sides[:, 0]]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        lean = np.where(rise == 0.0, 0.0, rise / heat)
+    return np.clip(lean, -_EXP_LIMIT, _EXP_LIMIT)
+
+
+def _bernoulli(lean: np.ndarray) -> np.ndarray:
+    """B(x) = x / (e**x - 1), B(0) = 1, without overflow."""
+    small = np.abs(lean) < 1e-8
+    safe = np.where(small, 1.0, lean)
+    with np.errstate(over="ignore"):
+        value = safe / np.expm1(safe)
+    return np.where(small, 1.0 - 0.5 * lean, value)
