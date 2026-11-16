@@ -4,12 +4,12 @@ Rules: `docs/bible.md#physicsquantum-relativity` ("The foundation" and "How the 
 the foam" first); words: `CONTEXT.md` (Planck box, energy volume, joint; never node, edge,
 vertex, or merge for joint collapse).
 
-Four packages. `potts/` is the engine: a fixed grid of Planck boxes on the GPU (Warp, CUDA)
+Five packages. `potts/` is the engine: a fixed grid of Planck boxes on the GPU (Warp, CUDA)
 carrying the energy as a quantum fluid, one complex number per box; energy volumes (A) and
 joints (B) are cells, groups of boxes, every A wrapped in joints, and a cell's size is how many
 boxes it holds (cellular Potts). `view/` is the only viewer, a pyglet window on the GPU.
 `scenes/` is the scorecard: each scene runs the engine and returns measured numbers, no
-verdict. `measure/` holds the measures scenes share (dimension, whirl winding), CPU only. The fluid engine without cells (`fluid/`),
+verdict. `fit/` searches settings on the fit set only (expansion shape, structure) and never changes a default. `measure/` holds the measures scenes share (dimension, whirl winding), CPU only. The fluid engine without cells (`fluid/`),
 the earlier ABAB engine (`abab/`), the browser app and the milestone code were removed (owner,
 2026-11-15); they are in git history. Its kept kernels (multigrid pull, uneven field) live in
 `potts/`.

@@ -8,4 +8,6 @@ Module map:
           `python -m physics.view`
   scenes/ the fit's scorecard: scenes that build a start, run the engine and return
           measured numbers (expansion, structure, orbit, bound lump, black hole, Hubble gap)
+  fit/    the fit search: settings scored on expansion shape and structure only,
+          `python -m physics.fit OUT_DIR`
 """
