@@ -7,7 +7,8 @@ alike, in an empty margin), plus each blob. A blob is a dict with `offset` (3
 floats, box units, from the grid's middle (side - 1) / 2; box i's centre at i),
 `radius` (boxes; an occupied box is in the ball when its centre is within it),
 `energy` (the blob's extra energy in its A boxes, spread evenly over them; its B boxes
-get as much per box, as the start's joints do: a joint is a full cell) and `velocity` (3
+get as much per box, as the start's joints do: a joint is a full cell) or, in its
+place, `density` (the extra energy per box, A and B alike) and `velocity` (3
 floats, boxes per time unit). The fluid is one complex number per box, psi =
 sqrt(energy) exp(i phase), and its flow is the phase's gradient (hbar = mass = 1), so a
 ball moves when its phase rises along the velocity: phase = velocity . (x - centre)
@@ -16,7 +17,7 @@ ball's edge by up to |velocity| radius, so that product should stay well under p
 Nothing outside a cell can hold energy (empty space is no box), so a blob is a dense,
 moving region of the foam, not a ball in a vacuum. Overlapping blobs add their
 energies; the later blob's phase wins in shared boxes. Raises ValueError for a blob
-that covers no A box or has energy <= 0.
+that covers no A box or has energy (or density) <= 0.
 """
 from __future__ import annotations
 
@@ -40,9 +41,9 @@ def blob_start(cells_per_side: int, boxes_per_cell_side: int, blobs: list[dict],
         offsets = places - ((side - 1) / 2.0 + np.asarray(blob["offset"], dtype=np.float64))
         inside = (owner >= 0) & ((offsets ** 2).sum(axis=-1) <= blob["radius"] ** 2)
         a_boxes = inside & ~joint
-        if not a_boxes.any() or blob["energy"] <= 0:
+        per_box = blob["density"] if "density" in blob else blob["energy"] / max(int(a_boxes.sum()), 1)
+        if not a_boxes.any() or per_box <= 0:
             raise ValueError(f"blob {blob} covers no energy-volume box or holds no energy")
-        per_box = blob["energy"] / a_boxes.sum()
         energy[a_boxes] += per_box
         energy[inside & joint] += per_box
         phase[inside] = (offsets @ np.asarray(blob.get("velocity", (0.0, 0.0, 0.0)), dtype=np.float64))[inside]

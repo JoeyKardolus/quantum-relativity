@@ -27,8 +27,8 @@ Module map:
   pull.py             pull: the A-energy's potential on a cube round the active region (CUDA graph)
   time_levels.py      time_levels: each cell's own substep (local clocks), boxes ordered by level
   on_site.py          on_site: each box's phase turned by the pull and the fluid's push (a joint's stiffer)
-  hop.py              hop: exact two-box rotations across faces; friction (as heat) at A-B faces, the seal
-  fluid_energy.py     fluid_energy: the fluid equation's own energy (flow, pull, push), reported
+  hop.py              hop: exact two-box rotations across faces; friction at A-B faces, booked as heat; the seal
+  fluid_energy.py     fluid_energy: the fluid equation's own energy (flow, pull, push), plain or clocked
   energy_flow.py      energy_flow: one step of the fluid on local clocks, Strang-split exact rotations
   joint_swing.py      joint_swing: each joint a spring with inertia, its aim for the moves
   box_moves.py        box_moves: 64 phases of plate moves (size, pull, push; wrapping, connected)

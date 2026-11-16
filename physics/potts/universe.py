@@ -41,7 +41,9 @@ Start references, set by `Universe.from_host`, never changed by a step:
 steps counts step() calls, substeps the finest fluid substeps, box_updates the box
 updates they made (each box only at its own level), collapses the joints that
 collapsed, splits the volumes that tore, last_moves the boxes that changed owner in
-the last step; corrected is True once the start's size correction ran.
+the last step; corrected is True once the start's size correction ran. work_pull,
+work_compression and work_moves tally what those phases of a step did to the fluid's
+energy (step.py).
 `Universe.from_host(owner, energy, kind, boxes_per_cell_side, seed, device, phase=None)`
 builds one from numpy arrays: owner (side, side, side) ints, energy (side, side,
 side) float >= 0 (must be 0 in empty boxes), kind per cell, and an optional phase
@@ -117,6 +119,9 @@ class Universe:
     splits: int = 0
     last_moves: int = 0
     corrected: bool = False
+    work_pull: float = 0.0
+    work_compression: float = 0.0
+    work_moves: float = 0.0
     scratch: dict = field(default_factory=dict)
 
     @classmethod

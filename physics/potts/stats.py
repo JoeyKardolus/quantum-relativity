@@ -8,10 +8,18 @@ region_host.py; outside it every box is empty):
                     the start's total (the hops and turns are exact rotations, so
                     only float64 rounding moves it)
   fluid_energy      the energy fluid's own energy in its equation (fluid_energy.py):
-                    flow, pull and push terms; not conserved while the pull, the
-                    cells and friction change (reported, not a rule)
-  heat              total heat (energy units): directed flow turned into jiggling by
-                    friction at A-B faces; bookkeeping, not part of total_energy
+                    flow, pull and push terms, in proper time; not conserved while the
+                    pull, the cells and friction change (reported, not a rule);
+                    clocked_fluid_energy the same weighed by the local clocks, the
+                    quantity the fluid's steps keep
+  heat              total heat: directed flow turned into jiggling by friction at A-B
+                    faces, in clocked_fluid_energy's units (the flow energy friction
+                    took, hop.py); bookkeeping, not part of total_energy and not
+                    comparable with it
+  work_pull, work_compression, work_moves  what the pull's re-solve, the joints' new
+                    compression and the box moves did to clocked_fluid_energy since the
+                    start (step.py); energy_balance = clocked_fluid_energy + heat - their
+                    sum, which only the flow's splitting between time levels moves
   cells, joints     living energy volumes (A) and joints (B); cell_count_growth their
                     number over the start's (volume splits raise it, collapses lower it)
   collapses, splits joints that have collapsed and volumes that have torn since the start
@@ -50,7 +58,7 @@ from physics.potts.universe import ENERGY_VOLUME, JOINT, Universe
 
 
 def stats(universe: Universe, settings: Settings | None = None) -> dict:
-    """Energy, heat, cells and joints, collapses and splits, space, lumps and seals, wrapping, edge, clocks."""
+    """Energy, heat and work, cells and joints, collapses and splits, space, lumps and seals, wrapping, edge, clocks."""
     settings = Settings.all_on() if settings is None else settings
     cell_sums(universe, settings)
     owner = region_host(universe, universe.owner)
@@ -85,13 +93,22 @@ def stats(universe: Universe, settings: Settings | None = None) -> dict:
     wrap_breaks = int(np.sum(a_high & (a_low | (touch_low < 0))))
     joint_boxes = occupied & (kind[np.maximum(owner, 0)] == JOINT)
     lumps = np.flatnonzero(volumes & (held >= settings.lump_factor * universe.rest_a * np.maximum(boxes, 1)))
+    fluid = fluid_energy(universe, settings)
+    clocked = fluid_energy(universe, settings, clocked=True)
+    heat_total = float(heat.sum(dtype=np.float64))
+    work = float(universe.work_pull + universe.work_compression + universe.work_moves)
     sealed = sum(1 for lump in lumps if _sealed(lump, low, high, kind, compression, settings.seal_compression))
     return {
         "total_energy": total,
         "energy_drift": total - universe.start_total,
         "relative_drift": (total - universe.start_total) / universe.start_total if universe.start_total else 0.0,
-        "fluid_energy": fluid_energy(universe, settings),
-        "heat": float(heat.sum(dtype=np.float64)),
+        "fluid_energy": fluid,
+        "clocked_fluid_energy": clocked,
+        "heat": heat_total,
+        "work_pull": float(universe.work_pull),
+        "work_compression": float(universe.work_compression),
+        "work_moves": float(universe.work_moves),
+        "energy_balance": clocked + heat_total - work,
         "cells": int(volumes.sum()),
         "joints": int(joints.sum()),
         "cell_count_growth": float((volumes.sum() + joints.sum()) / (universe.start_cells + universe.start_joints)),

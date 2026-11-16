@@ -22,7 +22,8 @@ Planck boxes on the GPU (Warp), each owned by one cell or empty; energy volumes 
   coordinates off the outer layer, the rest joints, every cell k^3 boxes.
 - **Seams** are joint boxes with another joint among their 26 neighbours (`seam_box.py`);
   the fluid crosses into or between joints only there, by the most squeezed joint's openness.
-  Friction only at A-B faces (phase difference relaxed, flow energy to heat).
+  Friction only at A-B faces; its heat is the clocked flow-energy drop on every face the
+  turned boxes touch; `step` books other phases as work (`stats()["energy_balance"]`).
 - **Pull** is V in every box's phase turn (no step at A-B faces); sourced by A only.
 - **Collapse** merges every A touching the joint at a face, edge or corner (`touch_pairs.py`);
   a joint touching empty space does not collapse.
@@ -36,10 +37,9 @@ Planck boxes on the GPU (Warp), each owned by one cell or empty; energy volumes 
 
 ## Measured (2026-11-16, RTX 5080, seed 1, 8^3 cells of 6^3 boxes, defaults)
 
-27 volumes, 485 joints; 300 steps in 19 s (18,336 substeps). Relative drift 3e-15; wrap
-breaks 0, web one piece; 0 collapses, 0 splits; occupied x1.71, edge share 0; lumps 0-4.
-A rerun: 1 collapse, 27 volumes to 19.
-Heat 396k exceeds the total energy 110,592: friction's bookkeeping is open.
+27 volumes, 485 joints; 300 steps in 14 s. Relative drift 4e-15; wrap breaks 0, web one
+piece; 0-1 collapses; occupied x1.72, edge share 0. Heat 619k, work pull -165k, compression
++276k, moves +716k; balance 75,324 to 72,022 (-4.4%).
 
 ## Run
 

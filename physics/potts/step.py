@@ -15,6 +15,13 @@ Contract: `step(universe, settings)` changes the universe in place and returns N
   6. joint_collapse: joints squeezed past their limit vanish and their energy volumes
      fall together; volume_split: volumes grown past the split size tear around a new
      joint; cell_sums after either
+The work each non-flow phase does on the fluid's energy (fluid_energy.py, clocked: the
+quantity the steps keep, in which friction's heat is booked, hop.py) is tallied, measured just before and after it: universe.work_pull (the pull's re-solve
+and the cell sums after it), work_compression (the cell sums after the flow: the joints'
+new compression changes their push and openness) and work_moves (the start's size
+correction, joint swing, box moves, collapses and splits). Bookkeeping only: with heat
+the fluid's energy balance closes as clocked fluid energy + heat - work, which only the
+flow phase's splitting between time levels moves (stats.py "energy_balance").
 universe.steps grows by 1 (substeps and box_updates by energy_flow); the last move
 count is kept in universe.last_moves. Raises ValueError when a flow speed stops being
 finite or a cell needs a time level over settings.max_level (the universe is then left
@@ -26,6 +33,7 @@ from physics.potts.active_region import active_region
 from physics.potts.box_moves import box_moves
 from physics.potts.cell_sums import cell_sums
 from physics.potts.energy_flow import energy_flow
+from physics.potts.fluid_energy import fluid_energy
 from physics.potts.joint_collapse import joint_collapse
 from physics.potts.joint_swing import joint_swing
 from physics.potts.pull import pull
@@ -37,13 +45,19 @@ from physics.potts.volume_split import volume_split
 
 def step(universe: Universe, settings: Settings) -> None:
     """One step: pull, the energy fluid on local clocks, one sweep of plate moves, collapses and splits."""
+    cell_sums(universe, settings)
+    before = fluid_energy(universe, settings, clocked=True)
     if not universe.corrected:
         size_correction(universe, settings)
-    cell_sums(universe, settings)
+        cell_sums(universe, settings)
+        before = _tally(universe, settings, "work_moves", before)
     pull(universe, settings)
     cell_sums(universe, settings)
+    _tally(universe, settings, "work_pull", before)
     energy_flow(universe, settings)
+    before = fluid_energy(universe, settings, clocked=True)
     cell_sums(universe, settings)
+    before = _tally(universe, settings, "work_compression", before)
     joint_swing(universe, settings)
     universe.last_moves = box_moves(universe, settings)
     active_region(universe)
@@ -52,4 +66,12 @@ def step(universe: Universe, settings: Settings) -> None:
         cell_sums(universe, settings)
     if volume_split(universe, settings) > 0:
         cell_sums(universe, settings)
+    _tally(universe, settings, "work_moves", before)
     universe.steps += 1
+
+
+def _tally(universe: Universe, settings: Settings, name: str, before: float) -> float:
+    """Add the fluid energy's change since `before` to the named work tally; return the energy now."""
+    now = fluid_energy(universe, settings, clocked=True)
+    setattr(universe, name, getattr(universe, name) + now - before)
+    return now
