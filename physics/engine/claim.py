@@ -24,7 +24,11 @@ move: a box turns plus only when none of its 26 neighbours is empty or off the g
 the plus boxes among them form one group (26-connected inside the block), so a claim
 never lets an energy volume touch empty space or a second energy volume (only collapse
 joins volumes, collapse.py); a plus box turns minus only when the plus boxes round it
-still form one group, so a claim never tears a volume in two. Returns None.
+still form one group, so a claim never tears a volume in two. And a joint box turns
+plus only when the minus boxes among its 18 face and edge neighbours form one group
+joined across faces inside the block (the digital-topology simple-point test for the
+web), so a claim never cuts the joint web or seals a joint box inside a volume: joints
+stay one connected web (owner, 2026-11-16). Returns None.
 """
 from __future__ import annotations
 
@@ -38,6 +42,7 @@ from physics.engine.settings import Settings
 from physics.engine.state import State
 
 _NEIGHBOURS = {}
+_FACE_NEIGHBOURS = {}
 
 
 @wp.func
@@ -114,7 +119,8 @@ def _pushed_out(quanta: wp.array3d(dtype=wp.int32), pull: wp.array3d(dtype=wp.fl
 @wp.kernel
 def _claim(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32),
            pull: wp.array3d(dtype=wp.float32), clock: wp.array3d(dtype=wp.float32),
-           marks: wp.array3d(dtype=wp.uint8), adjacency: wp.array(dtype=wp.int32), side: int, length: int,
+           marks: wp.array3d(dtype=wp.uint8), adjacency: wp.array(dtype=wp.int32),
+           face_adjacency: wp.array(dtype=wp.int32), side: int, length: int,
            offset: wp.vec3i, volume_rest: float,
            volume_stiffness: float, joint_rest: float, push: float, push_steepness: float,
            tallies: wp.array2d(dtype=wp.int64)):
@@ -127,6 +133,7 @@ def _claim(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float3
         return
     held = quanta[site[0], site[1], site[2]]
     plus_round = int(0)
+    minus_round = int(0)
     empty_round = int(0)
     for index in range(27):
         if index != 13:
@@ -137,9 +144,13 @@ def _claim(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float3
                 value = quanta[there[0], there[1], there[2]]
                 if value > 0:
                     plus_round = plus_round | (1 << index)
-                elif value == 0:
+                elif value < 0:
+                    if wp.abs(index // 9 - 1) + wp.abs(index // 3 % 3 - 1) + wp.abs(index % 3 - 1) <= 2:
+                        minus_round = minus_round | (1 << index)
+                else:
                     empty_round = empty_round | (1 << index)
-    if held < 0 and (empty_round != 0 or not _one_group(plus_round, adjacency)):
+    if held < 0 and (empty_round != 0 or not _one_group(plus_round, adjacency)
+                     or minus_round == 0 or not _one_group(minus_round, face_adjacency)):
         return
     if held > 0 and not _one_group(plus_round, adjacency):
         return
@@ -187,18 +198,21 @@ def _claim(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float3
     wp.atomic_add(tallies, home, 2, wp.int64(1))
 
 
-def _adjacency(device) -> wp.array:
-    """Per block index 0..26 the bit mask of its 26-neighbours inside the 3x3x3 block (the centre, 13, left out)."""
+def _adjacency(device, faces_only: bool = False) -> wp.array:
+    """Per block index 0..26 the bit mask of its 26-neighbours (or face neighbours) inside the 3x3x3 block, centre 13 left out."""
     key = str(device)
-    if key not in _NEIGHBOURS:
+    store = _FACE_NEIGHBOURS if faces_only else _NEIGHBOURS
+    if key not in store:
         places = np.array([(index // 9, index // 3 % 3, index % 3) for index in range(27)])
         masks = np.zeros(27, dtype=np.int64)
         for index in range(27):
             for other in range(27):
-                if other not in (index, 13) and np.abs(places[index] - places[other]).max() == 1:
+                apart = np.abs(places[index] - places[other])
+                touching = apart.sum() == 1 if faces_only else apart.max() == 1
+                if other not in (index, 13) and touching:
                     masks[index] |= 1 << other
-        _NEIGHBOURS[key] = wp.array(masks.astype(np.int32), dtype=wp.int32, device=device)
-    return _NEIGHBOURS[key]
+        store[key] = wp.array(masks.astype(np.int32), dtype=wp.int32, device=device)
+    return store[key]
 
 
 def claim(state: State, settings: Settings, phase_index: int) -> None:
@@ -209,7 +223,8 @@ def claim(state: State, settings: Settings, phase_index: int) -> None:
         return
     device = state.quanta.device
     wp.launch(_claim, dim=dims, device=device,
-              inputs=[state.quanta, state.phase, state.pull, state.clock, state.marks, _adjacency(device), state.side,
+              inputs=[state.quanta, state.phase, state.pull, state.clock, state.marks, _adjacency(device),
+                      _adjacency(device, faces_only=True), state.side,
                       state.shape[0],
                       wp.vec3i(*offset), settings.volume_rest, settings.volume_stiffness, settings.joint_rest,
                       settings.push, settings.push_steepness, state.tallies])

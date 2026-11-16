@@ -1,15 +1,16 @@
 """Bound lump scene: the size of the biggest lump while its surroundings spread or fall.
 
 Contract: `bound_lump(cells_per_side=7, boxes_per_cell_side=10, seed=1, unevenness=0.3,
-steps=60, every=2, settings=None, device="cuda")` builds
-physics.engine.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness)
+steps=60, every=2, settings=None, device="cuda", joint_unevenness=0.0)` builds
+physics.engine.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness,
+joint_unevenness)
 (nothing placed: the lump forms by itself), runs `steps` steps with settings (default
 Settings(), every rule on) and at the start and every `every` steps finds the lump
 holding the most quanta: of the energy volumes (physics.engine cells) whose quanta per
 box are at least physics.engine.stats LUMP_FACTOR times the start's mean plus quanta per
 plus box (as stats counts lumps), the one with the most quanta. That may be a different cell from one sample to the next. Returns a dict (no
 verdict):
-  cells_per_side, boxes_per_cell_side, seed, unevenness, steps, settings (dict)
+  cells_per_side, boxes_per_cell_side, seed, unevenness, joint_unevenness, steps, settings (dict)
   time                 sample times
   lump_boxes           Planck boxes the lump holds (0: no lump yet)
   lump_energy          its whole quanta (0 with no lump)
@@ -32,13 +33,14 @@ from physics.scenes.sampled_run import sampled_run
 
 
 def bound_lump(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int = 1, unevenness: float = 0.3,
-               steps: int = 60, every: int = 2, settings: Settings | None = None, device: str = "cuda") -> dict:
+               steps: int = 60, every: int = 2, settings: Settings | None = None, device: str = "cuda", joint_unevenness: float = 0.0) -> dict:
     """Biggest lump's boxes, energy and radius, and the surroundings' radius, over time."""
     settings = settings or Settings()
-    universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device)
+    universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device,
+                            joint_unevenness=joint_unevenness)
     samples = sampled_run(universe, settings, steps, every, lambda sampled: _measure(sampled, settings))
     result = {"cells_per_side": cells_per_side, "boxes_per_cell_side": boxes_per_cell_side, "seed": seed,
-              "unevenness": unevenness, "steps": steps, "settings": asdict(settings),
+              "unevenness": unevenness, "joint_unevenness": joint_unevenness, "steps": steps, "settings": asdict(settings),
               "time": [time for time, _ in samples]}
     for key in ("lump_boxes", "lump_energy", "lump_radius", "surroundings_radius"):
         result[key] = [measured[key] for _, measured in samples]

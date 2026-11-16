@@ -15,7 +15,9 @@ fitted on the fit set only, the expansion shape (slowing, then speeding up) and 
   most packed energy volumes, not the step counter; searches before
   2026-11-16's change used the counter. No dark-energy or base-push setting is ever searched.
 - **Fixed before a run**: ranges, score, run size and seeds. Change them only before a new
-  search, and say so in its write-up. The start's seed is not fitted.
+  search, and say so in its write-up. The start's seed is not fitted; its two unevennesses
+  (energy volumes, joints: `START_RANGES`, 0..0.6) are, by `fit_search` only. The stand-in
+  and gradient fit keep the default start.
 - **One GPU run at a time**: the search runs every universe in one process, one after another.
   Never start a second GPU job beside it.
 - **Results are data**: OUT_DIR goes to tmp or object storage, never into the repo.
@@ -33,15 +35,13 @@ fitted on the fit set only, the expansion shape (slowing, then speeding up) and 
   in 10 steps (a box's own quanta turning its phase through the steep joint push), so
   potentials, openness and clocks read a density the tape does not see. Adam steps by a
   fixed share of the unit cube.
-- Stand-in universes run side by side, each with its own settings; the engine takes one
-  setting per batch.
+- Stand-in universes run side by side, each with its own settings.
 
 ## First comparison (2026-11-16, 7^3 cells of 10, seed 1 start, one run)
 
-Stand-in 24 steps: random, 64 points side by side, best 0.42 in 2.8 s; gradient, 4 starts x
-15 steps, best 0.16 (peak 0.28) in 14.6 s. Real score, seeds 1-3: defaults 0.00; random's
-two best -0.10, -0.11; gradient's best 0.12 (pull 1e-6 and steepness 2.0, both range
-edges), its second -0.13. The stand-in ranks the real score badly; one comparison only.
+Stand-in: random 64 points best 0.42 in 2.8 s; gradient 4 starts x 15 steps best 0.16 in
+14.6 s. Real score, seeds 1-3: defaults 0.00, random's best -0.10, gradient's best 0.12 (two
+settings at range edges). The stand-in ranks the real score badly; one comparison only.
 
 ## Run
 

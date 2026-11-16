@@ -8,8 +8,9 @@ Wiltshire, MNRAS Letters 2025, doi 10.1093/mnrasl/slae112 (Pantheon+ supernovae 
 timescape); DES Collaboration, arXiv 2406.05048 (supernovae with other data combined disfavour it).
 
 Contract: `timescape(cells_per_side=7, boxes_per_cell_side=10, seed=1, unevenness=0.3, steps=60,
-every=2, observers=3, settings=None, device="cuda")` builds
-physics.engine.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness) (nothing
+every=2, observers=3, settings=None, device="cuda", joint_unevenness=0.0)` builds
+physics.engine.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness,
+joint_unevenness) (nothing
 placed), runs it with settings (default Settings(), every rule on) keeping every energy
 volume's own elapsed local time (clocked_run.py), and picks the `observers` most packed
 energy volumes at the end (observer_cells.py). The observers' clock is the mean of their
@@ -18,7 +19,7 @@ space is timed twice: (a) by the global step counter, (b) by the observers' cloc
 sample after step 0 is the baseline (kept from the cell engine, whose first step was a size
 correction); the growth and deceleration numbers use the samples from there on. Returns a dict
 (numbers and lists of floats, no verdict):
-  cells_per_side, boxes_per_cell_side, seed, unevenness, steps, observers, settings (dict)
+  cells_per_side, boxes_per_cell_side, seed, unevenness, joint_unevenness, steps, observers, settings (dict)
   observer_ids        the observer volumes (physics.engine cells labels at the end), most
                       packed first
   observer_packing    their quanta per box at the end over the start's mean plus quanta per
@@ -60,10 +61,11 @@ from physics.scenes.rms_radius import rms_radius
 
 def timescape(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int = 1, unevenness: float = 0.3,
               steps: int = 60, every: int = 2, observers: int = 3, settings: Settings | None = None,
-              device: str = "cuda") -> dict:
+              device: str = "cuda", joint_unevenness: float = 0.0) -> dict:
     """Growth of space timed by the step counter and by clocks in the densest lumps, with both q's."""
     settings = settings or Settings()
-    universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device)
+    universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device,
+                            joint_unevenness=joint_unevenness)
     samples, local = clocked_run(universe, settings, steps, every, lambda sampled: _measure(sampled, settings))
     final = stats(universe, settings)
     picked = observer_cells(universe, observers, local)
@@ -77,7 +79,7 @@ def timescape(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int 
     rest = start["plus"] / max(start["plus_boxes"], 1)
     packing = found["quanta"][picked] / np.maximum(found["boxes"][picked], 1) / rest
     result = {"cells_per_side": cells_per_side, "boxes_per_cell_side": boxes_per_cell_side, "seed": seed,
-              "unevenness": unevenness, "steps": steps, "observers": observers, "settings": asdict(settings),
+              "unevenness": unevenness, "joint_unevenness": joint_unevenness, "steps": steps, "observers": observers, "settings": asdict(settings),
               "observer_ids": picked.tolist(), "observer_packing": packing.tolist(), "time": times.tolist(),
               "local_time": local_time.tolist(), "each_local_time": each_local.tolist(),
               "clock_ratio": (local_time[1:] / times[1:]).tolist(),

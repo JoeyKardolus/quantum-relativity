@@ -14,7 +14,7 @@ scene builds a start, runs the engine (`physics.engine`) and returns measured nu
   `state.start`. Energy per box is |quanta| (whole numbers, plus pulls, minus pushes), the
   fluid sqrt(|quanta|) e^(i phase) (`wave_field.py`), flow the phase's gradient. Energies
   passed to blob_start are in units of 1000 quanta (the start's quanta per box). Cells are
-  read off the signs each sample (`engine/cells.py`: a joint wraps one volume); ids do
+  read off the signs each sample (`engine/cells.py`: one joint per neighbour pair); ids do
   not persist. Kernels must not be reached into. Belt trick alone writes phase (its drive).
 - **Local clocks.** Timescape (unfitted) and the fit time expansion by the most packed
   energy volumes' mean box clock, volumes followed by shared boxes (`clocked_run.py`).

@@ -1,6 +1,6 @@
 """The viewer: the Planck-box engine in a GPU window, drawn as small squares (the only viewer).
 
-`python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame F]`.
+`python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--joint-unevenness J] [--slope S] [--set name=value ...] [--steps-per-frame F]`.
 Every occupied Planck box is a small square at its centre: red in an energy
 volume (A), blue in a joint (B); empty boxes are not drawn; keys 1, 2 and 3 show
 energy volumes, joints or both. Two looks (key G): nearest, the start, draws the

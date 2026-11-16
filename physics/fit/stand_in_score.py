@@ -17,7 +17,7 @@ potential on local clocks) and De Raedt pair rotations along x, y, z by parity, 
 then back, with an openness graded by the joint's squeeze and shut past the seal, and
 friction and drift spreading, on plus-minus faces. Here it differs from the engine,
 which since 2026-11-16 moves no quanta across a plus-minus face and instead passes plus
-quanta between two plus boxes across a one-box joint (physics.engine.leak), so quanta
+quanta between two plus boxes across one joint of any thickness (physics.engine.leak), so quanta
 change sign only in collapse. What it leaves out, because
 none of it has a gradient: the rounding to whole quanta, the claims (space does not
 grow: every box keeps its kind) and the collapse (collapse_squeeze still acts through

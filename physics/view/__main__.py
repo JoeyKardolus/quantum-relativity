@@ -1,4 +1,4 @@
-"""Command line: `python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame F]`.
+"""Command line: `python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--joint-unevenness J] [--slope S] [--set name=value ...] [--steps-per-frame F]`.
 
 Contract: sets the Mesa GPU variables (`use_gpu_driver`) before pyglet is imported,
 builds a `CellsSource` (physics.engine, a checkerboard of N^3 cells of K^3 Planck
@@ -21,7 +21,9 @@ def main() -> None:
     parser.add_argument("--boxes-per-cell", type=int, default=6, help="Planck boxes along each edge of a start cell")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--unevenness", type=float, default=0.3,
-                        help="root mean square of the log energy across the start")
+                        help="root mean square of the log energy across the start's energy volumes")
+    parser.add_argument("--joint-unevenness", type=float, default=0.0,
+                        help="root mean square of the log packing across the start's joints (0: all at rest)")
     parser.add_argument("--slope", type=float, default=-3.0,
                         help="spectral slope of the start's ripples, P(k) = k**slope (-3: every size alike)")
     parser.add_argument("--set", action="append", default=[], metavar="name=value",
@@ -41,7 +43,7 @@ def main() -> None:
     from physics.view.cells_source import CellsSource
     try:
         source = CellsSource(arguments.cells, arguments.boxes_per_cell, arguments.seed,
-                             arguments.unevenness, arguments.slope, overrides)
+                             arguments.unevenness, arguments.slope, overrides, arguments.joint_unevenness)
     except TypeError as raised:
         parser.error(f"--set: {raised}")
     from physics.view.point_window import PointWindow

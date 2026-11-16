@@ -1,7 +1,9 @@
 """fit_run: one fit-set universe, stepped and scored on expansion shape and structure.
 
 Contract: fit_run(overrides, seed, cells, boxes, steps, every, observers=3) -> dict. Builds
-physics.engine new_universe(cells, boxes, seed), steps it with Settings(**overrides)
+physics.engine new_universe(cells, boxes, seed, unevenness, joint_unevenness), the two
+start unevennesses taken from overrides when there (new_universe's defaults otherwise), and
+steps it with Settings(**the other overrides)
 keeping every energy volume's elapsed local time (physics.scenes.clocked_run) and samples every `every` steps. The
 expansion is timed as an astronomer times it: by the mean local clock of the `observers` most
 packed energy volumes at the end (physics.scenes.observer_cells; bible: time is local), not by
@@ -73,11 +75,15 @@ def _structure_score(first, last):
         "ln_growth_small": float(small)}
 
 
+_START_KEYS = ("unevenness", "joint_unevenness")
+
+
 def fit_run(overrides, seed, cells, boxes, steps, every, observers=3):
-    """Run one universe with Settings(**overrides) and return its scores and series."""
+    """Run one universe from the overrides' start unevennesses and settings; return its scores and series."""
     started = time.time()
-    settings = Settings(**overrides)
-    universe = new_universe(cells, boxes, seed)
+    settings = Settings(**{name: value for name, value in overrides.items() if name not in _START_KEYS})
+    start = {name: value for name, value in overrides.items() if name in _START_KEYS}
+    universe = new_universe(cells, boxes, seed, **start)
     occupied = host_boxes(universe)["quanta"] != 0
     occupied_axis = np.nonzero(occupied.any(axis=(1, 2)))[0]
     lower, upper = int(occupied_axis.min()), int(occupied_axis.max()) + 1

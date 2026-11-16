@@ -29,7 +29,7 @@ squares. Module map in `__init__.py`.
   (positions, density, kind 0 / 1, border; Warp arrays on one device). Stepping and gathers
   run on the stepper thread; a source or gather error stops stepping and shows in the title.
   Look, kind and slice changes republish while paused.
-- **A CPU Warp array's `.numpy()` shares its buffer**: `box_points.py` copies on CPU.
+- **A CPU Warp array's `.numpy()` shares its buffer**: `box_points.py` copies.
 - **Headless tests**: `__init__.py` imports neither OpenGL nor the engine; tests use a fake
   source on the Warp CPU device. Never a fake source in the shipped command.
 
@@ -42,7 +42,7 @@ red / 25,441 blue lit pixels; glow brightest 2/255; slice 50/50.
 ## Run
 
 ```
-PYTHONPATH=. .venv/bin/python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame F]
+PYTHONPATH=. .venv/bin/python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--joint-unevenness J] [--slope S] [--set name=value ...] [--steps-per-frame F]
 PYTHONPATH=. .venv/bin/pytest -q physics/view
 ```
 Starts paused: space starts / pauses, 1 / 2 / 3 kinds, G look, S slice, up / down move it,

@@ -14,7 +14,9 @@ clock_rate.py), t the face's openness (openness.py: 1 between two boxes of one s
 0 into empty space, across a plus-minus face, or off the grid: no hop); the rounding's
 uniform comes from a hash of the box's place in its universe, the universe's key
 (state.py), the step and the pass, so a universe steps the same alone or side by side
-in a batch. Inside an energy volume and inside the joint web the flow is frictionless
+in a batch. With fluid substeps (substeps.py) universe u's pairs turn for duration /
+state.substeps[u], only while `sub_index` is below that count, and the hash takes the
+substep too. Inside an energy volume and inside the joint web the flow is frictionless
 (bible rule 4). No box drops below 1 quantum by flow (a box empties only by a claim,
 claim.py) and no box changes sign: quanta never cross between the kinds here; energy
 passes between energy volumes only through a joint, as one transfer (leak.py).
@@ -28,6 +30,7 @@ import warp as wp
 from physics.engine.clock_rate import clock_rate
 from physics.engine.openness import openness
 from physics.engine.pair_rotation import pair_rotation
+from physics.engine.pass_seed import pass_seed
 from physics.engine.settings import Settings
 from physics.engine.state import State
 
@@ -50,7 +53,8 @@ def _signed(sign_of: int, amount: int) -> int:
 
 @wp.kernel
 def _hop(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32), side: int, axis: int,
-         parity: int, duration: float, clock_packing: float, seed: int, keys: wp.array(dtype=wp.int32)):
+         parity: int, duration: float, clock_packing: float, seed: int, keys: wp.array(dtype=wp.int32),
+         counts: wp.array(dtype=wp.int32), sub_index: int):
     ti, tj, tk = wp.tid()
     pairs = (side - parity) // 2
     home = ti // side
@@ -60,6 +64,10 @@ def _hop(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32)
         here[0] = home * side + parity + 2 * (ti - home * pairs)
     else:
         here[axis] = parity + 2 * here[axis]
+    count = counts[home]
+    if sub_index >= count:
+        return
+    span = duration / float(count)
     there = here
     there[axis] = here[axis] + 1
     near = quanta[here[0], here[1], here[2]]
@@ -67,7 +75,7 @@ def _hop(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32)
     open_share = openness(near, far)
     if open_share <= 0.0:
         return
-    tau = duration * wp.sqrt(clock_rate(near, clock_packing) * clock_rate(far, clock_packing))
+    tau = span * wp.sqrt(clock_rate(near, clock_packing) * clock_rate(far, clock_packing))
     box_index = ((here[0] - home * side) * side + here[1]) * side + here[2]
     rng = wp.rand_init(seed ^ keys[home], box_index)
     moved, near_new, far_new = pair_rotation(wp.abs(near), wp.abs(far), phase[here[0], here[1], here[2]],
@@ -78,7 +86,8 @@ def _hop(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32)
     phase[there[0], there[1], there[2]] = _wrap(far_new)
 
 
-def hop(state: State, settings: Settings, axis: int, parity: int, duration: float, pass_index: int) -> None:
+def hop(state: State, settings: Settings, axis: int, parity: int, duration: float, pass_index: int,
+        sub_index: int = 0) -> None:
     """Move whole quanta across the same-sign faces along `axis` whose lower box has `parity`, by exact pair rotations."""
     pairs = (state.side - parity) // 2
     if pairs <= 0:
@@ -86,7 +95,7 @@ def hop(state: State, settings: Settings, axis: int, parity: int, duration: floa
     dims = [state.side] * 3
     dims[0] = state.universes * state.side
     dims[axis] = pairs * (state.universes if axis == 0 else 1)
-    seed = (state.step * 64 + pass_index) & 0x7FFFFFFF
+    seed = pass_seed(state.step, sub_index, pass_index)
     wp.launch(_hop, dim=tuple(dims), device=state.quanta.device,
               inputs=[state.quanta, state.phase, state.side, int(axis), int(parity), float(duration),
-                      settings.clock_packing, int(seed), state.keys])
+                      settings.clock_packing, int(seed), state.keys, state.substeps, int(sub_index)])

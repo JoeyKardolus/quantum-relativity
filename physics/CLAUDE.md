@@ -6,7 +6,7 @@ vertex, or merge for joint collapse).
 
 Seven packages. `engine/` is the engine: a fixed grid of Planck boxes on the GPU (Warp,
 CUDA), each holding one signed whole number of quanta (plus: an energy volume's box, minus:
-a joint's, 0: no space) and the quantum fluid's phase; every rule reads only neighbours;
+a joint's, 0: no space) and the fluid's phase; every rule reads only neighbours;
 universes run side by side; energy volumes, joints and seams are read off the signs
 (`engine/cells.py`, `engine/seams.py`), never stored. `ladder/` is the detail ladder the engine keeps
 beside its boxes once attached; `bench/` the side-by-side and size harness. `view/` is the
@@ -14,20 +14,19 @@ only viewer, a pyglet window on the GPU. `scenes/` is the scorecard: each scene 
 engine and returns measured numbers, no verdict. `fit/` searches settings on the fit set
 only (expansion shape, structure), by random search or by Warp gradients through a smooth
 stand-in of the engine, and never changes a default. `measure/` holds the measures
-scenes share (dimension, contacts, whirl winding), CPU only. Earlier engines (`potts/`
-and before) are in git history.
+scenes share (dimension, whirl winding), CPU only.
 
 ## Must not get wrong
 
 - **The rules are the bible's**: A pulls, fading with distance, at light speed; B pushes,
   steeply when squeezed, and collapses past the limit (the only way minus turns plus); flow
-  frictionless inside one sign; A leaks to A only across a one-box joint, with friction,
-  less when squeezed, none past the seal; every A wrapped in its own joint on all 26
-  sides, joints meeting at seams. The amount ignoring sign is exact to the quantum (bible rule 4). `engine/CLAUDE.md` says how.
+  frictionless inside one sign; A leaks to A across exactly one joint (any thickness),
+  with friction, less when squeezed, none past the seal; one shared joint between two
+  neighbouring volumes, every A wrapped on all 26 sides, joints one web meeting at seams;
+  a box changes kind only by a claim (its quanta go to the old kind first) or collapse. The amount ignoring sign is exact to the quantum (bible rule 4). `engine/CLAUDE.md` says how.
 - **Open space**: the start is a block of wrapped cells with uneven energy (ripples at every size,
   `engine/uneven_field.py`) inside an empty margin; space grows as joints claim empty boxes.
-  The grid's walls are closed, so a run whose cells reach them (`stats()["edge_share"]`) is
-  no longer open space. Report it.
+  Cells reaching the closed walls (`stats()["edge_share"]`) end open space; report it.
 - **Honesty.** Never tune a setting, seed or threshold until a result passes; report every
   number, seed, settings and miss.
 - **Expansion check before any fit** (seed 1, defaults): the numbers are in

@@ -1,12 +1,13 @@
 """Structure scene: how the clustering spectrum of the density field changes over time.
 
 Contract: `structure(cells_per_side=7, boxes_per_cell_side=10, seed=1, unevenness=0.3,
-steps=30, every=5, settings=None, device="cuda")` builds
-physics.engine.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness), runs
+steps=30, every=5, settings=None, device="cuda", joint_unevenness=0.0)` builds
+physics.engine.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness,
+joint_unevenness), runs
 `steps` steps with settings (default Settings(), every rule on) and measures the whole
 quanta per Planck box (A plus B, box_energies.py) at the start and every `every` steps. Returns a
 dict (no verdict):
-  cells_per_side, boxes_per_cell_side, seed, unevenness, steps, settings (dict)
+  cells_per_side, boxes_per_cell_side, seed, unevenness, joint_unevenness, steps, settings (dict)
   wavenumbers     k = 1 .. side // 2, cycles per grid side (power_spectrum.py)
   time            sample times
   power           per sample, the shell power of the density contrast at each k
@@ -29,14 +30,15 @@ from physics.scenes.sampled_run import sampled_run
 
 
 def structure(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int = 1, unevenness: float = 0.3,
-              steps: int = 30, every: int = 5, settings: Settings | None = None, device: str = "cuda") -> dict:
+              steps: int = 30, every: int = 5, settings: Settings | None = None, device: str = "cuda", joint_unevenness: float = 0.0) -> dict:
     """The density contrast's spectrum, RMS and lump count at each sample, and the spectrum's growth."""
     settings = settings or Settings()
-    universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device)
+    universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device,
+                            joint_unevenness=joint_unevenness)
     samples = sampled_run(universe, settings, steps, every, lambda sampled: _measure(sampled, settings))
     first, last = np.asarray(samples[0][1]["power"]), np.asarray(samples[-1][1]["power"])
     return {"cells_per_side": cells_per_side, "boxes_per_cell_side": boxes_per_cell_side, "seed": seed,
-            "unevenness": unevenness, "steps": steps, "settings": asdict(settings),
+            "unevenness": unevenness, "joint_unevenness": joint_unevenness, "steps": steps, "settings": asdict(settings),
             "wavenumbers": samples[0][1]["wavenumbers"], "time": [time for time, _ in samples],
             "power": [measured["power"] for _, measured in samples],
             "rms_contrast": [measured["rms_contrast"] for _, measured in samples],

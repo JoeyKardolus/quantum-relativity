@@ -1,12 +1,13 @@
 """Expansion scene: does the occupied region grow, and does its growth slow, then speed up?
 
 Contract: `expansion(cells_per_side=7, boxes_per_cell_side=10, seed=1, unevenness=0.3,
-steps=60, every=2, settings=None, device="cuda")` builds
-physics.engine.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness), runs
+steps=60, every=2, settings=None, device="cuda", joint_unevenness=0.0)` builds
+physics.engine.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness,
+joint_unevenness), runs
 `steps` steps with settings (default Settings(), every rule on), measuring at the start and
 every `every` steps (sampled_run.py). Returns a dict (numbers and lists of floats, no
 verdict):
-  cells_per_side, boxes_per_cell_side, seed, unevenness, steps, settings (dict)
+  cells_per_side, boxes_per_cell_side, seed, unevenness, joint_unevenness, steps, settings (dict)
   time               sample times
   occupied_growth    stats "occupied_growth" per sample: boxes holding space over the start's
   occupied_radius    radius of a ball of the occupied boxes (stats "occupied"), boxes
@@ -41,10 +42,11 @@ from physics.scenes.sampled_run import sampled_run
 
 
 def expansion(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int = 1, unevenness: float = 0.3,
-              steps: int = 60, every: int = 2, settings: Settings | None = None, device: str = "cuda") -> dict:
+              steps: int = 60, every: int = 2, settings: Settings | None = None, device: str = "cuda", joint_unevenness: float = 0.0) -> dict:
     """Occupied and energy radius over time, their growth rates and whether the rate turns."""
     settings = settings or Settings()
-    universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device)
+    universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device,
+                            joint_unevenness=joint_unevenness)
     samples = sampled_run(universe, settings, steps, every, lambda sampled: _measure(sampled, settings))
     times = [time for time, _ in samples]
     occupied_radius = [measured["occupied_radius"] for _, measured in samples]
@@ -54,7 +56,7 @@ def expansion(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int 
     half = rate_time.size // 2
     final = stats(universe, settings)
     return {"cells_per_side": cells_per_side, "boxes_per_cell_side": boxes_per_cell_side, "seed": seed,
-            "unevenness": unevenness, "steps": steps, "settings": asdict(settings), "time": times,
+            "unevenness": unevenness, "joint_unevenness": joint_unevenness, "steps": steps, "settings": asdict(settings), "time": times,
             "occupied_growth": [measured["occupied_growth"] for _, measured in samples],
             "occupied_radius": occupied_radius, "energy_radius": energy_radius,
             "edge_share": [measured["edge_share"] for _, measured in samples],

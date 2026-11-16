@@ -3,9 +3,9 @@
 Contract: `uneven_field(side, seed, slope, unevenness)` returns a float64 numpy array
 of shape (side, side, side), periodic over the cube, with mean 0 and root mean square
 exactly `unevenness`. Its power spectrum follows P(k) = k**slope: white noise
-(numpy default_rng(seed), standard normal per box) is Fourier transformed (numpy
-rfftn, once on the CPU; Warp has no FFT), every mode of wavenumber k (cycles per
-cube side, 1 to the Nyquist corner) is scaled by k**(slope / 2), the k = 0 mode is
+(numpy default_rng(seed), standard normal per box; `seed` an int or a tuple of ints,
+the second field of a start) is Fourier transformed (numpy rfftn, once on the CPU;
+Warp has no FFT), every mode of wavenumber k (cycles per cube side, 1 to the Nyquist corner) is scaled by k**(slope / 2), the k = 0 mode is
 removed, and the result is transformed back and scaled to the asked root mean square.
 So `slope` says how the amplitude is shared over wavelengths: in 3D, slope -3 gives
 every octave of wavelength the same share of the unevenness (ripples at all sizes
@@ -19,7 +19,7 @@ import math
 import numpy as np
 
 
-def uneven_field(side: int, seed: int, slope: float, unevenness: float) -> np.ndarray:
+def uneven_field(side: int, seed, slope: float, unevenness: float) -> np.ndarray:
     """A periodic Gaussian random field with power spectrum k**slope and rms unevenness."""
     if side < 8:
         raise ValueError(f"side must be at least 8, got {side}")

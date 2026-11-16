@@ -9,8 +9,13 @@ resumes. A run that raises is recorded with score -2 and its error, never droppe
 Settings fitted, ranges fixed for the whole-quanta engine (2026-11-16) before any search
 on it: pull_strength, push, collapse_squeeze, friction (log, each a decade or more round
 its default), push_steepness (linear), seal_squeeze = collapse_squeeze * fraction with
-fraction in 0.2 .. 0.9 (always below collapse). The cell engine's search (attraction,
-push_power, compressions) cannot be compared with these.
+fraction in 0.2 .. 0.9 (always below collapse). Searched beside them, the start's two
+unevennesses (owner, 2026-11-16, decision D), separate settings of
+physics.engine.new_universe: unevenness (energy volumes) and joint_unevenness (joints), each
+linear in 0 .. 0.6 (ranges fixed 2026-11-16 before any search; the defaults 0.3 and 0 lie
+inside). The unit cube has SEARCHED axes: NAMES (the engine settings, which the stand-in
+also reads) then START_NAMES. The cell engine's search (attraction, push_power,
+compressions) cannot be compared with these.
 No dark-energy or base-push setting is searched (bible rule 8: expansion is drift from
 imperfect transfer, nothing pushes space apart).
 """
@@ -29,18 +34,21 @@ LOG_RANGES = {"pull_strength": (1e-8, 1e-6), "push": (0.05, 5.0), "collapse_sque
               "friction": (0.1, 10.0)}
 LINEAR_RANGES = {"push_steepness": (2.0, 10.0), "seal_fraction": (0.2, 0.9)}
 NAMES = list(LOG_RANGES) + list(LINEAR_RANGES)
+START_RANGES = {"unevenness": (0.0, 0.6), "joint_unevenness": (0.0, 0.6)}
+START_NAMES = list(START_RANGES)
+SEARCHED = NAMES + START_NAMES
 
 
 def _unit_to_overrides(unit):
-    """Map a point of the unit cube to engine settings (seal = collapse * seal_fraction)."""
+    """Map a point of the unit cube (NAMES, or all SEARCHED axes) to overrides (seal = collapse * seal_fraction)."""
     values = {}
-    for index, name in enumerate(NAMES):
+    for name, coordinate in zip(SEARCHED, unit):
         if name in LOG_RANGES:
             low, high = LOG_RANGES[name]
-            values[name] = float(math.exp(math.log(low) + unit[index] * (math.log(high) - math.log(low))))
+            values[name] = float(math.exp(math.log(low) + coordinate * (math.log(high) - math.log(low))))
         else:
-            low, high = LINEAR_RANGES[name]
-            values[name] = float(low + unit[index] * (high - low))
+            low, high = (LINEAR_RANGES | START_RANGES)[name]
+            values[name] = float(low + coordinate * (high - low))
     fraction = values.pop("seal_fraction")
     values["seal_squeeze"] = float(values["collapse_squeeze"] * fraction)
     return values
@@ -85,14 +93,14 @@ def fit_search(results, cells=7, boxes=10, steps=120, every=6, default_seeds=(1,
             _run(results, size, "defaults", None, {}, seed)
     generator = np.random.default_rng(lattice_seed)
     lattice = np.stack([(generator.permutation(random_points) + generator.random(random_points)) / max(random_points, 1)
-                        for _ in NAMES], axis=1)
+                        for _ in SEARCHED], axis=1)
     if "random" not in phases:
         for unit in lattice:
             _run(results, size, "random", unit, _unit_to_overrides(unit), 1)
     if "refine" not in phases:
         for record in _best(_load(results), ("random",), refine_best):
             for _ in range(refine_count):
-                unit = np.clip(np.asarray(record["unit"]) + generator.normal(0, 0.15, len(NAMES)), 0, 1)
+                unit = np.clip(np.asarray(record["unit"]) + generator.normal(0, 0.15, len(SEARCHED)), 0, 1)
                 _run(results, size, "refine", unit, _unit_to_overrides(unit), 1)
     if "recheck" not in phases:
         for record in _best(_load(results), ("random", "refine"), recheck_top):

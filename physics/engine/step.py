@@ -2,13 +2,15 @@
 
 Contract: `step(state, settings)` advances the state by one step_time of the counter:
   1. pull_wave     the pull moves one leapfrog step at light speed (pull_wave.py)
-  2. fluid         Strang splitting: on_site for half a step, the hops along x, y, z
+  2. fluid         cut into equal substeps per universe, as many as its steepest
+                   same-sign face needs (substeps.py; numerics, owner decision E), each
+                   a Strang splitting: on_site for half a step, the hops along x, y, z
                    (lower-box parity 0 then 1) for half a step each, the leaks across
-                   one-box joints along x, y, z (group 0 then 1) for half a step each and
+                   joints along x, y, z (group 0 then 1) for half a step each and
                    again in reverse order, the hops in reverse order for the other half,
                    on_site for half a step (on_site.py; hop.py: whole quanta inside one
                    sign, frictionless; leak.py: plus quanta from energy volume box to
-                   energy volume box across a joint box in one transfer, friction and
+                   energy volume box across one joint in one transfer, friction and
                    drift spreading; local clocks)
   3. claim         `claims_per_step` of the 64 claim phases, in an order shuffled afresh
                    every 64 / claims_per_step steps, one fixed sequence for every universe so a
@@ -36,6 +38,7 @@ from physics.engine.on_site import on_site
 from physics.engine.pull_wave import pull_wave
 from physics.engine.settings import Settings
 from physics.engine.state import State
+from physics.engine.substeps import substeps
 from physics.engine.tick_clocks import tick_clocks
 
 _ORDER = [(axis, parity) for axis in range(3) for parity in range(2)]
@@ -43,24 +46,30 @@ _CLAIM_ORDER_SEED = 64
 
 
 def step(state: State, settings: Settings) -> None:
-    """One step: pull wave, fluid with whole quanta, border claims, collapse, local clocks."""
+    """One step: pull wave, fluid with whole quanta in substeps, border claims, collapse, local clocks."""
     state.marks.zero_()
     pull_wave(state, settings)
     half = 0.5 * settings.step_time
-    on_site(state, settings, half)
-    for pass_index, (axis, parity) in enumerate(_ORDER):
-        hop(state, settings, axis, parity, half, pass_index)
-    for pass_index, (axis, group) in enumerate(_ORDER + _ORDER[::-1]):
-        leak(state, settings, axis, group, half, 12 + pass_index)
-    for pass_index, (axis, parity) in enumerate(_ORDER[::-1]):
-        hop(state, settings, axis, parity, half, 6 + pass_index)
-    on_site(state, settings, half)
+    for sub_index in range(int(substeps(state, settings).max())):
+        _fluid(state, settings, half, sub_index)
     for phase_index in _claim_phases(state, settings):
         claim(state, settings, phase_index)
     collapse(state, settings)
     tick_clocks(state, settings)
     state.step += 1
     ladder_sync(state)
+
+
+def _fluid(state: State, settings: Settings, half: float, sub_index: int) -> None:
+    """One fluid substep, Strang split; each kernel divides `half` by its universe's substep count."""
+    on_site(state, settings, half, sub_index)
+    for pass_index, (axis, parity) in enumerate(_ORDER):
+        hop(state, settings, axis, parity, half, pass_index, sub_index)
+    for pass_index, (axis, group) in enumerate(_ORDER + _ORDER[::-1]):
+        leak(state, settings, axis, group, half, 12 + pass_index, sub_index)
+    for pass_index, (axis, parity) in enumerate(_ORDER[::-1]):
+        hop(state, settings, axis, parity, half, 6 + pass_index, sub_index)
+    on_site(state, settings, half, sub_index)
 
 
 def _claim_phases(state: State, settings: Settings) -> list:

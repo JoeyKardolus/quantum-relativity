@@ -6,11 +6,11 @@ Contract: `seams(found)` takes a cells() result and returns a dict:
   faces   int: how many faces lie between two boxes of different joints
   pairs   int64 (n, 2): every pair of joint cell ids (lower first) that meet on a face,
           each pair once, sorted
-  volumes int64 (n, 2): the energy volumes those two joints wrap (cells()["wraps"]),
-          -1 where a joint wraps none
-Joints wrap energy volumes (cells.py), so a seam runs through the middle of the joint
-web between two energy volumes: the bible's seam, where joints meet (foundation and
-rule 6). Boxes on the grid's walls have no neighbour beyond them.
+  between int64 (n, 2, 2): for each pair the energy volumes each of its two joints
+          lies between (cells()["between"]), -1 for empty space or none
+A joint is the one shared slab between two energy volumes (cells.py), so seams run
+along the mortar's edges, where three or more volumes' joints meet: the bible's seam,
+where joints meet (foundation and rule 6). Boxes on the grid's walls have no neighbour beyond them.
 """
 from __future__ import annotations
 
@@ -40,5 +40,5 @@ def seams(found: dict) -> dict:
         faces += int(meeting.sum())
         pairs.append(np.sort(np.stack([owner[low][meeting], owner[high][meeting]], axis=1), axis=1))
     joined = np.unique(np.concatenate(pairs).astype(np.int64), axis=0) if faces else np.zeros((0, 2), dtype=np.int64)
-    wraps = np.asarray(found["wraps"], dtype=np.int64)
-    return {"boxes": marked, "faces": faces, "pairs": joined, "volumes": wraps[joined]}
+    between = np.asarray(found["between"], dtype=np.int64)
+    return {"boxes": marked, "faces": faces, "pairs": joined, "between": between[joined]}

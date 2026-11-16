@@ -22,6 +22,10 @@ next (inside.py), so each is its own closed box of space. Per box:
              (step.py zeroes it; collapse.py also uses it for its two passes)
   tallies    int64 (universes, 4): per universe the quanta spread by drift, joint boxes
              collapsed, claims made, minus quanta turned plus by collapse
+  substeps   int32 (universes,): how many fluid substeps each universe takes this step
+             (substeps.py; 1 until a step sets it), read by on_site, hop and leak
+  capped     int64 numpy (universes,), on the host: steps that needed more substeps
+             than settings.max_substeps and took only that many
 20 bytes and one uint8 per box. `seed` is an int (universe u gets seed + u) or one int
 per universe; `seeds` keeps them and `keys` (int32, on the device) their hashes, which
 seed each universe's whole-number rounding (hop.py): a universe with seed s steps the
@@ -59,6 +63,8 @@ class State:
     start: tuple = ()
     step: int = 0
     ladder: object = None
+    substeps: object = None
+    capped: object = None
 
     @property
     def shape(self) -> tuple:
@@ -98,7 +104,9 @@ class State:
                    marks=wp.zeros(stacked, dtype=wp.uint8, device=device),
                    tallies=wp.zeros((universes, 4), dtype=wp.int64, device=device),
                    seeds=seeds, keys=wp.array(keys, dtype=wp.int32, device=device),
-                   start=tuple(_start(cube) for cube in quanta))
+                   start=tuple(_start(cube) for cube in quanta),
+                   substeps=wp.array(np.ones(universes, dtype=np.int32), dtype=wp.int32, device=device),
+                   capped=np.zeros(universes, dtype=np.int64))
 
 
 def _wrapped(phase: np.ndarray) -> np.ndarray:

@@ -1,7 +1,7 @@
 """Hubble gap scene: the growth rate of space early in the run against late in it.
 
 Contract: `hubble_gap(cells_per_side=7, boxes_per_cell_side=10, seed=1, unevenness=0.3,
-steps=60, every=2, settings=None, device="cuda")` runs the expansion scene
+steps=60, every=2, settings=None, device="cuda", joint_unevenness=0.0)` runs the expansion scene
 (expansion.py) with those arguments and returns a dict (no verdict):
   early_rate, late_rate   mean occupied_rate (d ln occupied radius / dt, the size of
                           space) over the first and the last quarter of the rate samples
@@ -23,9 +23,10 @@ KNOWN_LATE_OVER_EARLY = 73.5 / 67.4
 
 
 def hubble_gap(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int = 1, unevenness: float = 0.3,
-               steps: int = 60, every: int = 2, settings: Settings | None = None, device: str = "cuda") -> dict:
+               steps: int = 60, every: int = 2, settings: Settings | None = None, device: str = "cuda", joint_unevenness: float = 0.0) -> dict:
     """Early and late mean growth rate of space in the expansion scene, their gap and ratio."""
-    grown = expansion(cells_per_side, boxes_per_cell_side, seed, unevenness, steps, every, settings, device)
+    grown = expansion(cells_per_side, boxes_per_cell_side, seed, unevenness, steps, every, settings, device,
+                      joint_unevenness)
     rates = np.asarray(grown["occupied_rate"])
     quarter = max(rates.size // 4, 1)
     early = float(rates[:quarter].mean())

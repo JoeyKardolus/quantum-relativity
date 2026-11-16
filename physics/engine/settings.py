@@ -26,6 +26,14 @@ never changed to make a result pass.
   clock_packing    quanta per box at which a local clock runs at half rate; 0 switches
                    local clocks off (side-by-side comparisons only)
   claims_per_step  how many of the 64 claim phases (blocks 4 apart) run each step
+  max_turn         numerics, not a rule (owner 2026-11-16, decision E): the most the
+                   phase difference across one same-sign face may turn in one fluid
+                   substep, in radians; each step's fluid part is cut into as many equal
+                   substeps per universe as its steepest face needs (substeps.py), so the
+                   steep push is integrated stably; 0 runs one substep a step (the old,
+                   coarse step, for side-by-side comparisons)
+  max_substeps     the most substeps one step may take; a step that needs more takes
+                   this many and is counted in state.capped
 """
 from __future__ import annotations
 
@@ -50,6 +58,8 @@ class Settings:
     spread_share: float = 0.01
     clock_packing: float = 10000.0
     claims_per_step: int = 1
+    max_turn: float = 0.25
+    max_substeps: int = 64
 
     def __post_init__(self) -> None:
         if self.light_speed * self.step_time >= 3.0 ** -0.5:
@@ -58,3 +68,5 @@ class Settings:
             raise ValueError("the seal must come before the collapse: 0 < seal_squeeze < collapse_squeeze")
         if not 0 <= self.claims_per_step <= 64:
             raise ValueError("claims_per_step runs between 0 and 64 phases")
+        if self.max_turn < 0.0 or not 1 <= self.max_substeps <= 1024:
+            raise ValueError("max_turn must be >= 0 and max_substeps between 1 and 1024")

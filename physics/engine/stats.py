@@ -7,7 +7,7 @@ Contract: `stats(state, settings=None, universe=0)` copies that universe's boxes
   energy_drift      amount - the start's amount, in quanta (0: exact, bible rule 4);
                     relative_drift that over the start's amount
   plus_share        plus / amount (collapse is the one rule that turns minus into plus)
-  cells, joints     energy volumes and joint cells (cells.py: a joint wraps one volume);
+  cells, joints     energy volumes and joint cells (cells.py: one shared joint between two volumes);
                     cell_count_growth their number over the start's (start["cells"], set
                     by new_universe; NaN when unknown)
   seam_faces, seam_pairs  faces where two joints meet and how many joint pairs meet (seams.py)

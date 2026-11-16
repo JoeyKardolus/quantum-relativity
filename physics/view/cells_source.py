@@ -3,7 +3,8 @@
 Contract (the source interface the `Stepper` reads; a test may supply any object
 that has the same):
   reset()      back to a fresh start: `new_universe(cells_per_side,
-               boxes_per_cell_side, seed, unevenness, slope)`, step 0
+               boxes_per_cell_side, seed, unevenness, slope,
+               joint_unevenness=joint_unevenness)`, step 0
   step()       one engine step, `physics.engine.step(state, settings)`; works whether
                that step changes the state in place (returns None) or returns a new one
   steps        steps since the last reset
@@ -32,16 +33,18 @@ class CellsSource:
     """A universe of cells stepped under all rules, read as its occupied Planck boxes."""
 
     def __init__(self, cells_per_side: int, boxes_per_cell_side: int, seed: int,
-                 unevenness: float, slope: float, overrides: dict[str, float] | None = None) -> None:
+                 unevenness: float, slope: float, overrides: dict[str, float] | None = None,
+                 joint_unevenness: float = 0.0) -> None:
         self.cells_per_side, self.boxes_per_cell_side = cells_per_side, boxes_per_cell_side
         self.seed, self.unevenness, self.slope = seed, unevenness, slope
+        self.joint_unevenness = joint_unevenness
         self.settings = Settings(**_typed(overrides or {}))
         self.reset()
 
     def reset(self) -> None:
-        """A fresh start from the same sizes, seed, unevenness and slope."""
+        """A fresh start from the same sizes, seed, both unevennesses and slope."""
         self.state = new_universe(self.cells_per_side, self.boxes_per_cell_side, self.seed,
-                                  self.unevenness, self.slope)
+                                  self.unevenness, self.slope, joint_unevenness=self.joint_unevenness)
         self.steps = 0
 
     def step(self) -> None:
