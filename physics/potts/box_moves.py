@@ -2,7 +2,10 @@
 
 Contract: `box_moves(universe, settings, correcting=False)` runs one sweep of 64 phases
 on the GPU and returns the number of boxes that changed owner (one small copy to the
-host). A phase visits the sites b of the active region (active_region.py) whose
+host). The sweep visits its phases in a fresh order, `phase_order(seed, sweep)`: one
+fixed x-major order made directions the cube treats as the same carry flow differently
+(x / y / z 0.959 / 0.969 / 0.974, -x 5% below x; shuffled 0.966 / 0.968 / 0.966,
+round 3, 2026-11-16). A phase visits the sites b of the active region (active_region.py) whose
 coordinates are one pattern mod 4; a site's whole work stays inside the 4x4x4 block
 from b - 1 to b + 2, and those blocks never overlap in a phase, so moves never race on
 boxes (only on per-cell counters, which are atomic).
@@ -60,6 +63,7 @@ exactly repeatable.
 """
 from __future__ import annotations
 
+import numpy as np
 import warp as wp
 
 from physics.potts.box_owner import box_owner
@@ -456,7 +460,7 @@ def box_moves(universe: Universe, settings: Settings, correcting: bool = False) 
     sweep = universe.scratch.get("sweeps", 0)
     universe.scratch["sweeps"] = sweep + 1
     move_owner, move_psi = _sweep_start(universe)
-    for phase in range(64):
+    for phase in phase_order(universe.seed, sweep):
         offset = wp.vec3i(phase // 16, (phase // 4) % 4, phase % 4)
         seed = (universe.seed * 1000003 + sweep * 64 + phase) % (2 ** 31 - 1)
         wp.launch(_moves, dim=dims, device=device,
@@ -468,6 +472,11 @@ def box_moves(universe: Universe, settings: Settings, correcting: bool = False) 
                           settings.push_power, settings.move_share, clock_max,
                           int(settings.proposals), int(correcting), seed, moved])
     return int(moved.numpy()[0])
+
+
+def phase_order(seed: int, sweep: int) -> list:
+    """The 64 phases in the order sweep `sweep` of a universe seeded `seed` visits them."""
+    return [int(phase) for phase in np.random.default_rng((seed, sweep)).permutation(64)]
 
 
 def _sweep_start(universe: Universe) -> tuple:

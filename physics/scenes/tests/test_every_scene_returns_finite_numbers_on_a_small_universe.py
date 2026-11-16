@@ -20,7 +20,8 @@ SCENES = {
                            small_radius=1.5, steps=6),
     "black_hole": lambda: black_hole(6, 4, energies=(100.0, 400.0), radius=3.0, steps=20),
     "space_dimension": lambda: space_dimension(6, 4, steps=4, sources=4),
-    "isotropy": lambda: isotropy(6, 4, blob_energy=100.0, blob_radius=2.0, speed=0.2, steps=4),
+    "isotropy": lambda: isotropy(6, 4, blob_energy=100.0, blob_radius=2.0, flow_radius=4.0, speed=0.2, steps=4,
+                                  seeds=(1, 2)),
     "spin": lambda: spin(4, 4, drift_speed=0.2, steps=6),
 }
 

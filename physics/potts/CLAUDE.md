@@ -28,19 +28,19 @@ Planck boxes on the GPU (Warp), each owned by one cell or empty; energy volumes 
 - **Collapse** merges every A touching the joint at a face, edge or corner (`touch_pairs.py`);
   a joint touching empty space does not collapse.
 - **64 phases, blocks 4 apart**: a site's plate, its 26-neighbour check, home and source box
-  stay in its own 4x4x4 block. Moves claim only inside the active region.
+  stay in its own 4x4x4 block. Moves claim only inside the active region. Each sweep shuffles
+  the phase order (`phase_order`): a fixed x-major order made x, y, z carry flow unequally.
 - **Box kernels run on the active region** (`active_region.py`, PAD 4).
 - **Local clocks** (`time_levels.py`): each cell its own level; a face hops at the finer of
   its two boxes' levels, for sqrt(clock_a clock_b) of proper time.
 - **Size energy is ln(n / aim)^2**, plus the Potts border term (`surface`).
 - **Not bit-repeatable** (move races, float atomics). Never tune.
 
-## Measured (2026-11-16 round 2, seed 1, 8^3 cells of 6^3, defaults)
+## Measured (2026-11-16, seed 1, 8^3 cells of 6^3, defaults)
 
-300 steps, 25 s: 0 lumps, sealed or collapses; occupied x1.69; drift 4e-15; wraps hold.
-Heat 42k, pull -17k, compression +64k, moves +394k; balance -3.0% (xfail): splitting
-error, moves stir the fluid. Flow carried 8.2 / 7.1 / -2.4 (axis / face / body), rest
-scatter 0.03; spin loses its winding (strength 0.86 to -0.01, tilt 90, into the joint).
+300 steps: no lumps or collapses; occupied x1.69; drift 4e-15; wraps hold. Heat 42k, moves
++394k (round 2); balance -3.0% (xfail, splitting error). Flow (round 3, scenes): direction-
+free within the scatter; spin loses its winding. Frozen-fluid friction bound: xfail.
 
 ## Run
 

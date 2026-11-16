@@ -35,9 +35,10 @@ stops at the grid's edge. Structure: contrast 1.97 to 2.8, lumps 0 to 0. Bound l
 forms. Orbit: the small blob falls in at distance 10 (early period 62, Newton 62.5) and turns
 0.6 of a turn at 14 (early period 34, Newton 104). Black hole: no ball seals (core energy
 about 100 to 155 of 250 to 2000; one collapse at 2000).
-Isotropy (2026-11-16): pull differs 2.2% by direction; flow is unreadable (carried 3.3 / -7.3 /
--7.5 axis / face / body, expected shift 0.004 boxes, rest scatter 0.06). Spin: winding lost,
-strength 0.86 to 0.15, tilt 90, drift +0.15, into the joint.
+Isotropy (round 3): pull differs 2.0% by direction. Flow: the foam's own energy
+given flow only (speed 0.3 inside radius 16, levelling off outside, known shift 2.35 boxes),
+4 seeds: carried 0.29 / 0.31 / 0.29 axis / face / body (sd 0.01 to 0.03, rest scatter
+0.08): direction-free within the scatter. Spin: winding lost, strength 0.86 to -0.12, tilt 90.
 
 ## Run
 
