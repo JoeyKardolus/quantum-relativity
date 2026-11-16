@@ -6,11 +6,15 @@ slope=-3, margin=None, box_quanta=1000, universes=1, device="cuda")` returns a S
 (k = boxes_per_cell_side); block (cx, cy, cz) is an energy volume when cx, cy and cz are
 all odd and none is n - 1 (the outer layer), else joint. So every energy volume is
 wrapped on all 26 sides by joint boxes and the joints form one web (bible "The
-foundation"); energy volumes start about 10 boxes across (owner, 2026-11-16). Each box
-holds a whole number: box_quanta * exp(g) / mean(exp(g)) rounded to the nearest whole,
-at least 1, plus in an energy volume's block and minus in a joint's, g the uneven field
-over the filled cube (uneven_field.py: seed, slope, rms unevenness; ripples at every
-size). The empty margin (0, no space) is `margin` boxes on every side (default: the
+foundation"); energy volumes start about 10 boxes across (owner, 2026-11-16). An
+energy volume's box holds box_quanta * exp(g) / mean(exp(g)) plus quanta rounded to the
+nearest whole, at least 1, g the uneven field over the filled cube (uneven_field.py:
+seed, slope, rms unevenness; ripples at every size); a joint's box holds -box_quanta,
+its rest packing with the default settings (joint_rest): the start's correction lets
+each joint's size follow its energy, so no joint starts squeezed (bible "The
+foundation": a joint is squeezed when pressed smaller than its energy wants). An
+uneven joint packing put the tail of the field past the seal and the collapse limit
+before any rule acted (rulefix decisions.md). The empty margin (0, no space) is `margin` boxes on every side (default: the
 filled cube's own width), rounded up so the side is a multiple of 8 (whole ladder
 blocks). With universes > 1 the batch holds that many universes side by side, universe
 u built from seed + u (its own uneven field) and stepped with seed + u. Each
@@ -46,13 +50,12 @@ def new_universe(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: i
     volume_cells = inner_odd[:, None, None] & inner_odd[None, :, None] & inner_odd[None, None, :]
     volume_boxes = np.repeat(np.repeat(np.repeat(volume_cells, boxes_per_cell_side, 0), boxes_per_cell_side, 1),
                              boxes_per_cell_side, 2)
-    sign = np.where(volume_boxes, 1, -1)
     quanta = np.zeros((universes, side, side, side), dtype=np.int32)
     inside = (slice(low, low + filled),) * 3
     for index in range(universes):
         raw = np.exp(uneven_field(filled, seed + index, slope, unevenness))
         whole = np.maximum(np.rint(box_quanta * raw / raw.mean()), 1).astype(np.int32)
-        quanta[index][inside] = sign * whole
+        quanta[index][inside] = np.where(volume_boxes, whole, -int(box_quanta))
     phase = np.zeros(quanta.shape, dtype=np.float32)
     state = State.from_host(quanta, phase, seed=seed, device=device)
     for start in state.start:

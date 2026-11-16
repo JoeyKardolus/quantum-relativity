@@ -23,7 +23,9 @@ EMPTY, a library the core engine calls. Each box: one signed whole number of qua
   rest gathers no re-coding error. A COARSE block the core rewrites with new content is
   re-coded on the next pass: its rounding noise (<= step - 1 a box, totals exact) comes
   back each time it changes.
-- **Pools never shrink**: capacity stays at its peak (`memory_per_box()["allocated"]`).
+- **Lower levels replace FULL rows.** `switch_levels` ends by compacting every pool under
+  half used (`_Pool.shrink`: rows moved bit for bit, slots and shared keys renumbered in
+  `_moves._compact`; a new holder of slot numbers must be renumbered there too).
 
 ## How the core calls it, once per step
 
@@ -37,14 +39,12 @@ switch_levels(store)                                       # measure, promote, s
 Quiet REUSED blocks can step through `memo_step(memo, quanta, phase, core_step)`: one
 run per distinct block-with-halo. `promote_blocks` forces a region FULL ahead of an event.
 
-## Measured (2026-11-16, RTX 5080, wrapped-cell field, quiet_steps 1)
+## Measured (2026-11-16, RTX 5080)
 
-Bytes per box: FULL 8, COARSE 1.75, REUSED 4096 / (512 x holders) (0.125 for 64),
-EMPTY 0 plus 0.039 of index. 134M-box grid, half filled: in use 0.89 B a box, first
-switch 0.62 s (host hashing of 131k candidates), steady switch 0.048 s, gather with halo
-1 0.020 s, exact totals 0.037 s.
-Beside the engine it saves nothing yet: the dense boxes stay, so the largest universe at
-1 step/s falls from 28^3 cells to 20^3 with it on, while it counts 0.31-0.36 B a box.
+Bytes a box: FULL 8, COARSE 1.75, REUSED 4096 / (512 x holders), EMPTY 0 + 0.039 index.
+Quiet 134M-box field all COARSE: allocated 9.11 -> 2.01 B a box, GPU held 1.55 -> 0.34
+GB, totals exact, first switch 1.42 s. Beside the engine's default start no occupied
+block is quiet, so only EMPTY saves (0.35 B a box in use). Bench numbers: `bench/CLAUDE.md`.
 
 ## Run
 

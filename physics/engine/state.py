@@ -18,9 +18,10 @@ next (inside.py), so each is its own closed box of space. Per box:
   pull       float32, the pull field (energy per plus quantum), spread at light speed
   pull_rate  float32, its time derivative (leapfrog, pull_wave.py)
   clock      float32, the proper time this box has lived (local clocks, tick_clocks.py)
-  marks      uint8 scratch for two-pass kernels (collapse.py)
+  marks      uint8, per step which rule changed the box's kind: 2 a claim, 1 a collapse
+             (step.py zeroes it; collapse.py also uses it for its two passes)
   tallies    int64 (universes, 4): per universe the quanta spread by drift, joint boxes
-             collapsed, claims made, spare
+             collapsed, claims made, minus quanta turned plus by collapse
 20 bytes and one uint8 per box. `seed` is an int (universe u gets seed + u) or one int
 per universe; `seeds` keeps them and `keys` (int32, on the device) their hashes, which
 seed each universe's whole-number rounding (hop.py): a universe with seed s steps the

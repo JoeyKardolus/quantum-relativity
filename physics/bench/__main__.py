@@ -18,8 +18,8 @@ measured 22 universe-steps a second at 32**3 and 28.1 million boxes (64 energy v
 at 1.78 steps a second (2026-11-16). With --ladder the engine's step also writes and
 switches the detail ladder kept beside its boxes (physics.engine.attach_ladder); the probe
 then budgets 30 bytes a box (the engine's 21, the 8 of the per-step block copy, about 1 of
-ladder rows) and reports the ladder's own bytes a box after the timed steps
-(physics.ladder.memory_per_box "in_use").
+ladder rows) and reports, after the timed steps, the ladder's bytes a box at each level,
+in use and allocated, and its block counts (physics.ladder.memory_per_box) as "ladder".
 """
 from __future__ import annotations
 
@@ -70,8 +70,7 @@ def _engine_build(cells_per_side: int, ladder: bool = False, ladder_bytes: list 
     def advance() -> None:
         step(state, settings)
         if ladder_bytes is not None:
-            ladder_bytes.append({"size": cells_per_side, "step": state.step,
-                                 "in_use": memory_per_box(store)["in_use"]})
+            ladder_bytes.append({"size": cells_per_side, "step": state.step, **memory_per_box(store)})
     return advance, state.side ** 3
 
 
@@ -101,9 +100,9 @@ def main() -> None:
                                   list(range(3, 64)))
         for probe in result["probes"]:
             probe["energy_volumes"] = ((probe["size"] - 1) // 2) ** 3
-            in_use = [entry["in_use"] for entry in ladder_bytes if entry["size"] == probe["size"]]
-            if in_use:
-                probe["ladder_bytes_per_box"] = in_use[-1]
+            measured = [entry for entry in ladder_bytes if entry["size"] == probe["size"]]
+            if measured:
+                probe["ladder"] = measured[-1]
         result["ladder"] = arguments.ladder
     print(json.dumps({"engine": arguments.engine, **result}), flush=True)
 

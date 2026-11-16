@@ -3,8 +3,8 @@
 `_release` frees a block's storage (to EMPTY), `_to_full` decodes COARSE or copies
 REUSED into a FULL row, `_to_coarse` encodes FULL blocks and keeps those within the
 error bound, `_to_shared` hands FULL blocks to a shared exact copy keyed by their bytes,
-`_full_rows` copies FULL rows to the host. They change the host block table only; the
-caller syncs it to the device once at the end.
+`_full_rows` copies FULL rows to the host, `_compact` gives freed rows' memory back. They
+change the host block table only; the caller syncs it to the device once at the end.
 """
 from __future__ import annotations
 
@@ -134,3 +134,20 @@ def _to_shared(store: LadderStore, coords, keys: list) -> None:
         store.full.release([old])
         store.level[block] = Level.REUSED
         store.slot[block] = slot
+
+
+def _compact(store: LadderStore) -> None:
+    """Shrink every pool to its live rows (`_Pool.shrink`) and renumber the block table and shared keys."""
+    for code, pool in ((Level.FULL, store.full), (Level.COARSE, store.coarse)):
+        held = store.level == code
+        remap = pool.shrink(store.slot[held])
+        if remap is not None:
+            store.slot[held] = remap[store.slot[held]]
+    held = store.level == Level.REUSED
+    remap = store.shared.shrink(np.fromiter(store.shared_refs, dtype=np.int32, count=len(store.shared_refs)))
+    if remap is None:
+        return
+    store.slot[held] = remap[store.slot[held]]
+    store.shared_refs = {int(remap[slot]): refs for slot, refs in store.shared_refs.items()}
+    store.shared_bytes = {int(remap[slot]): key for slot, key in store.shared_bytes.items()}
+    store.shared_key = {key: int(remap[slot]) for key, slot in store.shared_key.items()}

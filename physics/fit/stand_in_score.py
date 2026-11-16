@@ -14,8 +14,11 @@ psi = sqrt(n) e^{i phase} in float32, n = |psi|^2 the quanta as a real number, e
 keeping its start's sign. Each step is the engine's (physics.engine.step): the pull's
 leapfrog wave sourced by plus quanta, then Strang splitting of on_site (the box
 potential on local clocks) and De Raedt pair rotations along x, y, z by parity, forward
-then back, with the engine's openness (graded by the joint's squeeze, shut past the
-seal), friction and drift spreading on plus-minus faces. What it leaves out, because
+then back, with an openness graded by the joint's squeeze and shut past the seal, and
+friction and drift spreading, on plus-minus faces. Here it differs from the engine,
+which since 2026-11-16 moves no quanta across a plus-minus face and instead passes plus
+quanta between two plus boxes across a one-box joint (physics.engine.leak), so quanta
+change sign only in collapse. What it leaves out, because
 none of it has a gradient: the rounding to whole quanta, the claims (space does not
 grow: every box keeps its kind) and the collapse (collapse_squeeze still acts through
 the seal). Empty boxes and the grid's walls hold pull 0 and pass nothing, as in the

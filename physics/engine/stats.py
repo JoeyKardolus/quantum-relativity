@@ -6,12 +6,14 @@ Contract: `stats(state, settings=None, universe=0)` copies that universe's boxes
                     (pushing) quanta, exact ints
   energy_drift      amount - the start's amount, in quanta (0: exact, bible rule 4);
                     relative_drift that over the start's amount
-  plus_share        plus / amount (collapse is the one rule that turns minus into plus,
-                    but quanta crossing a plus-minus face take the receiving box's sign)
-  cells, joints     energy volumes and joint cells (cells.py); cell_count_growth their
-                    number over the start's (start["cells"], set by new_universe; NaN when unknown)
-  collapses, spread, claims  joint boxes collapsed, quanta spread by drift and claims
-                    made since the start (state tallies)
+  plus_share        plus / amount (collapse is the one rule that turns minus into plus)
+  cells, joints     energy volumes and joint cells (cells.py: a joint wraps one volume);
+                    cell_count_growth their number over the start's (start["cells"], set
+                    by new_universe; NaN when unknown)
+  seam_faces, seam_pairs  faces where two joints meet and how many joint pairs meet (seams.py)
+  collapses, collapsed_quanta, spread, claims  joint boxes collapsed and the minus quanta
+                    they turned plus, quanta spread by drift and claims made since the
+                    start (state tallies)
   occupied          boxes holding space; occupied_growth occupied / the start's
   radius            root mean square distance of the occupied boxes from the cube's
                     centre, in boxes
@@ -40,6 +42,7 @@ from scipy import ndimage
 
 from physics.engine.cells import ENERGY_VOLUME, cells
 from physics.engine.host_boxes import host_boxes
+from physics.engine.seams import seams
 from physics.engine.settings import Settings
 from physics.engine.state import State
 
@@ -48,7 +51,7 @@ _CORNERS = np.ones((3, 3, 3), dtype=bool)
 
 
 def stats(state: State, settings: Settings | None = None, universe: int = 0) -> dict:
-    """Amounts, drift, cells, lumps, seals, wrapping, web, edge, space, clocks of one universe."""
+    """Amounts, drift, cells, seams, lumps, seals, wrapping, web, edge, space, clocks of one universe."""
     settings = Settings() if settings is None else settings
     boxes = host_boxes(state, universe)
     quanta = boxes["quanta"].astype(np.int64)
@@ -67,8 +70,9 @@ def stats(state: State, settings: Settings | None = None, universe: int = 0) -> 
     squeeze = np.abs(quanta[joint_boxes]) / settings.joint_rest - 1.0
     rate = 1.0 / (1.0 + np.abs(quanta[occupied]) / settings.clock_packing) if settings.clock_packing > 0 else \
         np.ones(int(occupied.sum()))
-    spread, collapsed, claims, _ = (int(value) for value in state.tallies.numpy()[universe])
+    spread, collapsed, claims, collapsed_quanta = (int(value) for value in state.tallies.numpy()[universe])
     lumps = _lumps(found, start)
+    meeting = seams(found)
     return {
         "amount": amount, "plus": plus, "minus": minus,
         "energy_drift": amount - start["amount"],
@@ -76,7 +80,8 @@ def stats(state: State, settings: Settings | None = None, universe: int = 0) -> 
         "plus_share": plus / amount if amount else 0.0,
         "cells": int(volumes.sum()), "joints": int((~volumes).sum()),
         "cell_count_growth": found["kind"].size / start["cells"] if start.get("cells") else float("nan"),
-        "collapses": collapsed, "spread": spread, "claims": claims,
+        "seam_faces": meeting["faces"], "seam_pairs": int(len(meeting["pairs"])),
+        "collapses": collapsed, "collapsed_quanta": collapsed_quanta, "spread": spread, "claims": claims,
         "occupied": int(occupied.sum()),
         "occupied_growth": float(occupied.sum() / start["boxes"]) if start["boxes"] else 0.0,
         "radius": float(np.sqrt((places ** 2).sum(axis=1).mean())) if places.size else 0.0,

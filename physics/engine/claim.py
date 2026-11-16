@@ -17,7 +17,8 @@ site weighs every face neighbour as the giver of one move:
 and takes the move that lowers the sum of box_energy.py (pull, the volume's own push,
 the joint's steep push) over the touched boxes the most, if any lowers it. The claimed
 box takes the giver's phase and clock reading. Every quantum keeps its sign and the
-amount is exact; tallies[u, 2] counts universe u's claims.
+amount is exact (the box changes kind, its quanta do not); tallies[u, 2] counts
+universe u's claims and the claimed box's marks get bit 2 (step.py zeroes marks).
 Wrapping (bible rule 1, owner 2026-11-16), checked in the site's 3x3x3 block before a
 move: a box turns plus only when none of its 26 neighbours is empty or off the grid and
 the plus boxes among them form one group (26-connected inside the block), so a claim
@@ -113,7 +114,8 @@ def _pushed_out(quanta: wp.array3d(dtype=wp.int32), pull: wp.array3d(dtype=wp.fl
 @wp.kernel
 def _claim(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32),
            pull: wp.array3d(dtype=wp.float32), clock: wp.array3d(dtype=wp.float32),
-           adjacency: wp.array(dtype=wp.int32), side: int, length: int, offset: wp.vec3i, volume_rest: float,
+           marks: wp.array3d(dtype=wp.uint8), adjacency: wp.array(dtype=wp.int32), side: int, length: int,
+           offset: wp.vec3i, volume_rest: float,
            volume_stiffness: float, joint_rest: float, push: float, push_steepness: float,
            tallies: wp.array2d(dtype=wp.int64)):
     ti, tj, tk = wp.tid()
@@ -181,6 +183,7 @@ def _claim(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float3
     quanta[site[0], site[1], site[2]] = half
     phase[site[0], site[1], site[2]] = phase[giver[0], giver[1], giver[2]]
     clock[site[0], site[1], site[2]] = clock[giver[0], giver[1], giver[2]]
+    marks[site[0], site[1], site[2]] = marks[site[0], site[1], site[2]] | wp.uint8(2)
     wp.atomic_add(tallies, home, 2, wp.int64(1))
 
 
@@ -206,6 +209,7 @@ def claim(state: State, settings: Settings, phase_index: int) -> None:
         return
     device = state.quanta.device
     wp.launch(_claim, dim=dims, device=device,
-              inputs=[state.quanta, state.phase, state.pull, state.clock, _adjacency(device), state.side, state.shape[0],
+              inputs=[state.quanta, state.phase, state.pull, state.clock, state.marks, _adjacency(device), state.side,
+                      state.shape[0],
                       wp.vec3i(*offset), settings.volume_rest, settings.volume_stiffness, settings.joint_rest,
                       settings.push, settings.push_steepness, state.tallies])

@@ -12,7 +12,7 @@ fitted on the fit set only, the expansion shape (slowing, then speeding up) and 
 - **Never change a default from here.** A setting that wins goes to the owner as a
   scorecard on the issue; the owner decides.
 - **Local clocks, no dark energy.** The expansion dip is timed by the mean local clock of the
-  most packed energy volumes (as an astronomer would), not the step counter; searches before
+  most packed energy volumes, not the step counter; searches before
   2026-11-16's change used the counter. No dark-energy or base-push setting is ever searched.
 - **Fixed before a run**: ranges, score, run size and seeds. Change them only before a new
   search, and say so in its write-up. The start's seed is not fitted.
@@ -26,8 +26,9 @@ fitted on the fit set only, the expansion shape (slowing, then speeding up) and 
 
 - **Gradients go through a stand-in**, never the engine: whole quanta, claims and collapse
   have no gradient. The stand-in is the engine's fluid in float psi, every box keeping its
-  kind, scored like `fit_run` without lumps and with the counter's time. A stand-in
-  winner is checked on the real `fit_run` score.
+  kind; its quanta still cross plus-minus faces, which the engine replaced with its leak
+  (`engine/leak.py`). Scored like `fit_run` without lumps, by the counter. A winner is
+  checked on the real `fit_run` score.
 - **Its gradient is a direction, not a derivative.** The full tape gradient blew up to 1e26
   in 10 steps (a box's own quanta turning its phase through the steep joint push), so
   potentials, openness and clocks read a density the tape does not see. Adam steps by a

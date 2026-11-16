@@ -78,19 +78,14 @@ def coarse_phase(phase: wp.array2d(dtype=wp.uint8), phead: wp.array2d(dtype=wp.f
     return _wrap(phead[row, group * 2] + (float(offset) / 7.5 - 1.0) * phead[row, group * 2 + 1])
 
 
-@wp.kernel
-def gather_kernel(level: wp.array3d(dtype=wp.int32), slot: wp.array3d(dtype=wp.int32),
-                  full_q: wp.array4d(dtype=wp.int32), full_p: wp.array4d(dtype=wp.float32),
-                  shared_q: wp.array4d(dtype=wp.int32), shared_p: wp.array4d(dtype=wp.float32),
-                  c_sign: wp.array2d(dtype=wp.uint8), c_mag: wp.array2d(dtype=wp.uint8),
-                  c_phase: wp.array2d(dtype=wp.uint8), c_head: wp.array2d(dtype=wp.int32),
-                  c_phead: wp.array2d(dtype=wp.float32), wanted: wp.array2d(dtype=wp.int32), halo: int,
-                  out_q: wp.array4d(dtype=wp.int32), out_p: wp.array4d(dtype=wp.float32)):
-    """Every box of each wanted block plus `halo` boxes round it, read from whatever level holds it."""
-    item, ax, ay, az = wp.tid()
-    gx = wanted[item, 0] * 8 - halo + ax
-    gy = wanted[item, 1] * 8 - halo + ay
-    gz = wanted[item, 2] * 8 - halo + az
+@wp.func
+def _read_box(level: wp.array3d(dtype=wp.int32), slot: wp.array3d(dtype=wp.int32),
+              full_q: wp.array4d(dtype=wp.int32), full_p: wp.array4d(dtype=wp.float32),
+              shared_q: wp.array4d(dtype=wp.int32), shared_p: wp.array4d(dtype=wp.float32),
+              c_sign: wp.array2d(dtype=wp.uint8), c_mag: wp.array2d(dtype=wp.uint8),
+              c_phase: wp.array2d(dtype=wp.uint8), c_head: wp.array2d(dtype=wp.int32),
+              c_phead: wp.array2d(dtype=wp.float32), gx: int, gy: int, gz: int):
+    """(quanta, phase) of grid box (gx, gy, gz) read from whatever level holds it; 0, 0 outside or EMPTY."""
     quanta = int(0)
     angle = float(0.0)
     inside = gx >= 0 and gy >= 0 and gz >= 0
@@ -113,8 +108,43 @@ def gather_kernel(level: wp.array3d(dtype=wp.int32), slot: wp.array3d(dtype=wp.i
         if code == 3:
             quanta = shared_q[row, lx, ly, lz]
             angle = shared_p[row, lx, ly, lz]
+    return quanta, angle
+
+
+@wp.kernel
+def gather_kernel(level: wp.array3d(dtype=wp.int32), slot: wp.array3d(dtype=wp.int32),
+                  full_q: wp.array4d(dtype=wp.int32), full_p: wp.array4d(dtype=wp.float32),
+                  shared_q: wp.array4d(dtype=wp.int32), shared_p: wp.array4d(dtype=wp.float32),
+                  c_sign: wp.array2d(dtype=wp.uint8), c_mag: wp.array2d(dtype=wp.uint8),
+                  c_phase: wp.array2d(dtype=wp.uint8), c_head: wp.array2d(dtype=wp.int32),
+                  c_phead: wp.array2d(dtype=wp.float32), wanted: wp.array2d(dtype=wp.int32), halo: int,
+                  out_q: wp.array4d(dtype=wp.int32), out_p: wp.array4d(dtype=wp.float32)):
+    """Every box of each wanted block plus `halo` boxes round it, read from whatever level holds it."""
+    item, ax, ay, az = wp.tid()
+    quanta, angle = _read_box(level, slot, full_q, full_p, shared_q, shared_p, c_sign, c_mag, c_phase, c_head,
+                              c_phead, wanted[item, 0] * 8 - halo + ax, wanted[item, 1] * 8 - halo + ay,
+                              wanted[item, 2] * 8 - halo + az)
     out_q[item, ax, ay, az] = quanta
     out_p[item, ax, ay, az] = angle
+
+
+@wp.kernel
+def stored_differs_kernel(level: wp.array3d(dtype=wp.int32), slot: wp.array3d(dtype=wp.int32),
+                          full_q: wp.array4d(dtype=wp.int32), full_p: wp.array4d(dtype=wp.float32),
+                          shared_q: wp.array4d(dtype=wp.int32), shared_p: wp.array4d(dtype=wp.float32),
+                          c_sign: wp.array2d(dtype=wp.uint8), c_mag: wp.array2d(dtype=wp.uint8),
+                          c_phase: wp.array2d(dtype=wp.uint8), c_head: wp.array2d(dtype=wp.int32),
+                          c_phead: wp.array2d(dtype=wp.float32), wanted: wp.array2d(dtype=wp.int32),
+                          new_q: wp.array4d(dtype=wp.int32), new_p: wp.array4d(dtype=wp.float32),
+                          changed: wp.array(dtype=wp.int32), filled: wp.array(dtype=wp.int32)):
+    """changed[n] = 1 when a box of block n differs from what the store reads, in quanta or phase bits; filled[n] = 1 when new block n has a nonzero box."""
+    item, ax, ay, az = wp.tid()
+    quanta, angle = _read_box(level, slot, full_q, full_p, shared_q, shared_p, c_sign, c_mag, c_phase, c_head,
+                              c_phead, wanted[item, 0] * 8 + ax, wanted[item, 1] * 8 + ay, wanted[item, 2] * 8 + az)
+    if quanta != new_q[item, ax, ay, az] or angle != new_p[item, ax, ay, az]:
+        changed[item] = 1
+    if new_q[item, ax, ay, az] != 0:
+        filled[item] = 1
 
 
 @wp.kernel
@@ -317,13 +347,3 @@ def total_kernel(quanta: wp.array4d(dtype=wp.int32), totals: wp.array(dtype=wp.i
         wp.atomic_add(totals, 0, wp.int64(value))
     if value < 0:
         wp.atomic_add(totals, 1, wp.int64(-value))
-
-
-@wp.kernel
-def differs_kernel(old_q: wp.array4d(dtype=wp.int32), old_p: wp.array4d(dtype=wp.float32),
-                   new_q: wp.array4d(dtype=wp.int32), new_p: wp.array4d(dtype=wp.float32),
-                   changed: wp.array(dtype=wp.int32)):
-    """changed[n] = 1 when any box of block n differs in quanta or phase bits."""
-    item, ax, ay, az = wp.tid()
-    if old_q[item, ax, ay, az] != new_q[item, ax, ay, az] or old_p[item, ax, ay, az] != new_p[item, ax, ay, az]:
-        changed[item] = 1

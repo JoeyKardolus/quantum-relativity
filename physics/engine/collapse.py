@@ -9,7 +9,9 @@ collapse is the one place where pushing energy becomes pulling energy; the packe
 it joins is where a black hole begins). The energy volumes on either side are joined
 through it: they fall into each other. Two passes, so every box decides on the same
 signs (marks first, flips after); the flips can run away over later steps as the joined
-volume pulls harder. tallies[u, 1] counts universe u's flipped boxes. Returns None.
+volume pulls harder. tallies[u, 1] counts universe u's flipped boxes and tallies[u, 3]
+the quanta they turned plus; a flipped box's marks get bit 1 (bit 2, a claim's, is
+kept). Returns None.
 """
 from __future__ import annotations
 
@@ -25,7 +27,7 @@ from physics.engine.state import State
 def _mark(quanta: wp.array3d(dtype=wp.int32), marks: wp.array3d(dtype=wp.uint8), side: int, joint_rest: float,
           limit: float):
     ti, tj, tk = wp.tid()
-    marks[ti, tj, tk] = wp.uint8(0)
+    marks[ti, tj, tk] = marks[ti, tj, tk] & wp.uint8(2)
     held = quanta[ti, tj, tk]
     if held >= 0 or squeeze(held, joint_rest) < limit:
         return
@@ -42,16 +44,18 @@ def _mark(quanta: wp.array3d(dtype=wp.int32), marks: wp.array3d(dtype=wp.uint8),
             if value > 0:
                 has_plus = 1
     if has_plus == 1:
-        marks[ti, tj, tk] = wp.uint8(1)
+        marks[ti, tj, tk] = marks[ti, tj, tk] | wp.uint8(1)
 
 
 @wp.kernel
 def _flip(quanta: wp.array3d(dtype=wp.int32), marks: wp.array3d(dtype=wp.uint8), side: int,
           tallies: wp.array2d(dtype=wp.int64)):
     ti, tj, tk = wp.tid()
-    if marks[ti, tj, tk] == wp.uint8(1):
-        quanta[ti, tj, tk] = -quanta[ti, tj, tk]
+    if (marks[ti, tj, tk] & wp.uint8(1)) == wp.uint8(1):
+        amount = -quanta[ti, tj, tk]
+        quanta[ti, tj, tk] = amount
         wp.atomic_add(tallies, ti // side, 1, wp.int64(1))
+        wp.atomic_add(tallies, ti // side, 3, wp.int64(amount))
 
 
 def collapse(state: State, settings: Settings) -> None:

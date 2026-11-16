@@ -7,31 +7,32 @@ and the detail ladder (`physics/ladder`) beside the boxes once `attach_ladder` i
 
 ## Must not get wrong
 
-- **The amount ignoring sign is exact.** Every move of energy is an integer transfer
-  between boxes; nothing rounds the quanta. A new rule that moves energy must move whole
-  quanta and keep the sum of |quanta| to the quantum (`totals`).
+- **The amount ignoring sign is exact.** Every move is an integer transfer of whole
+  quanta; the sum of |quanta| holds to the quantum (`totals`).
 - **The fluid is tied to the quanta**: its complex number is sqrt(|quanta|) e^{i phase},
-  never stored. `hop.py` (De Raedt pair rotations) hands over floor(flux + u) quanta,
-  u a hashed uniform, then keeps the rotated phase. No box drops below 1 quantum by flow.
-- **Signs change only by claims and collapse.** Quanta crossing a plus-minus face join the
-  receiving box's kind; a claim turns a border box with whole quanta pushed out to its
-  own kind; only `collapse.py` turns minus quanta plus.
+  never stored. `pair_rotation.py` (De Raedt) hands over floor(flux + u) quanta, u a
+  hashed uniform, then keeps the rotated phase. No box drops below 1 quantum by flow.
+- **Quanta change sign only in collapse.** Hops stay inside one sign; plus quanta cross
+  a one-box joint as one transfer between the plus boxes beside it (`leak.py`), never
+  deposited in it. A claim changes a box's kind, pushing its quanta out with their sign.
+  `marks` after a step: 1 collapse, 2 claim; tallies[u, 3] counts quanta turned plus.
 - **Wrapping is local**: a box turns plus only with no empty box or wall among its 26
   neighbours and the plus boxes round it one group; a plus box turns minus only if the
   plus boxes round it stay one group (`claim.py`).
-- **No joint labels**: a "seam" is any plus-minus face, graded by the joint box's squeeze
-  (`openness.py`). The bible's seam (where two joints touch) cannot be read from signs.
 - **Pull is a wave** (`pull_wave.py`, leapfrog); 0 in empty boxes and beyond walls.
-- **Universes never touch.** Every neighbour read goes through `inside(box, home, side)`,
-  hops pair by local parity, the rounding hash uses the local place and the universe's seed
-  key: a universe steps bit for bit the same alone and in a batch (test).
+- **Universes never touch.** Neighbour reads go through `inside`, pairs use local parity,
+  the hash the local place and seed key: alone equals batched, bit for bit (test).
 - **The boxes are the truth; the ladder is beside them.** `ladder_sync` writes changed blocks
-  and switches levels after each step; nothing reads back from it, because on_site turns
-  every occupied box's phase every step, so no occupied block is ever unchanged and a COARSE
-  block read back would take fresh rounding noise every step. Costs ~13x a step at 216^3.
-- **Cells are read, not kept** (`cells.py`, host scipy): volumes = 26-connected plus boxes,
-  joints = face-connected minus boxes; ids change between calls.
+  and switches levels after each step; nothing reads back (on_site turns every occupied
+  phase each step, so a COARSE read-back adds rounding noise). It costs ~1.6x a step
+  (134M boxes: 19.5 vs 30.8 steps/s) and saves no memory yet.
+- **Cells are read, not kept** (`cells.py`, host scipy): volumes = 26-connected plus boxes;
+  the volumes grow into the minus web face step by face step, and each volume's joint is
+  what it reached (face-connected); `seams.py` gives the faces where joints meet. Ids
+  change between calls.
 - **No dark energy, no base push.** Never tune a default to pass a test.
+- **The default step does not resolve the steep push** (open, 2026-11-16): seed 1 edge
+  joints spike from step ~90, collapse runs away from ~110; step_time 0.05: none.
 
 ## Measured (2026-11-16, RTX 5080, defaults)
 

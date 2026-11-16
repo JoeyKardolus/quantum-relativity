@@ -4,7 +4,8 @@ Contract: `write_blocks(store, block_ids, quanta, phase)` takes an (n, 3) array 
 coordinates and the blocks' new content as (n, 8, 8, 8) device or host arrays (quanta
 int32, phase float32). A block whose new content is bit-identical to what it reads now
 is left untouched at its level (a quiet block at rest costs nothing and gathers no
-re-coding error). A changed block is stored FULL exactly as given (a new FULL row; its
+re-coding error). The comparison reads the store in place, on the device: no copy of the
+old content and no host copy of the new. A changed block is stored FULL exactly as given (a new FULL row; its
 COARSE or REUSED storage is released), or EMPTY when all its quanta are 0. Its quiet run
 is kept: `switch_levels` decides its level next. Returns how many blocks changed. The
 quanta total is whatever the core wrote: keeping it is the core's job, the ladder only
@@ -15,9 +16,8 @@ from __future__ import annotations
 import numpy as np
 import warp as wp
 
-from physics.ladder._kernels import copy_rows_kernel, differs_kernel
+from physics.ladder._kernels import copy_rows_kernel, stored_differs_kernel
 from physics.ladder._moves import _release, _rows
-from physics.ladder.gather_blocks import gather_blocks
 from physics.ladder.level import Level
 from physics.ladder.settings import BLOCK
 from physics.ladder.store import LadderStore
@@ -33,15 +33,19 @@ def write_blocks(store: LadderStore, block_ids, quanta, phase) -> int:
         raise ValueError(f"quanta and phase must be ({count}, 8, 8, 8), got {new_q.shape}, {new_p.shape}")
     if count == 0:
         return 0
-    old_q, old_p = gather_blocks(store, coords, halo=0)
     changed = wp.zeros(count, dtype=wp.int32, device=store.device)
-    wp.launch(differs_kernel, dim=(count, BLOCK, BLOCK, BLOCK), device=store.device,
-              inputs=[old_q, old_p, new_q, new_p], outputs=[changed])
+    nonzero = wp.zeros(count, dtype=wp.int32, device=store.device)
+    full, shared, coarse = store.full.arrays, store.shared.arrays, store.coarse.arrays
+    wp.launch(stored_differs_kernel, dim=(count, BLOCK, BLOCK, BLOCK), device=store.device,
+              inputs=[store.level_dev, store.slot_dev, full["quanta"], full["phase"], shared["quanta"],
+                      shared["phase"], coarse["sign"], coarse["mag"], coarse["phase"], coarse["head"],
+                      coarse["phead"], wp.array(coords.astype(np.int32), dtype=wp.int32, device=store.device), new_q, new_p],
+              outputs=[changed, nonzero])
     moved = changed.numpy() == 1
     if moved.any():
         kept_run = store.quiet_run[tuple(coords[moved].T)].copy()
         _release(store, coords[moved])
-        filled = moved & np.any(new_q.numpy() != 0, axis=(1, 2, 3))
+        filled = moved & (nonzero.numpy() == 1)
         if filled.any():
             slots = store.full.alloc(int(filled.sum()))
             picks = np.flatnonzero(filled)
