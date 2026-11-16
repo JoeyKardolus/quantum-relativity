@@ -55,7 +55,8 @@ volumes it touches) or a dict, or one dict per universe, with "owner" (the box a
 match its owner's kind (ValueError otherwise). `seed` is an int (universe u gets seed +
 u) or one int per universe; `keys` hash them for the rounding (a universe steps the same
 alone as side by side). `start` holds per universe the start's amounts and boxes.
-`ladder` is None or the detail ladder's store (ladder_sync.py). Raises ValueError on a
+`ladder` is None or the detail ladder's store (ladder_sync.py); `quantum` is None or the
+moving energies tracked whole (quantum_store.py). Raises ValueError on a
 non-cubic or mismatched start, a seed count that is not one per universe, a box of 2**30
 quanta or more, or an odd side with wrap.
 """
@@ -111,6 +112,7 @@ class State:
     cell_boxes: object = None
     crossed: object = None
     device: object = None
+    quantum: object = None
     cells_d: dict = field(default_factory=dict)
 
     @property

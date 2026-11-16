@@ -17,7 +17,10 @@ every part runs on the local clock of the cell it acts in (owner, 2026-11-16):
                    (on_site.py, hop.py: whole quanta inside one cell, frictionless)
   5. cross         energy crosses every joint between two volumes, drifting down the
                    pull (each cell's mean pull as counted in 1 or 2) and diffusing by
-                   the fluid's own jiggle, the arriving quanta turned to heat (cross.py); the cells are counted again and every
+                   the fluid's own jiggle, the arriving quanta turned to heat (cross.py); quantum:
+                   every moving energy tracked whole turns its wave and its own
+                   oscillation and settles whole when reacted with or out of momentum
+                   (quantum.py, axiom 7); the cells are counted again and every
                    volume's size follows its new energy at once (cell_laws.py)
   6. joint_swing   every joint's size swings, pushed against its neighbours' and pressed
                    by the volumes' fluid on its faces (wall_press.py), the swing
@@ -47,6 +50,7 @@ from physics.engine.ladder_sync import ladder_sync
 from physics.engine.mortar_shift import mortar_shift
 from physics.engine.on_site import on_site
 from physics.engine.pull_wave import pull_wave
+from physics.engine.quantum import quantum
 from physics.engine.settings import Settings
 from physics.engine.state import State
 from physics.engine.substeps import substeps
@@ -71,6 +75,7 @@ def step(state: State, settings: Settings) -> None:
     for sub_index in range(int(substeps(state, settings).max())):
         _fluid(state, settings, half, sub_index)
     cross(state, settings, squeeze, pull)
+    quantum(state, settings, pull)
     pull = cell_count(state)
     cell_laws(state, settings)
     pressed = joint_swing(state, settings, pull - wall_press(state, settings))

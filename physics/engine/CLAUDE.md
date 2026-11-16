@@ -7,8 +7,11 @@ side; the detail ladder (`physics/ladder`) sits beside the boxes once attached.
 ## Must not get wrong
 
 - **One test file per owner axiom** (`tests/test_axiom_<n>_*.py`, n 1-8 as in the
-  bible's "The axioms"; axiom 7, quantum, is xfail "not built"). Never loosen one to
+  bible's "The axioms"). Never loosen one to
   pass; a red axiom test is a miss to report, and the engine is what changes.
+- **Axiom 7** (`quantum*.py`): a moving energy is a record in `state.quantum`. Only a
+  scene splits it (`quantum_hand`, staged: `cross` strips all direction); a settle
+  moves whole quanta. Bell tests: not built.
 - **The amount ignoring sign is exact.** Every move is a whole-quanta transfer
   (`totals`). The fluid is sqrt(|quanta|) e^{i phase}, never stored.
 - **Sign changes only in collapse (minus to plus) and a split's tear (plus to minus).**
@@ -24,25 +27,24 @@ side; the detail ladder (`physics/ladder`) sits beside the boxes once attached.
 - **No size at rest, no drift setting.** A cell wants (size_energy / quanta)**3 boxes
   (`cell_laws`), the constant fixed once by `new_universe`. Volumes only pull, joints
   only push, empty space does nothing.
-- **Collapse only when too packed** (owner, 2026-11-16): a joint's minus quanta per box
+- **Collapse only when too packed**: a joint's minus quanta per box
   past `collapse_packing`, never low energy. A tear's joint is born at its wanted size.
 - **The fluid has its own pressure** (`fluid_potential`, push * (n / cell mean - 1)):
-  whirl cores hold (healing 1 box). The volumes' fluid presses joints (`wall_press`), so
+  whirl cores hold. The volumes' fluid presses joints (`wall_press`), so
   joints swing from the start. Cells start with at least `least_cell_boxes` (216).
 - **Joints swing, volumes follow.** `joint_swing`: frictionless, energy-keeping spring
   step. Boxes follow sizes (`exchange`, `mortar_shift`, both by room order, joint
   included); a box changes cell only once emptied, every volume wrapped on 26 sides.
 - **Deterministic.** Box moves are proposed, then committed against their phase's worst
-  case (`settle_counts`): one seed, one run. No put-back on a racing atomic.
+  case (`settle_counts`): one seed, one run.
 - **Local clocks**: every per-cell rule runs at its cell's rate (`clock_rate`).
 - **Wrapping**: margin 0 wraps on an even side. Universes never touch (`reach`).
 
 ## Measured (2026-11-16, RTX 5080, defaults, seed 1)
 
 Default universe (88^3, 512 volumes), 2000 steps: amount exact, 0 collapses, 0 splits,
-lumps 126 -> 131, joints' share of boxes 25% (start) -> 30%, slowing (41% before the
-mortar shift kept room order). Strict xfail: axiom 2 swing (1 of 1536 joints swings
-only twice in 300 steps). Minimum cell: 6 across (whirl scan, `settings.py`).
+lumps 126 -> 131, joints' share of boxes 25% (start) -> 30%, slowing. Strict xfail: axiom 2 swing (1 of 1536 joints swings
+only twice in 300 steps).
 
 ## Run
 

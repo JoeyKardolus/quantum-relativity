@@ -43,6 +43,14 @@ Module map:
   substeps.py       substeps: fluid substeps per universe from its steepest face in a cell
   jiggle.py         jiggle: the fluid's own motion per quantum in each volume
   cross.py          cross: drift down the pull and diffusion through a joint, heat
+  quantum_store.py  quantum_store: the moving energies tracked whole and how they ended (axiom 7)
+  quantum_packet.py quantum_packet: name part of a volume's energy as one moving energy
+  quantum_joints.py quantum_joints: a volume's joints, kept to notice a collapse or tear
+  quantum_move.py   quantum_move: whole quanta from one volume's boxes to another's, any distance
+  quantum_hand.py   quantum_hand: frictionless handover between neighbours (splitter, merge back; staged)
+  quantum_settle.py quantum_settle: a moving energy settles whole in its pointer's cell
+  quantum_react.py  quantum_react: a placed reaction settles what has a part in a cell
+  quantum.py        quantum: the step's part: waves and oscillations turn, pointers jump, settles
   exchange.py       exchange: wall boxes follow the cells' sizes, ABAB kept, light speed
   mortar_shift.py   mortar_shift: a growing volume pushes a thin joint wall into its neighbour
   group_label.py    group_label: connected groups of boxes, joined round wrapping edges
@@ -87,6 +95,14 @@ from physics.engine.hop import hop
 from physics.engine.substeps import substeps
 from physics.engine.cross import cross
 from physics.engine.jiggle import jiggle
+from physics.engine.quantum_store import quantum_store
+from physics.engine.quantum_packet import quantum_packet
+from physics.engine.quantum_joints import quantum_joints
+from physics.engine.quantum_move import quantum_move
+from physics.engine.quantum_hand import quantum_hand
+from physics.engine.quantum_settle import quantum_settle
+from physics.engine.quantum_react import quantum_react
+from physics.engine.quantum import quantum
 from physics.engine.exchange import exchange
 from physics.engine.mortar_shift import mortar_shift
 from physics.engine.group_label import group_label
@@ -109,6 +125,7 @@ from physics.engine.view_source import view_source
 
 __all__ = ["Settings", "State", "uneven_field", "new_universe", "reach", "face_step", "near", "clock_rate",
            "pass_seed", "pair_rotation", "box_potential", "fluid_potential", "cell_count", "cell_laws", "cell_upload", "cell_room", "settle_counts", "joint_swing",
-           "pull_wave", "on_site", "hop", "substeps", "jiggle", "cross", "exchange", "mortar_shift", "group_label", "one_group", "block_adjacency",
+           "pull_wave", "on_site", "hop", "substeps", "jiggle", "cross", "quantum_store", "quantum_packet", "quantum_joints", "quantum_move", "quantum_hand",
+           "quantum_settle", "quantum_react", "quantum", "exchange", "mortar_shift", "group_label", "one_group", "block_adjacency",
            "collapse", "volume_split", "wall_press", "tick_clocks", "totals", "attach_ladder", "ladder_sync", "step",
            "host_boxes", "lattice_of", "ENERGY_VOLUME", "JOINT", "cells", "seams", "stats", "view_source"]
