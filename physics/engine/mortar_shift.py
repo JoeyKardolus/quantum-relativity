@@ -8,13 +8,17 @@ grid of sites moved by a fresh offset each step, so the 3 x 3 x 3 blocks round t
 sites and the boxes they drain into never overlap). A site box j of J that touches A
 across a face, has plus boxes of B among its 26 neighbours (the set S, n boxes) and no
 other volume's, no empty space or wall, and every joint box on its faces a joint of A,
-moves when A's room (state.size minus boxes, over state.size, cell_room.py) still
-exceeds B's after the move even if every shift proposed in the same phase went through
-(propose, then commit; settle_counts.py), with
+moves when A's room (state.size minus boxes, over state.size, cell_room.py) and J's
+room both still exceed B's after the move even if every shift proposed in the same phase
+went through (propose, then commit; settle_counts.py): B gives n boxes, one net to A and
+n - 1 to J, so like any box handed on (exchange.py) they go only to cells with more room
+(2026-11-16: without J's room in it every shift fattened the wall by n - 1 boxes a
+one-box wall cannot hand back, and the joints' share of the boxes rose from 25% to 41%
+in 2000 steps), with
 chance the slowest clock rate of A, B and J (on local clocks): j joins A and the boxes of S join J, so A grows by one box, B gives n,
-J holds n - 1 more boxes than before, and its size (state.size) does not change: the
-wall was moved, not grown, so J gives the extra boxes back to whichever volume wants
-them (exchange.py). Each box of S
+J holds n - 1 more boxes than before, and its size (state.size) does not change; J gives
+the extra boxes on to a volume that wants them where the wall has grown thick enough
+(exchange.py). Each box of S
 empties its plus quanta into the boxes of B on its faces that stay B's (whole quanta,
 evenly) and takes an even share of j's minus quanta (at least 1 each); j takes half the
 quanta of A's fullest face-neighbouring box with that box's phase and clock. A shift
@@ -130,7 +134,9 @@ def _shift(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float3
         if found > 0:
             lead = cell_room(sizes[home, first], boxes[home, first] + 1) - cell_room(sizes[home, second],
                                                                              boxes[home, second] - found)
-            if lead >= 0.0:
+            wall = cell_room(sizes[home, joint], boxes[home, joint] + found - 1) - cell_room(
+                sizes[home, second], boxes[home, second] - found)
+            if lead >= 0.0 and wall >= 0.0:
                 grower = first
                 shrinker = second
                 count = found
@@ -186,11 +192,14 @@ def _shift(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float3
                     return
     if mode == 0:
         wp.atomic_add(ins, home, grower, 1)
+        wp.atomic_add(ins, home, joint, count - 1)
         wp.atomic_add(outs, home, shrinker, count)
         return
     taken = boxes[home, grower] + ins[home, grower]
     left = boxes[home, shrinker] - outs[home, shrinker]
     if left < 2 or cell_room(sizes[home, grower], taken) - cell_room(sizes[home, shrinker], left) < 0.0:
+        return
+    if cell_room(sizes[home, joint], boxes[home, joint] + ins[home, joint]) - cell_room(sizes[home, shrinker], left) < 0.0:
         return
     wp.atomic_add(delta, home, grower, 1)
     wp.atomic_add(delta, home, shrinker, -count)

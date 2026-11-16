@@ -19,7 +19,7 @@ scenes share (dimension, whirl winding), CPU only.
 ## Must not get wrong
 
 - **The rules are the bible's**: A pulls, fading with distance, at light speed; B pushes,
-  steeply when squeezed, and collapses past the limit into one cell (the only way minus
+  steeply when squeezed, and collapses only when packed past `collapse_packing`, into one cell (the only way minus
   turns plus); flow frictionless inside a cell; energy crosses A to A down the pull (plus
   diffusion) through their one joint, the only friction, making heat, less when squeezed, none past the seal; every A
   wrapped on all 26 sides, joints thin mortar in one web; only a too-big A tears; no size

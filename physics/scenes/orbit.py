@@ -1,6 +1,6 @@
 """Orbit scene: a small blob given sideways speed past a big one, inside the foam; radius, period, Kepler.
 
-Contract: `orbit(cells_per_side=19, boxes_per_cell_side=4, distances=(10.0, 20.0),
+Contract: `orbit(cells_per_side=19, boxes_per_cell_side=6, distances=(10.0, 20.0),
 big_energy=2000.0, big_radius=3.0, small_energy=20.0, small_radius=1.5, steps=120,
 settings=None, device="cuda")` runs one start per distance (blob_start.py): an even
 start of wrapped cells, a big ball of extra energy big_energy in the middle, a small
@@ -54,7 +54,7 @@ from physics.scenes.sampled_run import sampled_run
 TRACK_MARGIN = 3.0
 
 
-def orbit(cells_per_side: int = 19, boxes_per_cell_side: int = 4, distances: tuple[float, ...] = (10.0, 20.0),
+def orbit(cells_per_side: int = 19, boxes_per_cell_side: int = 6, distances: tuple[float, ...] = (10.0, 20.0),
           big_energy: float = 2000.0,
           big_radius: float = 3.0, small_energy: float = 20.0, small_radius: float = 1.5, steps: int = 120,
           settings: Settings | None = None, device: str = "cuda") -> dict:

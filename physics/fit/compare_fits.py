@@ -79,10 +79,9 @@ def compare_fits(out_dir, cells: int = 7, boxes: int = 10, random_points: int = 
 
 
 def _default_unit() -> np.ndarray:
-    """The defaults' place in the unit cube (seal_fraction = seal_squeeze / collapse_squeeze)."""
+    """The defaults' place in the unit cube."""
     defaults = Settings()
-    values = {name: getattr(defaults, name) for name in NAMES if name != "seal_fraction"}
-    values["seal_fraction"] = defaults.seal_squeeze / defaults.collapse_squeeze
+    values = {name: getattr(defaults, name) for name in NAMES}
     unit = []
     for name in NAMES:
         if name in LOG_RANGES:

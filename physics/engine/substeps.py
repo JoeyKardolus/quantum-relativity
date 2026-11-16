@@ -2,7 +2,7 @@
 
 Contract: `substeps(state, settings)` reads, per universe, the steepest face: the largest
 |turn rate difference| between two face-neighbouring boxes of one cell (the hops act
-only there, hop.py), a box's turn rate being box_potential * its cell's clock rate
+only there, hop.py), a box's turn rate being fluid_potential * its cell's clock rate
 (on_site.py).
 Over one substep of length step_time / n that face's phase difference turns by
 steepest * step_time / n; n is the smallest whole number keeping it at or below
@@ -23,8 +23,8 @@ import math
 import numpy as np
 import warp as wp
 
-from physics.engine.box_potential import box_potential
 from physics.engine.face_step import face_step
+from physics.engine.fluid_potential import fluid_potential
 from physics.engine.reach import reach
 from physics.engine.settings import Settings
 from physics.engine.state import State
@@ -32,7 +32,8 @@ from physics.engine.state import State
 
 @wp.kernel
 def _steepest(quanta: wp.array3d(dtype=wp.int32), owner: wp.array3d(dtype=wp.int32), pull: wp.array3d(dtype=wp.float32),
-              rates: wp.array2d(dtype=wp.float32), pushes: wp.array2d(dtype=wp.float32), side: int, wrap: int,
+              rates: wp.array2d(dtype=wp.float32), pushes: wp.array2d(dtype=wp.float32),
+              packings: wp.array2d(dtype=wp.float32), pressure: float, side: int, wrap: int,
               steepest: wp.array(dtype=wp.float32)):
     ti, tj, tk = wp.tid()
     held = quanta[ti, tj, tk]
@@ -41,13 +42,13 @@ def _steepest(quanta: wp.array3d(dtype=wp.int32), owner: wp.array3d(dtype=wp.int
     home = ti // side
     here = wp.vec3i(ti, tj, tk)
     cell = owner[ti, tj, tk]
-    own = box_potential(held, pull[ti, tj, tk], pushes[home, cell]) * rates[home, cell]
+    own = fluid_potential(held, pull[ti, tj, tk], pushes[home, cell], packings[home, cell], pressure) * rates[home, cell]
     largest = float(0.0)
     for face in range(3):
         there, valid = reach(here, face_step(2 * face), home, side, wrap)
         if valid and owner[there[0], there[1], there[2]] == cell:
-            other = box_potential(quanta[there[0], there[1], there[2]], pull[there[0], there[1], there[2]],
-                                  pushes[home, cell]) * rates[home, cell]
+            other = fluid_potential(quanta[there[0], there[1], there[2]], pull[there[0], there[1], there[2]],
+                                    pushes[home, cell], packings[home, cell], pressure) * rates[home, cell]
             largest = wp.max(largest, wp.abs(other - own))
     if largest > 0.0:
         wp.atomic_max(steepest, home, largest)
@@ -62,8 +63,8 @@ def substeps(state: State, settings: Settings) -> np.ndarray:
     device = state.quanta.device
     steepest = wp.zeros(state.universes, dtype=wp.float32, device=device)
     wp.launch(_steepest, dim=state.shape, device=device,
-              inputs=[state.quanta, state.owner, state.pull, state.cells_d["rate"], state.cells_d["push"], state.side,
-                      int(state.wrap), steepest])
+              inputs=[state.quanta, state.owner, state.pull, state.cells_d["rate"], state.cells_d["push"],
+                      state.cells_d["packing"], float(settings.push), state.side, int(state.wrap), steepest])
     needed = np.array([max(1, math.ceil(float(value) * settings.step_time / settings.max_turn))
                        for value in steepest.numpy()], dtype=np.int64)
     state.capped += needed > settings.max_substeps

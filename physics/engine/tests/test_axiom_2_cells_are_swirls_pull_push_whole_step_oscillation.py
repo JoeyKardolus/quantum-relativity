@@ -2,8 +2,10 @@
 
 The owner's axiom (bible physics/quantum-relativity, "The axioms", 2026-11-16), checked in 3 parts, each
 kept whole from the file it came from (names that two parts shared carry a _P<n> suffix).
-Two checks are red, marked as strict xfail with the miss as reason so the commit gate
-admits the regrouping; their assertions are unchanged and a pass turns the mark red.
+The 500-step whirl was strict xfail until 2026-11-16 and passes unchanged since the fluid
+has its own pressure (fluid_potential.py). The swing is still strict xfail with the miss
+as reason (the commit gate refuses a red test); its assertion is unchanged and a pass
+turns the mark red.
 
 Part 1 (was axiom 07). A volume only pulls, a joint only pushes; empty space does nothing.
 
@@ -43,9 +45,8 @@ phase turns, so the winding round a closed loop of boxes (phase steps wrapped to
 (-pi, pi], summed, over 2 pi) is a whole number. Plain fluid: a 40-box cube all plus (one
 energy volume, no joints, no empty boxes, no pull: pull_strength 0), +1000 quanta per box
 dipping as tanh(r / healing)**2 (at least 1 quantum) towards a whirl line along z
-through the middle, phase the angle round that line; healing 1 box (the core width the
-old default volume stiffness gave; an energy volume now has no push of its own, so the
-fluid is free and the core width is only the start's shape). `step` runs 500 steps with every other rule at its default
+through the middle, phase the angle round that line; healing 1 box (the fluid's own pressure,
+fluid_potential.py, gives a core 1 / sqrt(2 push) = 1 box wide at the default push). `step` runs 500 steps with every other rule at its default
 (local clocks on). Every 50 steps the winding round squares of half width 3, 5 and 7
 boxes round the line, in every z plane 8..31, is exactly 1, round a square beside the
 line exactly 0, and the amount of quanta is identical.
@@ -135,8 +136,9 @@ def _winding_P2(field: np.ndarray, plane: int, low: tuple, high: tuple) -> float
 
 
 @needs_gpu
-@pytest.mark.xfail(strict=True, reason="miss 2026-11-16: joints start at rest at their balance and nothing jolts "
-                   "them, median 2 reversals in 300 steps; the check is unchanged and must pass to drop this")
+@pytest.mark.xfail(strict=True, reason="miss 2026-11-16: the volumes' fluid now presses the joints (wall_press.py), "
+                   "median 11 reversals, but 1 of 1536 joints (780, by a slowly growing lump) swings only 2 times in "
+                   "300 steps, riding a slow drift; the check is unchanged and must pass to drop this")
 def test_every_joint_swings_back_and_forth():
     from physics.engine.tests.axiom_run import axiom_run
     run = axiom_run()
@@ -192,8 +194,6 @@ def _winding_P3(field: np.ndarray, plane: int, low: tuple, high: tuple) -> float
 
 
 @needs_gpu
-@pytest.mark.xfail(strict=True, reason="miss 2026-11-16: one loop round the whirl reads -1 at step 500 (the "
-                   "low-quanta core scrambles); the check is unchanged and must pass to drop this")
 def test_a_whirl_keeps_one_whole_turn_and_the_amount_holds():
     settings = Settings(pull_strength=0.0, split_across=0.0)
     axis = np.arange(SIDE_P3) - CENTRE_P3

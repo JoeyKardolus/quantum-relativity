@@ -1,6 +1,6 @@
 """Axiom 1, Energy: an always-moving quantum fluid, one whole signed number of quanta per Planck box at each moment of local time; the total is fixed; zero is empty space, which does nothing.
 
-The owner's axiom (bible physics/quantum-relativity, "The axioms", 2026-11-16), checked in 3 parts, each
+The owner's axiom (bible physics/quantum-relativity, "The axioms", 2026-11-16), checked in 4 parts, each
 kept whole from the file it came from (names that two parts shared carry a _P<n> suffix).
 
 Part 1 (was axiom 01). Energy is whole signed quanta per Planck box, and the total ignoring sign is exactly conserved.
@@ -30,13 +30,25 @@ boxes, 100000 quanta at its peak, at least 1 quantum everywhere) gets a phase ri
 diagonal (1, 1, 1) / sqrt 3. Settings chosen before the run: (an energy volume has no push of its own since
 2026-11-16, so the fluid is free; before, volume stiffness 1e-6 made it near free; a
 linear wave, whose known speed is the lattice group velocity, sum over axes of
-u_i sin(0.3 u_i) for direction u) and local clocks off (clock_packing 0; on, the packed
+u_i sin(0.3 u_i) for direction u; push 0, so the fluid's own pressure, fluid_potential.py,
+which scales with push and makes the fluid nonlinear since 2026-11-16, is off: the test
+watches the hops' direction-freeness) and local clocks off (clock_packing 0; on, the packed
 peak would run slower than its tail, a separate rule). After 48 steps (12 time units) the
 packet's quanta centre has moved that far along its direction within 5%, the three
 speeds agree within 5%, it drifts sideways less than 0.05 boxes, and the amount of
 quanta is identical.
 Splits are off (split_across 0): one plus cube this big is one energy volume past the
 split size, and this test watches the fluid alone.
+
+Part 4 (2026-11-16). The default start's energy is moving, not at rest.
+
+Owner, 2026-11-16: axiom 1 says energy is always moving, so the start must have moving
+energy, not every joint at rest, from the start's own unevenness and no new setting.
+The default universe (new_universe(seed=1), Settings()): the start's phases are all 0
+(no flow yet), and after one step at least half of the energy volumes' boxes hold a
+different number of quanta than at the start (the uneven fluid flows under its own
+pressure, fluid_potential.py); and in the shared 300-step run (axiom_run.py) every joint's size has changed by step 10
+(the volumes press their joints unevenly, wall_press.py). Thresholds set before the run.
 """
 import numpy as np
 
@@ -126,7 +138,7 @@ def _run(unit: np.ndarray, settings: Settings) -> tuple:
 
 @needs_gpu
 def test_a_packet_goes_as_fast_along_an_axis_as_along_either_diagonal():
-    settings = Settings(pull_strength=0.0, clock_packing=0.0, split_across=0.0)
+    settings = Settings(pull_strength=0.0, push=0.0, clock_packing=0.0, split_across=0.0)
     speeds = {}
     for name, direction in DIRECTIONS.items():
         unit = np.asarray(direction) / np.linalg.norm(direction)
@@ -138,3 +150,25 @@ def test_a_packet_goes_as_fast_along_an_axis_as_along_either_diagonal():
         assert across < 0.05
         assert change == 0
     assert max(speeds.values()) <= 1.05 * min(speeds.values())
+
+
+@needs_gpu
+def test_the_default_start_is_moving_from_its_first_step():
+    from physics.engine.tests.axiom_run import axiom_run
+    state = new_universe(seed=1)
+    before = state.quanta.numpy().copy()
+    phases = float(np.abs(state.phase.numpy()).max())
+    step(state, Settings())
+    after = state.quanta.numpy()
+    plus = before > 0
+    changed = float((after[plus] != before[plus]).mean())
+    run = axiom_run()
+    joints = np.flatnonzero(run["kinds"] == -1)
+    start_size = run["checks"][0]["size"][joints]
+    tenth = run["steps"][9]["cell_size"][joints]
+    still = int((tenth == start_size).sum())
+    print(f"start phases at most {phases}; volume boxes whose quanta changed in step 1: {changed:.3f}; joints whose "
+          f"size has not moved by step 10: {still} of {joints.size}")
+    assert phases == 0.0
+    assert changed >= 0.5
+    assert still == 0

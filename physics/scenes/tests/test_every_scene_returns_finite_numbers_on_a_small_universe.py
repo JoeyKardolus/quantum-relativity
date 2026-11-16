@@ -14,19 +14,19 @@ from physics.scenes import (belt_trick, black_hole, bound_lump, expansion, hubbl
 from physics.scenes.tests._gpu import needs_gpu
 
 SCENES = {
-    "expansion": lambda: expansion(5, 4, steps=8, every=1),
-    "hubble_gap": lambda: hubble_gap(5, 4, steps=100, every=1),
-    "structure": lambda: structure(5, 4, steps=4, every=2),
-    "bound_lump": lambda: bound_lump(5, 4, steps=6, every=2),
-    "orbit": lambda: orbit(7, 4, distances=(5.0,), big_energy=100.0, big_radius=2.0, small_energy=2.0,
+    "expansion": lambda: expansion(5, 6, steps=8, every=1),
+    "hubble_gap": lambda: hubble_gap(5, 6, steps=100, every=1),
+    "structure": lambda: structure(5, 6, steps=4, every=2),
+    "bound_lump": lambda: bound_lump(5, 6, steps=6, every=2),
+    "orbit": lambda: orbit(7, 6, distances=(5.0,), big_energy=100.0, big_radius=2.0, small_energy=2.0,
                            small_radius=1.5, steps=6),
-    "black_hole": lambda: black_hole(6, 4, energies=(100.0, 400.0), radius=3.0, steps=20),
-    "space_dimension": lambda: space_dimension(6, 4, steps=4, sources=4),
-    "isotropy": lambda: isotropy(6, 4, blob_energy=100.0, blob_radius=2.0, flow_radius=4.0, speed=0.2, steps=4,
+    "black_hole": lambda: black_hole(6, 6, energies=(100.0, 400.0), radius=3.0, steps=20),
+    "space_dimension": lambda: space_dimension(6, 6, steps=4, sources=4),
+    "isotropy": lambda: isotropy(6, 6, blob_energy=100.0, blob_radius=2.0, flow_radius=4.0, speed=0.2, steps=4,
                                   seeds=(1, 2)),
-    "spin": lambda: spin(4, 4, drift_speed=0.2, steps=6),
-    "belt_trick": lambda: belt_trick(5, 4, margin=6, steps_per_turn=3, web_reach=2),
-    "timescape": lambda: timescape(6, 4, steps=30, every=1, observers=2),
+    "spin": lambda: spin(4, 6, drift_speed=0.2, steps=6),
+    "belt_trick": lambda: belt_trick(5, 6, margin=6, steps_per_turn=3, web_reach=2),
+    "timescape": lambda: timescape(6, 6, steps=30, every=1, observers=2),
 }
 
 

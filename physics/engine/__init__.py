@@ -30,6 +30,7 @@ Module map:
   pass_seed.py      pass_seed: the rounding hash's seed per step, substep and pass
   pair_rotation.py  pair_rotation (Warp func): the exact two-box fluid step in whole quanta
   box_potential.py  box_potential (Warp func): energy per quantum (pull for plus, push for minus)
+  fluid_potential.py fluid_potential (Warp func): box_potential plus the fluid's own pressure in its cell
   cell_count.py     cell_count: every cell's quanta, boxes and mean pull
   cell_laws.py      cell_laws: clock rate, wanted size, volume size, joint push and squeeze
   cell_upload.py    cell_upload: the cell table on the GPU for the box kernels
@@ -49,6 +50,7 @@ Module map:
   block_adjacency.py block_adjacency: the 3 x 3 x 3 block's neighbour masks
   collapse.py       collapse: a joint past the limit gives way, its volumes become one
   volume_split.py   volume_split: a too-big volume tears in two, only it
+  wall_press.py     wall_press: the volumes' fluid pressure on each joint's faces
   tick_clocks.py    tick_clocks: each box's and cell's own proper time
   totals.py         totals: exact plus, minus and total quanta, overall and per universe
   attach_ladder.py  attach_ladder: a detail ladder store beside the boxes
@@ -72,6 +74,7 @@ from physics.engine.clock_rate import clock_rate
 from physics.engine.pass_seed import pass_seed
 from physics.engine.pair_rotation import pair_rotation
 from physics.engine.box_potential import box_potential
+from physics.engine.fluid_potential import fluid_potential
 from physics.engine.cell_count import cell_count
 from physics.engine.cell_laws import cell_laws
 from physics.engine.cell_upload import cell_upload
@@ -91,6 +94,7 @@ from physics.engine.one_group import one_group
 from physics.engine.block_adjacency import block_adjacency
 from physics.engine.collapse import collapse
 from physics.engine.volume_split import volume_split
+from physics.engine.wall_press import wall_press
 from physics.engine.tick_clocks import tick_clocks
 from physics.engine.totals import totals
 from physics.engine.attach_ladder import attach_ladder
@@ -104,7 +108,7 @@ from physics.engine.stats import stats
 from physics.engine.view_source import view_source
 
 __all__ = ["Settings", "State", "uneven_field", "new_universe", "reach", "face_step", "near", "clock_rate",
-           "pass_seed", "pair_rotation", "box_potential", "cell_count", "cell_laws", "cell_upload", "cell_room", "settle_counts", "joint_swing",
+           "pass_seed", "pair_rotation", "box_potential", "fluid_potential", "cell_count", "cell_laws", "cell_upload", "cell_room", "settle_counts", "joint_swing",
            "pull_wave", "on_site", "hop", "substeps", "jiggle", "cross", "exchange", "mortar_shift", "group_label", "one_group", "block_adjacency",
-           "collapse", "volume_split", "tick_clocks", "totals", "attach_ladder", "ladder_sync", "step",
+           "collapse", "volume_split", "wall_press", "tick_clocks", "totals", "attach_ladder", "ladder_sync", "step",
            "host_boxes", "lattice_of", "ENERGY_VOLUME", "JOINT", "cells", "seams", "stats", "view_source"]

@@ -5,7 +5,7 @@ every part runs on the local clock of the cell it acts in (owner, 2026-11-16):
   1. cell_count, cell_laws  every cell's quanta and boxes are counted, its clock rate,
                    wanted size (length = constant / energy), a volume's size and a
                    joint's push and squeeze set (cell_count.py, cell_laws.py)
-  2. collapse      joints squeezed past the limit collapse, their two volumes one cell
+  2. collapse      joints packed past collapse_packing collapse, their two volumes one cell
                    (collapse.py); volume_split: the biggest volume past split_across in
                    each universe tears in two (volume_split.py); the cells are counted
                    again when either happened
@@ -19,8 +19,9 @@ every part runs on the local clock of the cell it acts in (owner, 2026-11-16):
                    pull (each cell's mean pull as counted in 1 or 2) and diffusing by
                    the fluid's own jiggle, the arriving quanta turned to heat (cross.py); the cells are counted again and every
                    volume's size follows its new energy at once (cell_laws.py)
-  6. joint_swing   every joint's size swings, pushed against its neighbours', the swing
-                   energy kept (joint_swing.py); a joint pressed to the collapse limit
+  6. joint_swing   every joint's size swings, pushed against its neighbours' and pressed
+                   by the volumes' fluid on its faces (wall_press.py), the swing
+                   energy kept (joint_swing.py); a joint pressed to the collapse packing
                    within the step collapses at once (collapse.py)
   7. exchange      the boxes follow the cells' sizes, at most at light speed
                    (exchange.py); mortar_shift: a growing volume pushes a one-box-thick
@@ -33,8 +34,6 @@ collapse and a tear. `marks` is zeroed first; after a step it says which boxes c
 cell or sign and by which rule (1 collapse, 2 owner change, 8 split). Returns None.
 """
 from __future__ import annotations
-
-import numpy as np
 
 from physics.engine.cell_count import cell_count
 from physics.engine.cell_laws import cell_laws
@@ -53,6 +52,7 @@ from physics.engine.state import State
 from physics.engine.substeps import substeps
 from physics.engine.tick_clocks import tick_clocks
 from physics.engine.volume_split import volume_split
+from physics.engine.wall_press import wall_press
 
 _ORDER = [(axis, parity) for axis in range(3) for parity in range(2)]
 
@@ -62,7 +62,7 @@ def step(state: State, settings: Settings) -> None:
     state.marks.zero_()
     pull = cell_count(state)
     squeeze = cell_laws(state, settings)
-    if collapse(state, settings, squeeze) + volume_split(state, settings):
+    if collapse(state, settings) + volume_split(state, settings):
         pull = cell_count(state)
         squeeze = cell_laws(state, settings)
     cell_upload(state)
@@ -73,8 +73,8 @@ def step(state: State, settings: Settings) -> None:
     cross(state, settings, squeeze, pull)
     pull = cell_count(state)
     cell_laws(state, settings)
-    pressed = joint_swing(state, settings, pull)
-    if collapse(state, settings, np.where(pressed, settings.collapse_squeeze, 0.0)):
+    pressed = joint_swing(state, settings, pull - wall_press(state, settings))
+    if collapse(state, settings, pressed):
         cell_count(state)
         cell_laws(state, settings)
     cell_upload(state)

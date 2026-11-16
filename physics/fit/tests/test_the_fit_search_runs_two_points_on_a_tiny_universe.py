@@ -10,14 +10,15 @@ from physics.scenes.tests._gpu import needs_gpu
 @needs_gpu
 def test_the_fit_search_runs_two_points_on_a_tiny_universe(tmp_path):
     results = tmp_path / "results.jsonl"
-    records = fit_search(results, cells=5, boxes=4, steps=6, every=1, default_seeds=(), random_points=2,
+    records = fit_search(results, cells=5, boxes=6, steps=6, every=1, default_seeds=(), random_points=2,
                          refine_best=0, recheck_top=0)
     assert [record["phase"] for record in records] == ["random", "random"]
     assert len(results.read_text().splitlines()) == 2
     for record in records:
         assert "error" not in record, record.get("trace")
         assert math.isfinite(record["score"]) and math.isfinite(record["E"]) and math.isfinite(record["S"])
-        assert record["overrides"]["seal_squeeze"] < record["overrides"]["collapse_squeeze"]
+        assert 0.2 <= record["overrides"]["seal_squeeze"] <= 2.0
+        assert 2.7e3 <= record["overrides"]["collapse_packing"] <= 2.7e5
         assert len(record["unit"]) == len(SEARCHED)
         assert 0.0 <= record["overrides"]["unevenness"] <= 0.9
         assert 0.0 <= record["overrides"]["joint_unevenness"] <= 0.9

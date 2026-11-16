@@ -1,9 +1,13 @@
-"""Collapse: a joint squeezed past its limit gives way, and its two energy volumes become one cell at once.
+"""Collapse: a joint packed past its limit gives way, and its two energy volumes become one cell at once.
 
-Contract: `collapse(state, settings, squeeze)` takes each joint's squeeze (cell_laws.py,
-its wanted length over its length minus 1) and collapses, most squeezed first, every
-joint that lies between two energy volumes with squeeze >= collapse_squeeze (owner,
-2026-11-16: when a joint collapses its two volumes become one cell at once). Joint J
+Contract: `collapse(state, settings, pressed=None)` collapses, most packed first, every
+joint that lies between two energy volumes and whose energy concentration, minus quanta
+per box (state.cell_quanta / state.cell_boxes, cell_count.py), is at least
+collapse_packing, or that `pressed` (bool per universe and cell id, joint_swing.py: its
+swing reached the collapse packing within the step) marks. Owner, 2026-11-16: a joint
+collapses only when its energy concentration gets too high, never because it is low on
+energy or smaller than its energy wants (a fresh joint from a tear holds the least
+energy it will ever have); when a joint collapses its two volumes become one cell at once. Joint J
 between volumes A and B (A the lower id, it stays): every box of J turns plus, its minus
 quanta becoming plus quanta of A, the same amount (bible rule 4: joint collapse is the
 one place where pushing energy becomes pulling energy), marks bit 1; except a box of J
@@ -29,9 +33,13 @@ from physics.engine.settings import Settings
 from physics.engine.state import State
 
 
-def collapse(state: State, settings: Settings, squeeze: np.ndarray) -> int:
-    """Collapse every joint squeezed past the limit; its two volumes become one."""
-    ready = (state.kind == -1) & (squeeze >= settings.collapse_squeeze) & (state.between.min(axis=-1) >= 0)
+def collapse(state: State, settings: Settings, pressed: np.ndarray | None = None) -> int:
+    """Collapse every joint packed past the limit (or pressed there by its swing); its two volumes become one."""
+    packing = state.cell_quanta / np.maximum(state.cell_boxes, 1)
+    over = packing >= settings.collapse_packing
+    if pressed is not None:
+        over |= pressed
+    ready = (state.kind == -1) & over & (state.between.min(axis=-1) >= 0)
     if not ready.any():
         return 0
     quanta, owner, marks = state.quanta.numpy(), state.owner.numpy(), state.marks.numpy()
@@ -39,7 +47,7 @@ def collapse(state: State, settings: Settings, squeeze: np.ndarray) -> int:
     done = 0
     for universe in np.flatnonzero(ready.any(axis=1)):
         rows = state.universe(int(universe))
-        for joint in sorted(np.flatnonzero(ready[universe]), key=lambda cell: -squeeze[universe, cell]):
+        for joint in sorted(np.flatnonzero(ready[universe]), key=lambda cell: -packing[universe, cell]):
             if state.kind[universe, joint] != -1 or state.between[universe, joint].min() < 0:
                 continue
             flipped, amount = _fall_in(state, int(universe), int(joint), quanta[rows], owner[rows], marks[rows])

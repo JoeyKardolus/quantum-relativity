@@ -1,6 +1,6 @@
 """Isotropy scene: is the foam the same in every direction? Pull and flow along a grid axis against a diagonal.
 
-Contract: `isotropy(cells_per_side=12, boxes_per_cell_side=4, blob_energy=500.0,
+Contract: `isotropy(cells_per_side=12, boxes_per_cell_side=6, blob_energy=500.0,
 blob_radius=3.0, flow_radius=16.0, speed=0.3, steps=20, seeds=(1, 2, 3, 4),
 cone_degrees=20.0, pull_steps=200, settings=None, device="cuda")` makes two measurements on
 the even checkerboard (default settings Settings(), every rule on). The Planck boxes form a cubic grid
@@ -69,7 +69,7 @@ from physics.scenes.wave_field import wave_field
 DIRECTIONS = {"axis": (1.0, 0.0, 0.0), "face_diagonal": (1.0, 1.0, 0.0), "body_diagonal": (1.0, 1.0, 1.0)}
 
 
-def isotropy(cells_per_side: int = 12, boxes_per_cell_side: int = 4, blob_energy: float = 500.0,
+def isotropy(cells_per_side: int = 12, boxes_per_cell_side: int = 6, blob_energy: float = 500.0,
              blob_radius: float = 3.0, flow_radius: float = 16.0, speed: float = 0.3, steps: int = 20,
              seeds: tuple = (1, 2, 3, 4), cone_degrees: float = 20.0, pull_steps: int = 200,
              settings: Settings | None = None, device: str = "cuda") -> dict:

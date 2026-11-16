@@ -3,9 +3,10 @@
 Contract: `joint_swing(state, settings, pull)` advances every joint's size and speed
 (state.size, state.speed) by one step_time. A joint's neighbours are the joints it
 shares an energy volume with (the cell graph, state.between). Its load is its push
-(cell_laws.py) plus the mean pull over its boxes (`pull`, cell_count.py; the pull is at
-most 0 where energy is, so it squeezes the joint: bible rule 8, "pull squeezes it and its
-push swells it back"). Each pair of neighbouring joints i, j is a spring running on the
+(cell_laws.py) plus `pull`: step.py passes the mean pull over its boxes (cell_count.py;
+the pull is at most 0 where energy is, so it squeezes the joint: bible rule 8, "pull
+squeezes it and its push swells it back") less the volumes' fluid pressing on its faces
+(wall_press.py). Each pair of neighbouring joints i, j is a spring running on the
 two joints' clocks: joint i's size accelerates by rate_i * rate_j * (load_i - load_j) /
 joint_inertia per unit of counter time, so what one joint gains its neighbour loses and
 the joints' summed size is kept (bible rule 5: the joints are the springs of the grid,
@@ -18,12 +19,12 @@ step length; it is implicit and solved by Newton's method (numerics, not a rule:
 explicit step gained energy at the steep wall and crushed joints to nothing). The step
 is cut into as many equal substeps as the stiffest joint needs for accuracy
 (omega * substep <= 1/2), at most MOST_SUBSTEPS. A joint whose size falls to the
-collapse limit (squeeze >= collapse_squeeze, size <= wanted / (1 + collapse_squeeze)^3)
-stops there, at rest, and is returned for collapse in the same step (axiom 6); an outer
-joint, with no second volume, cannot collapse: it is held at the limit size for the rest
-of the step. A joint already past the limit when the swing starts (a tear's piece left
-with little energy wants far more room than it has) does not swing: the collapse that
-opens the next step takes it (step.py). state.speed is the
+collapse packing (its minus quanta over its size reach collapse_packing, size <= quanta /
+collapse_packing; owner, 2026-11-16: only too high a concentration collapses a joint,
+never too little energy) stops there, at rest, and is returned for collapse in the same
+step (axiom 6); an outer joint, with no second volume, cannot collapse: it is held at the
+limit size for the rest of the step. A joint already past the limit when the swing starts
+does not swing: the collapse that opens the next step takes it (step.py). state.speed is the
 size change per unit of counter time (the clocks enter through the springs, so the
 summed size is kept exactly). Energy volumes are not moved (their size
 follows their energy). Returns a bool array (universes, capacity), True for each joint
@@ -66,7 +67,7 @@ def _swing_universe(state: State, settings: Settings, universe: int, joints: np.
     wanted = state.wanted[universe, joints]
     laplacian = _laplacian(state, universe, joints, rate) / settings.joint_inertia
     hardness = settings.push * wanted ** 6 / 5.0
-    floor = wanted / (1.0 + settings.collapse_squeeze) ** 3
+    floor = state.cell_quanta[universe, joints].astype(np.float64) / settings.collapse_packing
     size = state.size[universe, joints].astype(np.float64)
     speed = state.speed[universe, joints].astype(np.float64)
     stiffness = 30.0 * hardness / np.maximum(size, floor) ** 7

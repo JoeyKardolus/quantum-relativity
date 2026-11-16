@@ -30,7 +30,7 @@ scene builds a start, runs the engine (`physics.engine`) and returns measured nu
   `new_universe`'s uneven field only.
 - **Small and quick**: uneven starts default to 7^3 cells of 10 (bible: volumes start ~10
   across); placed starts keep 40 to 48 boxes a side. Tests run every scene on
-  5 to 7 lattice places of 4 boxes and check only that the numbers are finite (a place
+  5 to 7 lattice places of 6 boxes (a cell needs `least_cell_boxes`, 216) and check only that the numbers are finite (a place
   count n gives (n - 1) // 2 volumes a side without wrapping).
 
 ## Measured

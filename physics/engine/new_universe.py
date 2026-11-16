@@ -2,7 +2,7 @@
 
 Contract: `new_universe(cells_per_side=16, boxes_per_cell_side=10, seed=1, unevenness=0.3,
 slope=-3, margin=0, box_quanta=1000, universes=1, device="cuda", joint_unevenness=0.0)`
-returns a State (state.py) at rest, phase 0. The start lattice has cells_per_side places
+returns a State (state.py), phase 0. The start lattice has cells_per_side places
 per axis, numbered 1 .. n; a place is an energy volume when all three numbers are even
 (and inside 2 .. n - 1 unless the universe wraps), a block boxes_per_cell_side boxes
 across (owner, 2026-11-16: energy volumes start about 10 boxes across), the other
@@ -24,7 +24,8 @@ the weights adjusted round after round until every volume's plus boxes are its w
 size within 2 percent (at most 200 rounds; the carving below keeps it near 6 percent).
 Whole boxes cannot hit every size, so the correction then hands each volume the energy
 whose wanted size is the boxes it got (the total kept; each volume's energy moves by the
-few percent its box count missed), so every volume starts at rest. The mortar is carved out one box thick: a
+few percent its box count missed), so every volume starts at the size its energy wants.
+The mortar is carved out one box thick: a
 box that has among its 26 neighbours a box of a lower-numbered volume, or empty space or
 a wall, is a joint box. Its joint lies between its volume and that lower volume when the
 two are face neighbours on the lattice, else between its volume and the lattice face
@@ -40,9 +41,13 @@ there (whole quanta, largest remainders, at least 1 a box). Each joint gets the 
 whose wanted size is its box count, with the joints' constant fixed so that they hold
 box_quanta quanta per box on average (times exp(h) / mean(exp(h)) per joint, h normal
 with rms joint_unevenness from default_rng((seed + u, 1)), when joint_unevenness > 0),
-shared evenly over its boxes. So every cell starts at the size its energy wants: at
-rest. With universes > 1 the batch holds that many universes, universe u built from
-seed + u. Raises ValueError for cells_per_side < 3, k < 2, a negative margin, box_quanta
+shared evenly over its boxes. So every cell starts at the size its energy wants; the
+energy itself is not at rest: a volume's quanta follow the uneven field inside it, so
+its fluid, which has its own pressure (fluid_potential.py), starts flowing at once and
+presses its joints unevenly (wall_press.py; axiom 1, owner 2026-11-16: energy is always
+moving). Raises ValueError when boxes_per_cell_side ** 3 is below
+Settings().least_cell_boxes (a cell too small to hold a whirl). With universes > 1 the
+batch holds that many universes, universe u built from seed + u. Raises ValueError for cells_per_side < 3, k < 2, a negative margin, box_quanta
 < 1, a negative joint_unevenness and the uneven field's errors (filled side under 8).
 """
 from __future__ import annotations
@@ -133,12 +138,15 @@ def _carve(raw: wp.array3d(dtype=wp.int32), filled: int, wrap: int, partner: wp.
 def new_universe(cells_per_side: int = 16, boxes_per_cell_side: int = 10, seed: int = 1, unevenness: float = 0.3,
                  slope: float = -3.0, margin: int = 0, box_quanta: int = 1000, universes: int = 1,
                  device: str = "cuda", joint_unevenness: float = 0.0) -> State:
-    """Seeded energy volumes sized by their energy in a thin joint web, at rest."""
+    """Seeded energy volumes sized by their energy in a thin joint web, every cell at its wanted size."""
     if cells_per_side < 3 or boxes_per_cell_side < 2:
         raise ValueError(f"need at least 3 cells per side of at least 2 boxes, got {cells_per_side}, "
                          f"{boxes_per_cell_side}")
     if not joint_unevenness >= 0.0:
         raise ValueError(f"joint_unevenness must be >= 0, got {joint_unevenness}")
+    if boxes_per_cell_side ** 3 < Settings().least_cell_boxes:
+        raise ValueError(f"a cell needs at least {Settings().least_cell_boxes} boxes to hold a whirl, got "
+                         f"{boxes_per_cell_side} across ({boxes_per_cell_side ** 3} boxes)")
     if box_quanta < 1:
         raise ValueError(f"box_quanta must be at least 1, got {box_quanta}")
     margin = int(margin)

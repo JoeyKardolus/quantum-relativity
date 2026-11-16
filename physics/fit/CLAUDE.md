@@ -14,8 +14,8 @@ fitted on the fit set only, the expansion shape (slowing, then speeding up) and 
 - **Local clocks, no dark energy.** The expansion dip is timed by the mean local clock of the
   most packed energy volumes, not the step counter; searches before
   2026-11-16's change used the counter. No dark-energy or base-push setting is ever searched.
-- **Searched**: pull_strength, push, collapse_squeeze, crossing_rate (log), push_steepness,
-  seal fraction. **Fixed before a run**: ranges, score, run size and seeds. Change them only before a new
+- **Searched**: pull_strength, push, collapse_packing, crossing_rate (log), push_steepness,
+  seal_squeeze (linear). **Fixed before a run**: ranges, score, run size and seeds. Change them only before a new
   search, and say so in its write-up. The start's seed is not fitted; its two unevennesses
   (energy volumes, joints: `START_RANGES`, 0..0.9) are, by `fit_search` only. The stand-in
   and gradient fit keep the default start.

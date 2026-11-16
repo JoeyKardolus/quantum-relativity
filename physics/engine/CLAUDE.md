@@ -19,29 +19,30 @@ side; the detail ladder (`physics/ladder`) sits beside the boxes once attached.
 - **The cells are a graph** (`state.kind`, `state.between`): a joint knows its two
   volumes, a volume its joints. Collapse merges two volumes into one cell; a split
   touches only the too-big volume. Never read labels off the signs. A collapse keeps
-  minus every joint box that bridges two parts of the web; a split's joint pieces keep
-  the whole's squeeze (a piece with less energy wants more room).
+  minus every joint box bridging two parts of the web; a split's joint pieces keep the
+  whole's squeeze.
 - **No size at rest, no drift setting.** A cell wants (size_energy / quanta)**3 boxes
-  (`cell_laws`), the constant fixed once by `new_universe`'s correction. Volumes only
-  pull, joints only push, empty space does nothing.
-- **Joints swing, volumes follow.** `joint_swing` is a frictionless spring step
-  (implicit, discrete gradient) keeping swing energy and summed size exactly. A joint pressed to the collapse
-  limit in the swing collapses that step. Boxes follow sizes by relative room
-  (`exchange`, `mortar_shift`, `cell_room`), never sizes boxes; a box changes cell only
-  once emptied, every volume wrapped on all 26 sides.
+  (`cell_laws`), the constant fixed once by `new_universe`. Volumes only pull, joints
+  only push, empty space does nothing.
+- **Collapse only when too packed** (owner, 2026-11-16): a joint's minus quanta per box
+  past `collapse_packing`, never low energy. A tear's joint is born at its wanted size.
+- **The fluid has its own pressure** (`fluid_potential`, push * (n / cell mean - 1)):
+  whirl cores hold (healing 1 box). The volumes' fluid presses joints (`wall_press`), so
+  joints swing from the start. Cells start with at least `least_cell_boxes` (216).
+- **Joints swing, volumes follow.** `joint_swing`: frictionless, energy-keeping spring
+  step. Boxes follow sizes (`exchange`, `mortar_shift`, both by room order, joint
+  included); a box changes cell only once emptied, every volume wrapped on 26 sides.
 - **Deterministic.** Box moves are proposed, then committed against their phase's worst
   case (`settle_counts`): one seed, one run. No put-back on a racing atomic.
 - **Local clocks**: every per-cell rule runs at its cell's rate (`clock_rate`).
-- **Wrapping**: margin 0 wraps when the side is even, else walls (`open_margin.py`).
-- **Universes never touch** (`reach`). No dark energy, no base push.
+- **Wrapping**: margin 0 wraps on an even side. Universes never touch (`reach`).
 
 ## Measured (2026-11-16, RTX 5080, defaults, seed 1)
 
-Default universe (16 places of 10 boxes, wraps, 88^3, 512 volumes), 2000 steps at ~8.4
-steps/s: amount exact, 0 collapses, 0 splits, lumps 165 at step 200 and 173 at 2000
-(plain diffusion: 82 -> 4), joints' share of boxes 31% -> 41%, still rising. Strict xfail: axiom
-2 swing (joints start at rest at balance, nothing jolts them: median 2 reversals in 300
-steps) and the 500-step whirl (one loop reads -1 at step 500).
+Default universe (88^3, 512 volumes), 2000 steps: amount exact, 0 collapses, 0 splits,
+lumps 126 -> 131, joints' share of boxes 25% (start) -> 30%, slowing (41% before the
+mortar shift kept room order). Strict xfail: axiom 2 swing (1 of 1536 joints swings
+only twice in 300 steps). Minimum cell: 6 across (whirl scan, `settings.py`).
 
 ## Run
 

@@ -9,7 +9,7 @@ from physics.scenes.tests._gpu import needs_gpu
 @needs_gpu
 def test_observers_in_the_densest_lumps_keep_slower_local_time_than_the_counter():
     settings = Settings()
-    universe = new_universe(6, 4, seed=1)
+    universe = new_universe(6, 6, seed=1)
     samples, local = clocked_run(universe, settings, steps=6, every=2, measure=lambda sampled: None)
     picked = observer_cells(universe, 2, local)
     times = np.array([when for when, _ in samples])

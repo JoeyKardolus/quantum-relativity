@@ -1,6 +1,6 @@
 """Black hole scene: the sealed region's radius against the energy that fell together.
 
-Contract: `black_hole(cells_per_side=10, boxes_per_cell_side=4, energies=(250.0, 500.0,
+Contract: `black_hole(cells_per_side=10, boxes_per_cell_side=6, energies=(250.0, 500.0,
 1000.0, 2000.0), radius=6.0, steps=40, settings=None, device="cuda")` runs one start
 per energy: an even checkerboard holding a ball of that much extra energy at rest in
 its middle (blob_start.py, energies in units of 1000 quanta), falling in on itself by its
@@ -33,7 +33,7 @@ _KEYS = ("sealed", "sealed_boxes", "sealed_radius", "sealed_energy", "collapsed_
          "core_compression_min", "max_compression", "collapses")
 
 
-def black_hole(cells_per_side: int = 10, boxes_per_cell_side: int = 4,
+def black_hole(cells_per_side: int = 10, boxes_per_cell_side: int = 6,
                energies: tuple[float, ...] = (250.0, 500.0, 1000.0, 2000.0), radius: float = 6.0, steps: int = 40,
                settings: Settings | None = None, device: str = "cuda") -> dict:
     """Sealed region and fallen-together energy after each ball's fall, and how the radius scales."""

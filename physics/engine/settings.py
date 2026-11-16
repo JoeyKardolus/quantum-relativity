@@ -17,8 +17,13 @@ nothing.
   push             a joint's push per quantum when it holds the size its energy wants
   push_steepness   the push rises as (wanted size / size) ** push_steepness, a hard wall
   seal_squeeze     squeeze (wanted length / length - 1) at which a joint lets nothing cross
-  collapse_squeeze squeeze past which a joint collapses and its two volumes become one;
-                   larger than seal_squeeze, so a packed lump seals before it collapses
+  collapse_packing minus quanta per box past which a joint collapses and its two volumes
+                   become one (owner, 2026-11-16: a joint collapses only when its energy
+                   concentration gets too high, never because it is low on energy or
+                   smaller than its energy wants); default the start's 1000 quanta per
+                   box pressed into a 27th of the room (a side 3 times shorter), the
+                   limit the earlier collapse squeeze of 2 set for a joint at the start's
+                   packing
   crossing_rate    energy crosses a joint by diffusion bent by the pull (owner,
                    2026-11-16; cross.py): per unit of the joint's local time the quanta
                    moved from one volume to the other are crossing_rate * openness *
@@ -38,6 +43,13 @@ nothing.
   split_across     the size across, in boxes (cube root of its box count), at which an
                    energy volume tears in two and the tear becomes a new joint (bible
                    rule 8: the trigger is size); 0 switches splits off (comparisons only)
+  least_cell_boxes the fewest Planck boxes an energy volume may start with or keep after a tear
+                   (owner, 2026-11-16: a cell needs enough boxes to hold a proper whirl);
+                   measured, not fitted: the smallest cube in which a placed whirl (core
+                   tanh(r)^2, uneven energy, seeds 1 and 2) keeps its winding round every
+                   loop for 1000 steps with its core under half the cell's mean packing
+                   is 6 boxes across; at 5 across the whirl leaves the middle by step
+                   850-1000, at 4 its core never opens (up to 0.69 of the mean)
 """
 from __future__ import annotations
 
@@ -54,21 +66,24 @@ class Settings:
     push: float = 0.5
     push_steepness: float = 6.0
     seal_squeeze: float = 1.0
-    collapse_squeeze: float = 2.0
+    collapse_packing: float = 27000.0
     crossing_rate: float = 0.5 / 121.0
     joint_inertia: float = 1.0
     clock_packing: float = 10000.0
     max_turn: float = 0.25
     max_substeps: int = 64
     split_across: float = 20.0
+    least_cell_boxes: int = 216
 
     def __post_init__(self) -> None:
         if self.light_speed * self.step_time >= 3.0 ** -0.5:
             raise ValueError("light_speed * step_time must stay below 1 / sqrt(3)")
-        if not 0.0 < self.seal_squeeze < self.collapse_squeeze:
-            raise ValueError("the seal must come before the collapse: 0 < seal_squeeze < collapse_squeeze")
+        if not (self.seal_squeeze > 0.0 and self.collapse_packing > 0.0):
+            raise ValueError("seal_squeeze and collapse_packing must be > 0")
         if self.crossing_rate < 0.0 or self.joint_inertia <= 0.0:
             raise ValueError("crossing_rate must be >= 0 and joint_inertia > 0")
+        if self.least_cell_boxes < 1:
+            raise ValueError("least_cell_boxes must be at least 1")
         if self.split_across < 0.0:
             raise ValueError("split_across must be >= 0 (0: no splits)")
         if self.max_turn < 0.0 or not 1 <= self.max_substeps <= 1024:

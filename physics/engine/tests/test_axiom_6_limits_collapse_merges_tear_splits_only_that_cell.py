@@ -13,8 +13,9 @@ not turn), and the plus total changed by
 exactly the quanta collapse turned plus minus the quanta tears turned minus (plus and
 minus never cancel: no other rule changes the plus total). Staged trigger: the 8-volume
 even start of axiom 6 (new_universe(5, 10, seed=1, unevenness=0, margin=8)) with joint
-J between volumes (2, 2, 2) and (4, 2, 2) left with 100 quanta per box, so it wants a
-thousand times its room and is squeezed past the collapse limit; one full step():
+J between volumes (2, 2, 2) and (4, 2, 2) packed with 30000 quanta per box, past
+Settings().collapse_packing (27000; owner, 2026-11-16: a joint collapses only when its
+energy concentration gets too high); one full step():
 every box that turned minus to plus is marked as collapse, none turned plus to minus
 and nothing tore, and the plus gain equals the collapsed quanta, the amount exact. A box
 that changed cell in the same step (emptied and refilled by its new cell, owner-change
@@ -38,10 +39,12 @@ that changed sign is collapse marked (bit 1), tear marked (bit 8) or changed cel
 empty box or a wall among its 26 neighbours (every volume stays wrapped). Boxes did
 change cell.
 
-Part 3 (was axiom 10). A joint is squeezed when smaller than its energy wants; push rises steeply; past the limit it collapses into ONE cell at once.
+Part 3 (was axiom 10). A joint is squeezed when smaller than its energy wants; push rises steeply; packed past the limit it collapses into ONE cell at once, and never for being low on energy.
 
 Audit answers (owner, 2026-11-16): a joint is squeezed when it is smaller than its energy
-wants; when a joint collapses, its two volumes become one cell at once. Bible rule 8:
+wants; a joint collapses only when its energy concentration gets too high, never
+because it is low on energy or smaller than its energy wants; when a joint collapses,
+its two volumes become one cell at once. Bible rule 8:
 push rises steeply, like a hard wall. Staged on new_universe(5, 10, seed=1,
 unevenness=0, margin=8) (8 energy volumes, every box 1000, at rest), joint J at lattice
 (3, 2, 2) between energy volumes (2, 2, 2) and (4, 2, 2), Settings():
@@ -50,10 +53,13 @@ unevenness=0, margin=8) (8 energy volumes, every box 1000, at rest), joint J at 
      state.size_energy[0, 1]); the engine's own cell push (axiom_pressure.py) rises with
      that ratio at least as its cube at every step up
      (steeper than a gas pressed at fixed temperature, which rises as the ratio)
-  2. collapse: J left with 100 quanta per box (a tenth of the start's), so it wants a
-     side 10 times longer than it has, a thousand times its room: squeezed far past any
-     limit. Within 30 steps J collapses, and at the step it does the lattice holds 7
-     energy volumes (its two became one cell) and J holds no minus quanta
+  2. collapse: J packed with 30000 quanta per box, past collapse_packing (27000).
+     Within 30 steps J collapses, and at the step it does the lattice holds 7 energy
+     volumes (its two became one cell) and J holds no minus quanta
+  3. the trigger: J left with 100 quanta per box (a tenth of the start's), so it wants a
+     side 10 times longer than it has, a thousand times its room (squeezed far past the
+     squeeze of 2 that collapsed a joint until 2026-11-16): collapse() takes nothing;
+     packed with 30000 per box it takes J, one collapse
 
 Part 4 (was axiom 11). A too-big volume tears; only that volume splits, its middle plus quanta turn minus into the new joint, ABAB holds after.
 
@@ -65,10 +71,13 @@ plus the splits minus the collapses so far (each split adds exactly one volume; 
 run is printed with its split count). Staged trigger, Settings() (split_across unchanged):
 new_universe(5, 10, seed=1, unevenness=0, margin=10), 8 energy volumes, with energy
 volume V (lattice 2, 2, 2) left with 100 quanta per box, so it wants a side 10 times
-longer and grows. Up to 300 steps until the first split; at that step:
-  - the cell graph holds exactly one more energy volume (only V split)
-  - no box that belonged to any cell but V before the step got the split mark (its
-    neighbours unchanged)
+longer and grows, and energy leaves the volumes round it, so they want more room too. Up
+to 300 steps until the first split; at that step:
+  - the cell graph holds exactly one more energy volume (one volume split)
+  - every box that got the split mark belonged before the step to one energy volume, the
+    one with the most boxes, at least split_across ** 3 of them (only the too-big volume
+    tears, its neighbours unchanged; since 2026-11-16 the first to tear here is volume
+    (4, 2, 4), which loses energy toward V, not V itself)
   - the minus total rose by exactly the quanta the tear turned minus, and that is more
     than 0 (the tear's plus quanta became the new joint, amount kept)
   - ABAB: 0 touching box pairs of two volumes, 0 volume boxes beside empty space, the
@@ -76,8 +85,9 @@ longer and grows. Up to 300 steps until the first split; at that step:
   - the steps after (bug found 2026-11-16: the step after the split collapsed joint
     pieces and broke the web into 203 pieces, 28 plus boxes beside empty space): from
     the split on, 15 steps, the joints stay one web, no two volumes touch and no volume
-    box is beside empty space, with at least one collapse among them (the collapse
-    keeps every joint box that bridges two parts of the web minus, collapse.py)
+    box is beside empty space, and no joint collapses (owner, 2026-11-16: a fresh joint
+    from a tear holds the least energy it will ever have and must not collapse straight
+    back; until then the tear merged back 3 times in 15 steps)
 
 Part 5 (was test_the_default_start_has_no_collapse_in_its_first_20_steps). The default start holds no joint past the seal, and no joint collapses in its first 20 steps.
 
@@ -89,7 +99,8 @@ the default settings collapse no joint.
 """
 import numpy as np
 
-from physics.engine import Settings, State, cells, group_label, host_boxes, near, new_universe, stats, step, totals
+from physics.engine import (Settings, State, cell_count, cell_laws, cells, collapse, group_label, host_boxes, near,
+                            new_universe, stats, step, totals)
 from physics.engine.tests._gpu import needs_gpu
 from physics.engine.tests.axiom_pressure import axiom_pressure
 from physics.engine.tests.axiom_contacts import axiom_contacts
@@ -120,7 +131,7 @@ def test_every_sign_change_in_the_default_run_is_a_collapse_or_a_tear():
 def test_a_staged_collapse_is_the_only_minus_to_plus_and_keeps_the_amount():
     boxes = host_boxes(new_universe(5, 10, seed=1, unevenness=0.0, margin=8))
     quanta = boxes["quanta"].copy()
-    quanta[boxes["owner"] == J_P1] = -100
+    quanta[boxes["owner"] == J_P1] = -30000
     graph = {name: boxes[name] for name in ("owner", "kind", "between", "place", "size", "size_energy")}
     state = State.from_host(quanta, np.zeros(quanta.shape), seed=1, lattice=graph)
     before = totals(state)
@@ -197,9 +208,9 @@ def test_a_joint_smaller_than_its_energy_wants_pushes_steeply():
 
 
 @needs_gpu
-def test_a_joint_squeezed_past_the_limit_collapses_and_its_two_volumes_become_one_cell():
+def test_a_joint_packed_past_the_limit_collapses_and_its_two_volumes_become_one_cell():
     settings = Settings()
-    state = _start(100)
+    state = _start(30000)
     first, volumes_then, minus_left = None, None, None
     for count in range(1, 31):
         step(state, settings)
@@ -209,11 +220,27 @@ def test_a_joint_squeezed_past_the_limit_collapses_and_its_two_volumes_become_on
             volumes_then = found["volumes"]
             minus_left = int(-host_boxes(state)["quanta"][host_boxes(state)["owner"] == J_P3].clip(max=0).sum())
     measured = stats(state, settings)
-    print(f"J_P3 at 100 per box: first collapse at step {first}; energy volumes then {volumes_then}; J_P3's minus quanta "
+    print(f"J_P3 at 30000 per box: first collapse at step {first}; energy volumes then {volumes_then}; J_P3's minus quanta "
           f"then {minus_left}; after 30 steps collapses {measured['collapses']}, energy volumes {measured['cells']}, "
           f"squeeze by packing max {measured['squeeze_max']:.3f}")
     assert first is not None
     assert volumes_then == 7 and minus_left == 0
+
+
+@needs_gpu
+def test_a_joint_low_on_energy_is_never_collapsed_only_one_packed_too_high():
+    settings = Settings()
+    taken = {}
+    for packing in (100, 30000):
+        state = _start(packing)
+        cell_count(state)
+        squeeze = cell_laws(state, settings)[0, J_P3]
+        taken[packing] = (collapse(state, settings), float(squeeze), int(state.kind[0, J_P3]))
+    print("J_P3 per box: (collapses, squeeze before, kind after) " + "; ".join(
+        f"{packing}: {value}" for packing, value in taken.items()))
+    assert taken[100][1] > 2.0
+    assert taken[100][0] == 0 and taken[100][2] == -1
+    assert taken[30000][0] == 1 and taken[30000][2] == 0
 
 
 V = (2 * 7 + 2) * 7 + 2
@@ -242,6 +269,7 @@ def test_only_the_too_big_volume_splits_and_its_tear_becomes_the_joint():
     split_at, across = None, []
     for count in range(1, 301):
         before_owner = host_boxes(state)["owner"]
+        cells_kind_before = state.kind[0].copy()
         before_volumes = int((state.kind[0] == 1).sum())
         before = totals(state)
         torn_before = int(state.torn[0])
@@ -257,15 +285,21 @@ def test_only_the_too_big_volume_splits_and_its_tear_becomes_the_joint():
     after = totals(state)
     volumes_after = int((state.kind[0] == 1).sum())
     marks = state.marks.numpy()
-    others_marked = int((((marks & 8) == 8) & (before_owner != V)).sum())
+    torn_cells = np.unique(before_owner[(marks & 8) == 8])
+    torn_cell = int(torn_cells[0]) if torn_cells.size == 1 else -1
+    held = np.bincount(before_owner[before_owner >= 0].ravel(), minlength=state.kind.shape[1])
+    volume_kinds = cells_kind_before
+    biggest = int(np.argmax(np.where(volume_kinds == 1, held[:volume_kinds.size], -1)))
+    others_marked = int((((marks & 8) == 8) & (before_owner != torn_cell)).sum())
     torn = int(state.torn[0]) - torn_before
     touching, opened = axiom_contacts(state)
     web = stats(state, settings)["web_pieces"]
-    print(f"split at step {split_at}; energy volumes {before_volumes} -> {volumes_after}; split-marked boxes that "
+    print(f"split at step {split_at}; energy volumes {before_volumes} -> {volumes_after}; torn cells {torn_cells}, "
+          f"biggest volume before {biggest} with {held[biggest]} boxes; split-marked boxes that "
           f"belonged to other cells {others_marked}; tear {torn} quanta, minus rose {after['minus'] - before['minus']}; "
           f"touching {touching}, open {opened}, web pieces {web}")
     assert volumes_after == before_volumes + 1
-    assert others_marked == 0
+    assert torn_cell == biggest and held[biggest] >= settings.split_across ** 3 and others_marked == 0
     assert torn > 0 and after["minus"] - before["minus"] == torn
     assert touching == 0 and opened == 0 and web == 1
 
@@ -285,7 +319,7 @@ def test_no_joint_starts_sealed_and_none_collapses_in_20_steps():
 
 
 @needs_gpu
-def test_collapses_right_after_a_tear_keep_one_web_and_every_volume_wrapped():
+def test_a_tear_keeps_one_web_every_volume_wrapped_and_no_joint_collapses_after_it():
     settings = Settings()
     boxes = host_boxes(new_universe(5, 10, seed=1, unevenness=0.0, margin=10))
     quanta = boxes["quanta"].copy()
@@ -293,15 +327,18 @@ def test_collapses_right_after_a_tear_keep_one_web_and_every_volume_wrapped():
     graph = {name: boxes[name] for name in ("owner", "kind", "between", "place", "size", "size_energy")}
     state = State.from_host(quanta, np.zeros(quanta.shape, dtype=np.float32), seed=1, lattice=graph)
     rows = []
+    before_split = 0
     for count in range(1, 301):
+        if state.splits[0] == 0:
+            before_split = int(state.collapses[0])
         step(state, settings)
         if state.splits[0] > 0:
             touching, opened = axiom_contacts(state)
             rows.append((count, int(state.collapses[0]), stats(state, settings)["web_pieces"], touching, opened))
             if len(rows) == 15:
                 break
-    print("after the first split (step, collapses so far, web pieces, touching, open): " + "; ".join(
-        " ".join(str(value) for value in row) for row in rows))
+    print(f"collapses before the split {before_split}; after the first split (step, collapses so far, web pieces, "
+          "touching, open): " + "; ".join(" ".join(str(value) for value in row) for row in rows))
     assert len(rows) == 15
-    assert rows[-1][1] > 0
+    assert rows[-1][1] == before_split
     assert all(row[2] == 1 and row[3] == 0 and row[4] == 0 for row in rows)

@@ -4,8 +4,7 @@ Contract: `stand_in_score(start, units, steps, every, block=10, device="cuda")` 
 (score, parts), two Warp arrays on `device`: score (U,) and parts (U, 5) = E, dip, Sc, St,
 ln(R_last / R_first) per universe. `start` is one universe's signed whole quanta (a cube,
 numpy, as physics.engine.host_boxes gives it); `units` is a float32 Warp array (U, 6),
-one point of the fit's unit cube per universe (physics.fit.fit_search NAMES and ranges;
-seal_squeeze = collapse_squeeze * seal_fraction). The U universes run side by side, each
+one point of the fit's unit cube per universe (physics.fit.fit_search NAMES and ranges). The U universes run side by side, each
 with its own settings, from the same start. Called inside a `wp.Tape`, the tape holds the
 whole run and `tape.backward(grads={score: ones})` gives d score / d units in units.grad.
 
@@ -24,8 +23,9 @@ the engine, which moves no quanta across a plus-minus face, moves plus quanta fr
 volume to volume across their joint, down the pull and by diffusion (physics.engine.cross) and sizes cells by their
 energy, so quanta change sign only in collapse and a tear. What it leaves out, because
 none of it has a gradient: the rounding to whole quanta, the moving cells (space does not
-grow: every box keeps its kind) and the collapse (collapse_squeeze still acts through
-the seal). Empty boxes and the grid's walls hold pull 0 and pass nothing, as in the
+grow: every box keeps its kind), the collapse (collapse_packing is read but acts on
+nothing here), the fluid's own pressure (fluid_potential.py) and the volumes pressing
+the joints (wall_press.py). Empty boxes and the grid's walls hold pull 0 and pass nothing, as in the
 engine. Each array a pass writes is new, so the tape can run the run backwards. The
 potentials, openness, clock rates and pull source read each pass's |psi|^2 from a copy
 the tape does not record: the forward run is unchanged, but the gradient leaves out a
@@ -72,7 +72,7 @@ def _values(units: wp.array2d(dtype=wp.float32), low: wp.array(dtype=wp.float32)
 @wp.kernel
 def _seal(values: wp.array2d(dtype=wp.float32), seal: wp.array(dtype=wp.float32)):
     universe = wp.tid()
-    seal[universe] = values[universe, 2] * values[universe, 5]
+    seal[universe] = values[universe, 5]
 
 
 @wp.func
@@ -371,7 +371,7 @@ def stand_in_score(start: np.ndarray, units: wp.array, steps: int, every: int, b
 
 
 def _settings(units: wp.array, universes: int, device: str) -> tuple:
-    """Each universe's searched settings (pull_strength, push, collapse, crossing_rate, steepness, seal fraction) and seal."""
+    """Each universe's searched settings (pull_strength, push, collapse_packing, crossing_rate, steepness, seal) and seal."""
     ranges = [LOG_RANGES.get(name) or LINEAR_RANGES[name] for name in NAMES]
     low = wp.array([lower for lower, _ in ranges], dtype=wp.float32, device=device)
     high = wp.array([upper for _, upper in ranges], dtype=wp.float32, device=device)
