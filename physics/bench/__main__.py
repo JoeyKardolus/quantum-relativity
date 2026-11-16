@@ -3,15 +3,15 @@
   python -m physics.bench throughput diffusion [--side 32] [--counts 1 8 32 64] [--steps 50]
   python -m physics.bench throughput engine    [--counts 1 8 32 64] [--steps 20]
   python -m physics.bench size diffusion       (sides 32..1280 in steps of 32)
-  python -m physics.bench size engine          (cells a side 3..63, 10 boxes a cell side)
+  python -m physics.bench size engine          (lattice places a side 3..199, 10 boxes a volume side)
   python -m physics.bench size engine --ladder (the same with the detail ladder attached)
 
 Prints one JSON line per result. `diffusion` runs a whole QuantaBatch per step call;
 `engine` is physics.engine, all rules on: its throughput batches `count` universes side
 by side in one State (3 cells a side of 10 boxes with a 1-box margin, a 32**3 grid each,
 seed 1 + universe index) and steps them with one step call; its size search uses
-new_universe's default margin (the filled cube's width) and reports energy volumes
-beside boxes. A size probe raises MemoryError before building when its boxes would take
+new_universe's default margin 0 (a universe that wraps round when its side is even, else
+one with walls) and reports energy volumes beside boxes. A size probe raises MemoryError before building when its boxes would take
 more than the GPU's free memory at 33 bytes a box (the engine's arrays: 29 kept, among
 them the cell owner and target, and collapse's 4 a step), so no probe
 spills into WSL's shared system memory. The cell engine (physics.potts) this replaced
@@ -56,8 +56,8 @@ def _diffusion_build(side: int):
 def _engine_build(cells_per_side: int, ladder: bool = False, ladder_bytes: list | None = None):
     import warp as wp
     from physics.engine import Settings, attach_ladder, new_universe, step
-    filled = cells_per_side * 10
-    side = -(-(3 * filled) // 8) * 8
+    wrap = cells_per_side % 2 == 0 and (cells_per_side // 2 * 11) % 2 == 0
+    side = cells_per_side // 2 * 11 if wrap else (cells_per_side - 1) // 2 * 11 + 1
     per_box = _LADDER_BYTES_PER_BOX if ladder else _ENGINE_BYTES_PER_BOX
     if side ** 3 * per_box > wp.get_device("cuda:0").free_memory:
         raise MemoryError(f"{side ** 3} boxes do not fit in the GPU's free memory")
@@ -98,9 +98,10 @@ def main() -> None:
     else:
         ladder_bytes: list = []
         result = largest_universe(lambda size: _engine_build(size, arguments.ladder, ladder_bytes),
-                                  list(range(3, 64)))
+                                  list(range(3, 200)))
         for probe in result["probes"]:
-            probe["energy_volumes"] = ((probe["size"] - 1) // 2) ** 3
+            wraps = probe["size"] % 4 == 0
+            probe["energy_volumes"] = (probe["size"] // 2 if wraps else (probe["size"] - 1) // 2) ** 3
             measured = [entry for entry in ladder_bytes if entry["size"] == probe["size"]]
             if measured:
                 probe["ladder"] = measured[-1]

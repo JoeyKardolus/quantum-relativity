@@ -3,7 +3,8 @@
 Contract: `blob_start(cells_per_side, boxes_per_cell_side, blobs, device="cuda")` returns
 a physics.engine State at rest except for the blobs: new_universe(cells_per_side,
 boxes_per_cell_side, seed=1, unevenness=0) (every box holds BOX_QUANTA, 1000 quanta:
-+ in an energy volume's box, - in a joint's, inside an empty margin), plus each blob.
++ in an energy volume's box, - in a joint's, inside an empty margin as wide as the
+filled cube, open_margin.py), plus each blob.
 A blob is a dict with `offset` (3 floats, box units, from the grid's middle (side - 1)
 / 2; box i's centre at i), `radius` (boxes; an occupied box is in the ball when its
 centre is within it), `energy` (the blob's extra energy in units of BOX_QUANTA, spread
@@ -25,6 +26,7 @@ from __future__ import annotations
 import numpy as np
 
 from physics.engine import State, host_boxes, lattice_of, new_universe
+from physics.scenes.open_margin import open_margin
 
 BOX_QUANTA = 1000
 
@@ -32,7 +34,7 @@ BOX_QUANTA = 1000
 def blob_start(cells_per_side: int, boxes_per_cell_side: int, blobs: list[dict], device: str = "cuda") -> State:
     """An even foam of whole quanta holding balls of extra quanta, each moving at its own velocity."""
     even = new_universe(cells_per_side, boxes_per_cell_side, seed=1, unevenness=0.0, box_quanta=BOX_QUANTA,
-                        device=device)
+                        margin=open_margin(cells_per_side, boxes_per_cell_side), device=device)
     quanta = host_boxes(even)["quanta"].astype(np.int64)
     side = even.side
     places = np.stack(np.meshgrid(*[np.arange(side, dtype=np.float64)] * 3, indexing="ij"), axis=-1)

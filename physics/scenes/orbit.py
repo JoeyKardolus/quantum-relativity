@@ -1,12 +1,13 @@
 """Orbit scene: a small blob given sideways speed past a big one, inside the foam; radius, period, Kepler.
 
-Contract: `orbit(cells_per_side=11, boxes_per_cell_side=4, distances=(8.0, 16.0),
+Contract: `orbit(cells_per_side=19, boxes_per_cell_side=4, distances=(10.0, 20.0),
 big_energy=2000.0, big_radius=3.0, small_energy=20.0, small_radius=1.5, steps=120,
 settings=None, device="cuda")` runs one start per distance (blob_start.py): an even
 start of wrapped cells, a big ball of extra energy big_energy in the middle, a small
-ball small_energy at that distance along x (energy volumes sit at all-odd cell places,
-so the middle cell is one when cells_per_side is 3, 7, 11, ... and the balls land on
-energy volumes when the distances are whole multiples of two cell sides), moving along y at the Newtonian circular
+ball small_energy at that distance along x (energy volumes sit at all-even lattice places,
+boxes_per_cell_side + 1 boxes apart, so the middle place is a volume when
+(cells_per_side - 1) / 2 is odd, 7, 11, 15, 19, ..., and the balls land on energy
+volumes when the distances are whole multiples of boxes_per_cell_side + 1), moving along y at the Newtonian circular
 speed sqrt(G (M + m) / distance) for G = settings.pull_strength and the two balls' extra
 quanta M, m (energies in units of blob_start's BOX_QUANTA, 1000 quanta), the big ball moving the other way so the pair's momentum is 0. Empty
 space holds no boxes, so the blobs move through the foam (bible: the space between
@@ -53,7 +54,7 @@ from physics.scenes.sampled_run import sampled_run
 TRACK_MARGIN = 3.0
 
 
-def orbit(cells_per_side: int = 11, boxes_per_cell_side: int = 4, distances: tuple[float, ...] = (8.0, 16.0),
+def orbit(cells_per_side: int = 19, boxes_per_cell_side: int = 4, distances: tuple[float, ...] = (10.0, 20.0),
           big_energy: float = 2000.0,
           big_radius: float = 3.0, small_energy: float = 20.0, small_radius: float = 1.5, steps: int = 120,
           settings: Settings | None = None, device: str = "cuda") -> dict:

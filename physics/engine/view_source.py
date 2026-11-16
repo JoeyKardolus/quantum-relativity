@@ -7,7 +7,7 @@ device, one entry per occupied box of that universe (n of them), in its own box 
   density    float32 (n,), the box's whole quanta ignoring sign (a box has volume 1)
   kind       int32 (n,), 0 for a plus box (energy volume, red), 1 for a minus box (joint, blue)
   border     int32 (n,), 1 when a face neighbour holds the other sign, is empty, or is
-             the wall (the boxes that draw the cells' walls), else 0
+             the wall (a universe that wraps has none) (the boxes that draw the cells' walls), else 0
 Boxes come in index order ((x * side + y) * side + z), compacted by a prefix sum on the
 GPU; only the count is copied to the host. The simulation as it is: nothing is placed,
 smoothed or corrected for the drawing. Raises ValueError for a universe the batch lacks.
@@ -17,7 +17,7 @@ from __future__ import annotations
 import warp as wp
 
 from physics.engine.face_step import face_step
-from physics.engine.inside import inside
+from physics.engine.reach import reach
 from physics.engine.state import State
 
 
@@ -28,7 +28,7 @@ def _mark(quanta: wp.array3d(dtype=wp.int32), low: int, flags: wp.array3d(dtype=
 
 
 @wp.kernel
-def _gather(quanta: wp.array3d(dtype=wp.int32), side: int, home: int, flags: wp.array3d(dtype=wp.int32),
+def _gather(quanta: wp.array3d(dtype=wp.int32), side: int, wrap: int, home: int, flags: wp.array3d(dtype=wp.int32),
             places: wp.array3d(dtype=wp.int32), positions: wp.array(dtype=wp.vec3),
             density: wp.array(dtype=wp.float32), kind: wp.array(dtype=wp.int32), border: wp.array(dtype=wp.int32)):
     ti, tj, tk = wp.tid()
@@ -42,8 +42,8 @@ def _gather(quanta: wp.array3d(dtype=wp.int32), side: int, home: int, flags: wp.
     kind[slot] = wp.where(held > 0, 0, 1)
     edge = int(0)
     for face in range(6):
-        there = here + face_step(face)
-        if not inside(there, home, side):
+        there, valid = reach(here, face_step(face), home, side, wrap)
+        if not valid:
             edge = 1
         elif quanta[there[0], there[1], there[2]] * held <= 0:
             edge = 1
@@ -67,6 +67,6 @@ def view_source(state: State, universe: int = 0) -> dict:
              "border": wp.zeros(count, dtype=wp.int32, device=device)}
     if count:
         wp.launch(_gather, dim=shape, device=device,
-                  inputs=[state.quanta, state.side, universe, flags, places, found["positions"], found["density"],
+                  inputs=[state.quanta, state.side, int(state.wrap), universe, flags, places, found["positions"], found["density"],
                           found["kind"], found["border"]])
     return found

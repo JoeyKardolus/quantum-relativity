@@ -36,7 +36,7 @@ moving runs. Its known value is where the start's momentum carries it: the start
 lattice momentum P = sum over box faces between two boxes of one sign of Im(conj psi_a
 psi_b) along the face (the flow the hops make at openness 1), over the total quanta,
 times the time; hops pass nothing across a plus-minus face, and the leak across a
-joint (physics.engine.leak) turns or stops some of it with friction, which is
+joint (physics.engine.cross) turns or stops some of it with friction, which is
 what "carried" shows.
 Returns a dict (no verdict; same in every direction means the ratios are 1 and the
 differences 0):

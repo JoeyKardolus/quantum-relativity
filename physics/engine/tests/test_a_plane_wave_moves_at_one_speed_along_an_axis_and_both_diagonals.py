@@ -5,13 +5,16 @@ fluid still carries a packet at one speed whichever way it points. Plain fluid f
 40-box cube (all plus: no joints, no empty boxes, no pull). A Gaussian packet (width 4
 boxes, 100000 quanta at its peak, at least 1 quantum everywhere) gets a phase rising
 0.3 per box along x, along the face diagonal (1, 1, 0) / sqrt 2 and along the body
-diagonal (1, 1, 1) / sqrt 3. Settings chosen before the run: volume stiffness 1e-6 (a
+diagonal (1, 1, 1) / sqrt 3. Settings chosen before the run: (an energy volume has no push of its own since
+2026-11-16, so the fluid is free; before, volume stiffness 1e-6 made it near free; a
 linear wave, whose known speed is the lattice group velocity, sum over axes of
 u_i sin(0.3 u_i) for direction u) and local clocks off (clock_packing 0; on, the packed
 peak would run slower than its tail, a separate rule). After 48 steps (12 time units) the
 packet's quanta centre has moved that far along its direction within 5%, the three
 speeds agree within 5%, it drifts sideways less than 0.05 boxes, and the amount of
 quanta is identical.
+Splits are off (split_across 0): one plus cube this big is one energy volume past the
+split size, and this test watches the fluid alone.
 """
 import numpy as np
 
@@ -49,7 +52,7 @@ def _run(unit: np.ndarray, settings: Settings) -> tuple:
 
 @needs_gpu
 def test_a_packet_goes_as_fast_along_an_axis_as_along_either_diagonal():
-    settings = Settings(pull_strength=0.0, volume_stiffness=1e-6, clock_packing=0.0)
+    settings = Settings(pull_strength=0.0, clock_packing=0.0, split_across=0.0)
     speeds = {}
     for name, direction in DIRECTIONS.items():
         unit = np.asarray(direction) / np.linalg.norm(direction)

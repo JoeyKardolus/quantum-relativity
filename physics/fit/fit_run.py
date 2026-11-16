@@ -1,7 +1,8 @@
 """fit_run: one fit-set universe, stepped and scored on expansion shape and structure.
 
 Contract: fit_run(overrides, seed, cells, boxes, steps, every, observers=3) -> dict. Builds
-physics.engine new_universe(cells, boxes, seed, unevenness, joint_unevenness), the two
+physics.engine new_universe(cells, boxes, seed, unevenness, joint_unevenness) in an empty margin as
+wide as the filled cube (physics.scenes.open_margin), the two
 start unevennesses taken from overrides when there (new_universe's defaults otherwise), and
 steps it with Settings(**the other overrides)
 keeping every energy volume's elapsed local time (physics.scenes.clocked_run) and samples every `every` steps. The
@@ -28,7 +29,7 @@ import time
 import numpy as np
 
 from physics.engine import Settings, host_boxes, new_universe, stats
-from physics.scenes import box_energies, clocked_run, growth_rates, observer_cells, power_spectrum
+from physics.scenes import box_energies, clocked_run, growth_rates, observer_cells, open_margin, power_spectrum
 
 
 def _central_density(universe, lower, upper):
@@ -83,7 +84,7 @@ def fit_run(overrides, seed, cells, boxes, steps, every, observers=3):
     started = time.time()
     settings = Settings(**{name: value for name, value in overrides.items() if name not in _START_KEYS})
     start = {name: value for name, value in overrides.items() if name in _START_KEYS}
-    universe = new_universe(cells, boxes, seed, **start)
+    universe = new_universe(cells, boxes, seed, margin=open_margin(cells, boxes), **start)
     occupied = host_boxes(universe)["quanta"] != 0
     occupied_axis = np.nonzero(occupied.any(axis=(1, 2)))[0]
     lower, upper = int(occupied_axis.min()), int(occupied_axis.max()) + 1

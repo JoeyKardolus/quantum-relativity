@@ -51,6 +51,7 @@ from dataclasses import asdict
 import numpy as np
 
 from physics.engine import Settings, State, cells, host_boxes, new_universe, stats
+from physics.scenes.open_margin import open_margin
 from physics.scenes.box_energies import box_energies
 from physics.scenes.clocked_run import clocked_run
 from physics.scenes.deceleration import deceleration
@@ -65,6 +66,7 @@ def timescape(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int 
     """Growth of space timed by the step counter and by clocks in the densest lumps, with both q's."""
     settings = settings or Settings()
     universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device,
+                            margin=open_margin(cells_per_side, boxes_per_cell_side),
                             joint_unevenness=joint_unevenness)
     samples, local = clocked_run(universe, settings, steps, every, lambda sampled: _measure(sampled, settings))
     final = stats(universe, settings)

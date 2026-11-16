@@ -27,7 +27,7 @@ def main() -> None:
     parser.add_argument("--slope", type=float, default=-3.0,
                         help="spectral slope of the start's ripples, P(k) = k**slope (-3: every size alike)")
     parser.add_argument("--set", action="append", default=[], metavar="name=value",
-                        help="override one rule setting, e.g. --set friction=2")
+                        help="override one rule setting, e.g. --set crossing_rate=0.01")
     parser.add_argument("--steps-per-frame", type=int, default=1)
     arguments = parser.parse_args()
     overrides = {}

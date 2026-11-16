@@ -2,13 +2,14 @@
 
 Contract: `sealed_region(universe, settings)` reads universe 0 of a physics.engine State
 (physics.engine cells) and takes the core: the energy volume with the most whole quanta
-per box. Its joint is the joint boxes on its faces (the engine keeps no joint labels, so
-"its joints" are the minus boxes it touches across a face). It is sealed when it has
-such boxes and every one is squeezed to settings.seal_squeeze or past it (squeeze =
-|quanta| / joint_rest - 1: nothing crosses out, as stats counts sealed lumps). Returns
+per box. Its joints are the cells of the cell graph that lie between it and another
+volume or empty space (cells(...)["between"]). It is sealed when it has joints and every
+one is squeezed to settings.seal_squeeze or past it (squeeze = (wanted / size) ** (1/3)
+- 1, wanted = (size_energy[1] / quanta) ** 3, as stats counts sealed lumps: nothing
+crosses out). Returns
 a dict of floats:
   sealed             1.0 when the core is sealed, else 0.0
-  sealed_boxes       boxes of the core and its joint boxes when sealed, else 0
+  sealed_boxes       boxes of the core and its joints when sealed, else 0
   sealed_radius      radius of a ball of that many boxes, (3 * boxes / (4 pi))**(1/3)
   sealed_energy      whole quanta in those boxes when sealed, else 0
   collapsed_energy   the core's whole quanta (what fell together into it)
@@ -16,7 +17,7 @@ a dict of floats:
   core_labels        how many start energy volumes' boxes it holds (start_volumes: the
                      plus groups of the start, labelled the same way; 1 until joints
                      collapsed between volumes; 0 without a start given)
-  core_compression_min   the least squeezed of its joint boxes' squeeze (0 with none)
+  core_compression_min   the least squeezed of its joints' squeeze (0 with none)
 `sealed_region(universe, settings, start_volumes=None)`: start_volumes is the start's
 owner array (cells(...)["owner"] at the start) used for core_labels.
 The boxes are fixed Planck boxes; a box count is a volume of space here.
@@ -26,7 +27,6 @@ from __future__ import annotations
 import math
 
 import numpy as np
-from scipy import ndimage
 
 from physics.engine import Settings, State, cells, host_boxes
 
@@ -43,9 +43,11 @@ def sealed_region(universe: State, settings: Settings, start_volumes: np.ndarray
     packing = found["quanta"][:count] / np.maximum(found["boxes"][:count], 1)
     core = int(np.argmax(packing))
     core_boxes = found["owner"] == core
-    around = ndimage.binary_dilation(core_boxes) & (quanta < 0)
-    squeezed = np.abs(quanta[around]) / settings.joint_rest - 1.0
-    sealed = bool(around.any()) and bool(np.all(squeezed >= settings.seal_squeeze))
+    joints = np.flatnonzero((found["between"] == core).any(axis=1))
+    wanted = (float(boxes["size_energy"][1]) / np.maximum(found["quanta"][joints], 1).astype(np.float64)) ** 3
+    squeezed = np.cbrt(wanted / np.maximum(found["size"][joints], 1e-6)) - 1.0
+    sealed = bool(joints.size) and bool(np.all(squeezed >= settings.seal_squeeze))
+    around = np.isin(found["owner"], joints)
     region = core_boxes | around
     region_boxes = float(region.sum()) if sealed else 0.0
     labels = 0.0

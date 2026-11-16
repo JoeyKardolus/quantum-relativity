@@ -5,11 +5,14 @@ phase turns, so the winding round a closed loop of boxes (phase steps wrapped to
 (-pi, pi], summed, over 2 pi) is a whole number. Plain fluid: a 40-box cube all plus (one
 energy volume, no joints, no empty boxes, no pull: pull_strength 0), +1000 quanta per box
 dipping as tanh(r / healing)**2 (at least 1 quantum) towards a whirl line along z
-through the middle, phase the angle round that line; healing 1 / sqrt(2 g n) from the
-default volume stiffness. `step` runs 500 steps with every other rule at its default
+through the middle, phase the angle round that line; healing 1 box (the core width the
+old default volume stiffness gave; an energy volume now has no push of its own, so the
+fluid is free and the core width is only the start's shape). `step` runs 500 steps with every other rule at its default
 (local clocks on). Every 50 steps the winding round squares of half width 3, 5 and 7
 boxes round the line, in every z plane 8..31, is exactly 1, round a square beside the
 line exactly 0, and the amount of quanta is identical.
+Splits are off (split_across 0): one plus cube this big is one energy volume past the
+split size, and this test watches the fluid alone.
 """
 import numpy as np
 
@@ -31,10 +34,10 @@ def _winding(field: np.ndarray, plane: int, low: tuple, high: tuple) -> float:
 
 @needs_gpu
 def test_a_whirl_keeps_one_whole_turn_and_the_amount_holds():
-    settings = Settings(pull_strength=0.0)
+    settings = Settings(pull_strength=0.0, split_across=0.0)
     axis = np.arange(SIDE) - CENTRE
     across_x, across_y = np.meshgrid(axis, axis, indexing="ij")
-    healing = 1.0 / np.sqrt(2.0 * settings.volume_stiffness)
+    healing = 1.0
     density = 1000.0 * np.tanh(np.hypot(across_x, across_y) / healing) ** 2
     quanta = np.maximum(np.rint(density), 1).astype(np.int32)[..., None] * np.ones(SIDE, dtype=np.int32)
     phase = np.arctan2(across_y, across_x)[..., None] * np.ones(SIDE)

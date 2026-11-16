@@ -3,7 +3,7 @@
 Contract: `expansion(cells_per_side=7, boxes_per_cell_side=10, seed=1, unevenness=0.3,
 steps=60, every=2, settings=None, device="cuda", joint_unevenness=0.0)` builds
 physics.engine.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness,
-joint_unevenness), runs
+joint_unevenness, margin=open_margin(...)), runs
 `steps` steps with settings (default Settings(), every rule on), measuring at the start and
 every `every` steps (sampled_run.py). Returns a dict (numbers and lists of floats, no
 verdict):
@@ -35,6 +35,7 @@ from dataclasses import asdict
 import numpy as np
 
 from physics.engine import Settings, State, new_universe, stats
+from physics.scenes.open_margin import open_margin
 from physics.scenes.box_energies import box_energies
 from physics.scenes.growth_rates import growth_rates
 from physics.scenes.rms_radius import rms_radius
@@ -46,6 +47,7 @@ def expansion(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int 
     """Occupied and energy radius over time, their growth rates and whether the rate turns."""
     settings = settings or Settings()
     universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device,
+                            margin=open_margin(cells_per_side, boxes_per_cell_side),
                             joint_unevenness=joint_unevenness)
     samples = sampled_run(universe, settings, steps, every, lambda sampled: _measure(sampled, settings))
     times = [time for time, _ in samples]

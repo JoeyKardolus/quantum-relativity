@@ -10,7 +10,7 @@ from physics.scenes.tests._gpu import needs_gpu
 
 @needs_gpu
 def test_the_gradient_fit_climbs_from_each_start_with_finite_tape_gradients():
-    start = host_boxes(new_universe(3, 4, seed=1, margin=0))["quanta"]
+    start = host_boxes(new_universe(5, 4, seed=1, margin=0))["quanta"]
     starts = np.array([[0.5] * len(NAMES), [0.2, 0.8, 0.3, 0.6, 0.4, 0.7]])
     records = gradient_fit(start, starts, iterations=2, rate=0.05, steps=10, every=2, block=4)
     assert [record["iteration"] for record in records] == [0, 1, 2]

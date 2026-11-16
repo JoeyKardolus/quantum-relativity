@@ -8,9 +8,9 @@ Contract: `seams(found)` takes a cells() result and returns a dict:
           each pair once, sorted
   between int64 (n, 2, 2): for each pair the energy volumes each of its two joints
           lies between (cells()["between"]), -1 for empty space or none
-A joint is the one shared slab between two energy volumes (cells.py), so seams run
-along the mortar's edges, where three or more volumes' joints meet: the bible's seam,
-where joints meet (foundation and rule 6). Boxes on the grid's walls have no neighbour beyond them.
+A joint is the thin mortar between two energy volumes (cells.py), so seams run along
+the mortar's edges, where three or more volumes' joints meet: the bible's seam, where
+joints meet (foundation and rule 6). Boxes on the grid's walls have no neighbour beyond them.
 """
 from __future__ import annotations
 

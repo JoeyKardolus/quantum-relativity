@@ -15,10 +15,14 @@ keeping its start's sign. Each step is the engine's (physics.engine.step): the p
 leapfrog wave sourced by plus quanta, then Strang splitting of on_site (the box
 potential on local clocks) and De Raedt pair rotations along x, y, z by parity, forward
 then back, with an openness graded by the joint's squeeze and shut past the seal, and
-friction and drift spreading, on plus-minus faces. Here it differs from the engine,
-which since 2026-11-16 moves no quanta across a plus-minus face and instead passes plus
-quanta between two plus boxes across one joint of any thickness (physics.engine.leak), so quanta
-change sign only in collapse. What it leaves out, because
+a rub on plus-minus faces scaled by crossing_rate (the searched axis that stands for the
+crossing's friction). A plus box feels only the pull; a minus box pushes
+push * (n / joint packing) ** push_steepness and is squeezed by n / joint packing - 1,
+the joint packing being the start's mean quanta per minus box (fixed once by the start,
+as the engine's size_energy is; no size at rest, no drift setting). Here it differs from
+the engine, which moves no quanta across a plus-minus face, diffuses plus quanta from
+volume to volume across their joint (physics.engine.cross) and sizes cells by their
+energy, so quanta change sign only in collapse and a tear. What it leaves out, because
 none of it has a gradient: the rounding to whole quanta, the moving cells (space does not
 grow: every box keeps its kind) and the collapse (collapse_squeeze still acts through
 the seal). Empty boxes and the grid's walls hold pull 0 and pass nothing, as in the
@@ -130,25 +134,25 @@ def _move(sign: wp.array3d(dtype=wp.int32), pull_in: wp.array3d(dtype=wp.float32
 @wp.kernel
 def _on_site(sign: wp.array3d(dtype=wp.int32), psi_in: wp.array3d(dtype=wp.vec2), density: wp.array3d(dtype=wp.float32),
              pull: wp.array3d(dtype=wp.float32),
-             values: wp.array2d(dtype=wp.float32), side: int, duration: float, volume_rest: float,
-             volume_stiffness: float, joint_rest: float, clock_packing: float, psi_out: wp.array3d(dtype=wp.vec2)):
+             values: wp.array2d(dtype=wp.float32), side: int, duration: float, joint_packing: float,
+             clock_packing: float, psi_out: wp.array3d(dtype=wp.vec2)):
     ti, tj, tk = wp.tid()
     home = ti // side
     here = psi_in[ti, tj, tk]
     amount = density[ti, tj, tk]
     energy = float(0.0)
     if sign[ti, tj, tk] > 0:
-        energy = pull[ti, tj, tk] + volume_stiffness * amount / volume_rest
+        energy = pull[ti, tj, tk]
     if sign[ti, tj, tk] < 0:
-        energy = values[home, 1] * wp.pow(amount / joint_rest, values[home, 4])
+        energy = values[home, 1] * wp.pow(amount / joint_packing, values[home, 4])
     psi_out[ti, tj, tk] = _turn(here, -energy * duration * _rate(amount, clock_packing))
 
 
 @wp.kernel
 def _hop(sign: wp.array3d(dtype=wp.int32), psi_in: wp.array3d(dtype=wp.vec2), density: wp.array3d(dtype=wp.float32),
          values: wp.array2d(dtype=wp.float32),
-         seal: wp.array(dtype=wp.float32), side: int, axis: int, parity: int, duration: float, joint_rest: float,
-         clock_packing: float, spread_share: float, psi_out: wp.array3d(dtype=wp.vec2)):
+         seal: wp.array(dtype=wp.float32), side: int, axis: int, parity: int, duration: float, joint_packing: float,
+         clock_packing: float, psi_out: wp.array3d(dtype=wp.vec2)):
     ti, tj, tk = wp.tid()
     home = ti // side
     here = wp.vec3i(ti, tj, tk)
@@ -186,7 +190,7 @@ def _hop(sign: wp.array3d(dtype=wp.int32), psi_in: wp.array3d(dtype=wp.vec2), de
                 joint_size = far_size
                 if near_sign < 0:
                     joint_size = near_size
-                pressed = wp.max(joint_size / joint_rest - 1.0, 0.0)
+                pressed = wp.max(joint_size / joint_packing - 1.0, 0.0)
             open_share = 1.0 - pressed / seal[home]
             open_share = wp.max(open_share, 0.0)
             tau = duration * wp.sqrt(_rate(near_size, clock_packing) * _rate(far_size, clock_packing))
@@ -202,21 +206,6 @@ def _hop(sign: wp.array3d(dtype=wp.int32), psi_in: wp.array3d(dtype=wp.vec2), de
                 rub = 0.5 * (1.0 - kept) * apart
                 near_after = _turn(near_after, rub)
                 far_after = _turn(far_after, -rub)
-                near_new = wp.length_sq(near_after)
-                far_new = wp.length_sq(far_after)
-                spread = spread_share * wp.abs(wp.length_sq(near) - near_new)
-                near_end = near_new
-                far_end = far_new
-                if near_new > far_new:
-                    spread = wp.min(spread, 0.5 * (near_new - far_new))
-                    near_end = near_new - spread
-                    far_end = far_new + spread
-                else:
-                    spread = wp.min(spread, 0.5 * (far_new - near_new))
-                    near_end = near_new + spread
-                    far_end = far_new - spread
-                near_after = near_after * wp.sqrt(near_end / wp.max(near_new, 1.0e-12))
-                far_after = far_after * wp.sqrt(far_end / wp.max(far_new, 1.0e-12))
             if lower:
                 result = near_after
             else:
@@ -356,13 +345,14 @@ def stand_in_score(start: np.ndarray, units: wp.array, steps: int, every: int, b
     sample_inputs = [side, 0.5 * (side - 1), corner, block, blocks]
     wp.launch(_sample, dim=shape, device=device, inputs=[sign, psi, *sample_inputs, 0], outputs=[sums, block_sums])
     half = 0.5 * defaults.step_time
-    fixed = [defaults.joint_rest, defaults.clock_packing, defaults.spread_share]
+    minus = start < 0
+    joint_packing = float(np.abs(start[minus]).mean()) if minus.any() else 1.0
+    fixed = [joint_packing, defaults.clock_packing]
     for step_index in range(1, steps + 1):
         rate = _new(_speed_up, shape, device, [sign, _detached(psi), pull, rate, values, side,
                                                defaults.step_time * defaults.light_speed ** 2])
         pull = _new(_move, shape, device, [sign, pull, rate, defaults.step_time])
-        on_site_inputs = [values, side, half, defaults.volume_rest, defaults.volume_stiffness, defaults.joint_rest,
-                          defaults.clock_packing]
+        on_site_inputs = [values, side, half, joint_packing, defaults.clock_packing]
         psi = _new(_on_site, shape, device, [sign, psi, _detached(psi), pull, *on_site_inputs], dtype=wp.vec2)
         for axis, parity in _ORDER + _ORDER[::-1]:
             psi = _new(_hop, shape, device, [sign, psi, _detached(psi), values, seal, side, axis, parity, half, *fixed],
@@ -381,7 +371,7 @@ def stand_in_score(start: np.ndarray, units: wp.array, steps: int, every: int, b
 
 
 def _settings(units: wp.array, universes: int, device: str) -> tuple:
-    """Each universe's searched settings (pull_strength, push, collapse, friction, steepness, seal fraction) and seal."""
+    """Each universe's searched settings (pull_strength, push, collapse, crossing_rate, steepness, seal fraction) and seal."""
     ranges = [LOG_RANGES.get(name) or LINEAR_RANGES[name] for name in NAMES]
     low = wp.array([lower for lower, _ in ranges], dtype=wp.float32, device=device)
     high = wp.array([upper for _, upper in ranges], dtype=wp.float32, device=device)

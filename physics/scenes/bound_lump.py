@@ -27,6 +27,7 @@ import numpy as np
 
 from physics.engine import Settings, State, cells, host_boxes, new_universe
 from physics.engine.stats import LUMP_FACTOR
+from physics.scenes.open_margin import open_margin
 from physics.scenes.box_energies import box_energies
 from physics.scenes.rms_radius import rms_radius
 from physics.scenes.sampled_run import sampled_run
@@ -37,6 +38,7 @@ def bound_lump(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int
     """Biggest lump's boxes, energy and radius, and the surroundings' radius, over time."""
     settings = settings or Settings()
     universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device,
+                            margin=open_margin(cells_per_side, boxes_per_cell_side),
                             joint_unevenness=joint_unevenness)
     samples = sampled_run(universe, settings, steps, every, lambda sampled: _measure(sampled, settings))
     result = {"cells_per_side": cells_per_side, "boxes_per_cell_side": boxes_per_cell_side, "seed": seed,

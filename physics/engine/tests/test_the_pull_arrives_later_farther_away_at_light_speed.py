@@ -3,8 +3,10 @@
 Issue #3: pull spreads at a fixed finite speed instead of being solved across all space
 at once. A grid of 96 boxes a side is all joint (-1000 per box: space that carries the
 pull and adds none) with a ball of radius 2 boxes of plus quanta (+1000 per box) at its
-middle, switched on at step 0. Only `pull_wave` runs (default settings: light speed 1
-box per unit time, step_time 0.25). At distances r = 10, 14, ..., 34 boxes along +x the
+middle, switched on at step 0. Only `pull_wave` runs (default settings, light speed 1
+box per unit time, step_time 0.25, with local clocks off: the pull runs on each cell's
+clock since 2026-11-16, and this measures the wave's own speed; axiom 13 measures the
+clocks). At distances r = 10, 14, ..., 34 boxes along +x the
 arrival is the first step at which the pull there reaches half its static value
 -G M / r. The arrival times rise with r, and the slope of a straight-line fit of r
 against arrival time is the light speed within 10%. The walls (48 boxes out) reflect,
@@ -23,7 +25,7 @@ DISTANCES = np.arange(10, 35, 4)
 
 @needs_gpu
 def test_the_pull_arrives_at_r_over_c():
-    settings = Settings()
+    settings = Settings(clock_packing=0.0)
     places = np.arange(SIDE) - CENTRE
     radius = np.sqrt(places[:, None, None] ** 2 + places[None, :, None] ** 2 + places[None, None, :] ** 2)
     quanta = np.where(radius <= 2.0, 1000, -1000).astype(np.int32)

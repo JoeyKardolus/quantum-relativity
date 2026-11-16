@@ -10,6 +10,8 @@ totals equal the engine's exactly, every block a whirl line pierces is FULL, and
 boxes read back from the ladder exactly as the engine holds them. The levels seen over
 the run are printed; nothing here asks that a block go COARSE (that depends on how quiet
 the run is, which is the physics' business).
+Splits are off (split_across 0): one plus cube this big is one energy volume past the
+split size, and this test watches the fluid alone.
 """
 import numpy as np
 
@@ -22,12 +24,12 @@ SIDE = 48
 
 @needs_gpu
 def test_ladder_totals_match_and_whirl_blocks_stay_full():
-    settings = Settings(pull_strength=0.0)
+    settings = Settings(pull_strength=0.0, split_across=0.0)
     quanta = np.zeros((SIDE,) * 3, dtype=np.int32)
     quanta[8:40, 8:40, 8:40] = -1000
     places = np.arange(SIDE) - 23.5
     across_x, across_y = np.meshgrid(places, places, indexing="ij")
-    healing = 1.0 / np.sqrt(2.0 * settings.volume_stiffness)
+    healing = 1.0
     dip = np.maximum(np.rint(1000.0 * np.tanh(np.hypot(across_x, across_y) / healing) ** 2), 1).astype(np.int32)
     quanta[12:36, 12:36, 12:36] = dip[12:36, 12:36, None]
     phase = np.arctan2(across_y, across_x)[..., None] * np.ones(SIDE)

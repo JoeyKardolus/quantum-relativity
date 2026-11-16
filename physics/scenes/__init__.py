@@ -14,6 +14,7 @@ Module map:
   orbit.py           orbit: a small blob round a big one, radius, period, period^2 / radius^3
   black_hole.py      black_hole: sealed region radius against collapsed energy, per ball
   sampled_run.py     sampled_run: step a universe, measure it every few steps
+  open_margin.py     open_margin: the empty margin an open-space start gets, as wide as the filled cube
   blob_start.py      blob_start: moving balls of extra energy in an even checkerboard
   box_energies.py    box_energies: plus (A) and minus (B) quanta per Planck box on the host
   energy_centre.py   energy_centre: energy-weighted centre of masked boxes
@@ -38,6 +39,7 @@ from physics.scenes.bound_lump import bound_lump
 from physics.scenes.orbit import orbit
 from physics.scenes.black_hole import black_hole
 from physics.scenes.sampled_run import sampled_run
+from physics.scenes.open_margin import open_margin
 from physics.scenes.blob_start import blob_start
 from physics.scenes.box_energies import box_energies
 from physics.scenes.energy_centre import energy_centre
@@ -55,7 +57,7 @@ from physics.scenes.observer_cells import observer_cells
 from physics.scenes.deceleration import deceleration
 from physics.scenes.timescape import timescape
 
-__all__ = ["expansion", "hubble_gap", "structure", "bound_lump", "orbit", "black_hole", "sampled_run",
+__all__ = ["expansion", "hubble_gap", "structure", "bound_lump", "orbit", "black_hole", "sampled_run", "open_margin",
            "blob_start", "box_energies", "energy_centre", "rms_radius", "growth_rates", "power_spectrum",
            "sealed_region", "wave_field", "space_dimension", "isotropy", "spin", "belt_trick",
            "clocked_run", "observer_cells", "deceleration", "timescape"]

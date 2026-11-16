@@ -7,7 +7,7 @@ recheck (the recheck_top best searched points on every seed in recheck_seeds). E
 appended to `results` as it ends; a phase already in the file is skipped, so a stopped search
 resumes. A run that raises is recorded with score -2 and its error, never dropped.
 Settings fitted, ranges fixed for the whole-quanta engine (2026-11-16) before any search
-on it: pull_strength, push, collapse_squeeze, friction (log, each a decade or more round
+on it: pull_strength, push, collapse_squeeze, crossing_rate (log, each a decade or more round
 its default), push_steepness (linear), seal_squeeze = collapse_squeeze * fraction with
 fraction in 0.2 .. 0.9 (always below collapse). Searched beside them, the start's two
 unevennesses (owner, 2026-11-16, decision D), separate settings of
@@ -31,7 +31,7 @@ import numpy as np
 from physics.fit.fit_run import fit_run
 
 LOG_RANGES = {"pull_strength": (1e-8, 1e-6), "push": (0.05, 5.0), "collapse_squeeze": (1.0, 10.0),
-              "friction": (0.1, 10.0)}
+              "crossing_rate": (4e-4, 4e-2)}
 LINEAR_RANGES = {"push_steepness": (2.0, 10.0), "seal_fraction": (0.2, 0.9)}
 NAMES = list(LOG_RANGES) + list(LINEAR_RANGES)
 START_RANGES = {"unevenness": (0.0, 0.9), "joint_unevenness": (0.0, 0.9)}

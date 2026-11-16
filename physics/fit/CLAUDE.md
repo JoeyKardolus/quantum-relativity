@@ -14,7 +14,8 @@ fitted on the fit set only, the expansion shape (slowing, then speeding up) and 
 - **Local clocks, no dark energy.** The expansion dip is timed by the mean local clock of the
   most packed energy volumes, not the step counter; searches before
   2026-11-16's change used the counter. No dark-energy or base-push setting is ever searched.
-- **Fixed before a run**: ranges, score, run size and seeds. Change them only before a new
+- **Searched**: pull_strength, push, collapse_squeeze, crossing_rate (log), push_steepness,
+  seal fraction. **Fixed before a run**: ranges, score, run size and seeds. Change them only before a new
   search, and say so in its write-up. The start's seed is not fitted; its two unevennesses
   (energy volumes, joints: `START_RANGES`, 0..0.9) are, by `fit_search` only. The stand-in
   and gradient fit keep the default start.
@@ -28,20 +29,19 @@ fitted on the fit set only, the expansion shape (slowing, then speeding up) and 
 
 - **Gradients go through a stand-in**, never the engine: whole quanta, moving cells and collapse
   have no gradient. The stand-in is the engine's fluid in float psi, every box keeping its
-  kind; its quanta still cross plus-minus faces, which the engine replaced with its leak
-  (`engine/leak.py`). Scored like `fit_run` without lumps, by the counter. A winner is
-  checked on the real `fit_run` score.
+  kind; its quanta still cross plus-minus faces (the engine diffuses volume to volume,
+  `engine/cross.py`), a minus box pushes by its packing over the start's mean joint
+  packing, and `crossing_rate` scales the rub there. Scored like `fit_run` without lumps,
+  by the counter. A winner is checked on the real `fit_run` score.
 - **Its gradient is a direction, not a derivative.** The full tape gradient blew up to 1e26
   in 10 steps (a box's own quanta turning its phase through the steep joint push), so
   potentials, openness and clocks read a density the tape does not see. Adam steps by a
   fixed share of the unit cube.
 - Stand-in universes run side by side, each with its own settings.
 
-## First comparison (2026-11-16, 7^3 cells of 10, seed 1 start, one run)
+## First comparison
 
-Stand-in: random 64 points best 0.42 in 2.8 s; gradient 4 starts x 15 steps best 0.16 in
-14.6 s. Real score, seeds 1-3: defaults 0.00, random's best -0.10, gradient's best 0.12 (two
-settings at range edges). The stand-in ranks the real score badly; one comparison only.
+The 2026-11-16 comparison predates the rebuild and is void; re-run before quoting.
 
 ## Run
 

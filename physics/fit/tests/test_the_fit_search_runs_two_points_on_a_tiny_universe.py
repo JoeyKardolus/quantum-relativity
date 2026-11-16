@@ -10,7 +10,7 @@ from physics.scenes.tests._gpu import needs_gpu
 @needs_gpu
 def test_the_fit_search_runs_two_points_on_a_tiny_universe(tmp_path):
     results = tmp_path / "results.jsonl"
-    records = fit_search(results, cells=4, boxes=4, steps=6, every=1, default_seeds=(), random_points=2,
+    records = fit_search(results, cells=5, boxes=4, steps=6, every=1, default_seeds=(), random_points=2,
                          refine_best=0, recheck_top=0)
     assert [record["phase"] for record in records] == ["random", "random"]
     assert len(results.read_text().splitlines()) == 2
