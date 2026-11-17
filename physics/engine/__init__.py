@@ -38,6 +38,7 @@ Module map:
   settle_counts.py  settle_counts: a phase's box-count changes applied at once, order-free
   swing_table.py    swing_table: each volume's swinging joints in one fixed order, kept on the GPU
   joint_swing.py    joint_swing: joints' sizes swing like frictionless springs, energy kept
+  speed_handover.py speed_handover: a joint that stops swinging hands its speed to its spring neighbours
   pull_wave.py      pull_wave: the pull's wave equation, leapfrog, light speed, local clocks
   on_site.py        on_site: exact phase turns by the box potential on local clocks
   hop.py            hop: exact pair rotations moving whole quanta inside one cell
@@ -96,6 +97,7 @@ from physics.engine.cell_upload import cell_upload
 from physics.engine.cell_room import cell_room
 from physics.engine.settle_counts import settle_counts
 from physics.engine.swing_table import swing_table
+from physics.engine.speed_handover import speed_handover
 from physics.engine.joint_swing import joint_swing
 from physics.engine.pull_wave import pull_wave
 from physics.engine.site_turn import site_turn
@@ -138,7 +140,7 @@ from physics.engine.stats import stats
 from physics.engine.view_source import view_source
 
 __all__ = ["Settings", "State", "uneven_field", "new_universe", "reach", "face_step", "near", "clock_rate",
-           "pass_seed", "pair_rotation", "box_potential", "fluid_potential", "cell_count", "cell_laws", "cell_upload", "cell_room", "settle_counts", "swing_table", "joint_swing",
+           "pass_seed", "pair_rotation", "box_potential", "fluid_potential", "cell_count", "cell_laws", "cell_upload", "cell_room", "settle_counts", "swing_table", "speed_handover", "joint_swing",
            "pull_wave", "site_turn", "hop_pair", "on_site", "hop", "substeps", "later_substeps", "jiggle", "cross", "quantum_store", "quantum_packet", "quantum_joints", "quantum_move", "quantum_hand",
            "quantum_settle", "quantum_react", "quantum", "exchange", "mortar_shift", "group_label", "one_group", "block_adjacency",
            "collapse", "cells_span", "window_read", "window_write", "volume_split", "wall_press", "tick_clocks", "totals", "attach_ladder", "ladder_sync", "step",

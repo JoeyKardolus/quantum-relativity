@@ -33,7 +33,7 @@
    0.2439,
    0.2482
   ],
-  "status": "candidate: not yet run on the unfitted scenes",
-  "caveat": "wins on a burst of joint collapses in the first 200 steps; nothing seals, growth only slows (dip < 0), and its gain in region contrast is below the default's"
+  "status": "void: fitted on an engine whose joint swing had three faults (fixed 2026-11-17, physics/engine/joint_swing.py); search again before use",
+  "caveat": "its score was won on the faults: 1,120 of its 5,184 joints start past the collapse limit, and each one swelled its neighbours without end (the joints' summed size went from 582,000 to 1,305,000 boxes in 100 steps, 2.8e21 by step 750), which the fit counted as space growing; push_steepness was never read by the swing (6 was written in)"
  }
 }

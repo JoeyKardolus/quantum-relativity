@@ -1,6 +1,6 @@
 """Axiom 6, Limits: squeezed minus collapses into a merge of its two volumes; overstretched plus tears, and only that cell splits.
 
-The owner's axiom (bible physics/quantum-relativity, "The axioms", 2026-11-16), checked in 5 parts, each
+The owner's axiom (bible physics/quantum-relativity, "The axioms", 2026-11-16), checked in 7 parts, each
 kept whole from the file it came from (names that two parts shared carry a _P<n> suffix).
 
 Part 1 (was axiom 02). Plus and minus never cancel; only joint collapse turns minus into plus, only a tear turns plus into minus.
@@ -96,14 +96,43 @@ unevenness in slightly different energies, and one correction lets sizes follow 
 so no joint starts squeezed. The default start (new_universe(), seed 1) has every joint's
 squeeze (wanted length over length, minus 1; stats()) below the seal, and 20 steps of
 the default settings collapse no joint.
+
+Part 6 (2026-11-17). A joint already past its limit waits for its collapse and moves nothing else.
+
+A joint whose energy wants a size past the collapse packing does not swing (joint_swing.py:
+the collapse takes it once its boxes have followed), so it is in no spring: the joints
+that do swing trade size only with each other, without friction. Before 2026-11-17 such
+a joint stood in its neighbours' springs with load 0 and swelled them without end (in
+the fitted universe the joints' summed size grew from 582,000 to 1,305,000 boxes in 100
+steps, which the fit had counted as space growing). new_universe(8, 10, seed 1,
+joint_unevenness 0.8), Settings(): at least one joint starts past the limit; after 10
+steps of the whole engine, one more swing with the pull as load: the swinging joints'
+summed size and their swing energy (swing_energy.py) change by less than 1e-9 of
+themselves, no joint past the limit has moved, and none was pressed to the limit in
+that swing. Thresholds set before the run.
+
+Part 7 (2026-11-17). A joint that stops at its limit, or collapses, hands its speed on: the joints' speeds always add up to nothing.
+
+The springs only trade size between joints (bible rule 5), so the joints' speeds add up
+to nothing. A joint stopped at its collapse limit, found past it, or collapsing gives
+its speed to the joints it shared springs with (speed_handover.py). Before 2026-11-17
+it was stopped dead, and the others kept speeds adding up to its own the other way: the
+joints' summed size then drifted for good (in this run from 21,600 to 52,800 boxes in
+200 steps). The same start as part 6, 200 steps of the whole engine: at least one joint
+collapses, and after every step the joints' speeds add up to less than 1e-9 of their
+sizes added without sign. Staged on new_universe(5, 10, seed 1, unevenness 0, margin 8)
+after its cells are counted: one joint is given speed 3 and handed over; its speed is 0,
+only joints that share a volume with it gained, each in proportion to its clock rate,
+and the gains add up to 3 within 1e-12. Thresholds set before the run.
 """
 import numpy as np
 
-from physics.engine import (Settings, State, cell_count, cell_laws, cells, collapse, group_label, host_boxes, near,
-                            new_universe, stats, step, totals)
+from physics.engine import (Settings, State, cell_count, cell_laws, cells, collapse, group_label, host_boxes,
+                            joint_swing, near, new_universe, speed_handover, stats, step, totals)
 from physics.engine.tests._gpu import needs_gpu
 from physics.engine.tests.axiom_pressure import axiom_pressure
 from physics.engine.tests.axiom_contacts import axiom_contacts
+from physics.engine.tests.swing_energy import swing_energy
 
 
 J_P1 = (3 * 7 + 2) * 7 + 2
@@ -342,3 +371,61 @@ def test_a_tear_keeps_one_web_every_volume_wrapped_and_no_joint_collapses_after_
     assert len(rows) == 15
     assert rows[-1][1] == before_split
     assert all(row[2] == 1 and row[3] == 0 and row[4] == 0 for row in rows)
+
+
+@needs_gpu
+def test_a_joint_past_its_limit_does_not_swing_and_moves_no_other_joint():
+    settings = Settings()
+    state = new_universe(8, 10, seed=1, joint_unevenness=0.8)
+    for _ in range(10):
+        step(state, settings)
+    load = cell_count(state)
+    cell_laws(state, settings)
+    joints = (state.kind[0] == -1) & (state.wanted[0] > 0.0)
+    waiting = joints & (state.size[0] < state.cell_quanta[0] / settings.collapse_packing)
+    swinging = joints & ~waiting
+    summed = float(state.size[0, swinging].sum())
+    held = state.size[0, waiting].copy()
+    before = swing_energy(state, settings, load, swinging)
+    assert np.abs(state.speed[0, swinging]).max() > 1e-3
+    pressed = joint_swing(state, settings, load)
+    size_change = abs(float(state.size[0, swinging].sum()) - summed) / summed
+    energy_change = abs(swing_energy(state, settings, load, swinging) - before) / abs(before)
+    print(f"joints {int(joints.sum())}, past the limit and waiting {int(waiting.sum())}; one swing: the swinging joints' "
+          f"summed size changes by {size_change:.2e} of itself, their swing energy by {energy_change:.2e}; pressed "
+          f"{int(pressed.sum())}")
+    assert waiting.sum() >= 1 and not pressed.any()
+    assert np.array_equal(state.size[0, waiting], held) and not state.speed[0, waiting].any()
+    assert size_change <= 1e-9 and energy_change <= 1e-9
+
+
+@needs_gpu
+def test_a_stopped_or_collapsing_joint_hands_its_speed_on_so_the_speeds_add_up_to_nothing():
+    settings = Settings()
+    state = new_universe(8, 10, seed=1, joint_unevenness=0.8)
+    worst = 0.0
+    for _ in range(200):
+        step(state, settings)
+        speeds = state.speed[0, state.kind[0] == -1]
+        worst = max(worst, abs(float(speeds.sum())) / max(float(np.abs(speeds).sum()), 1e-300))
+    print(f"collapses in 200 steps {int(state.collapses[0])}; the joints' speeds added up over the same without sign, "
+          f"at worst {worst:.2e}")
+    assert state.collapses[0] >= 1
+    assert worst <= 1e-9
+    staged = new_universe(5, 10, seed=1, unevenness=0.0, margin=8)
+    cell_count(staged)
+    cell_laws(staged, settings)
+    joints = np.flatnonzero((staged.kind[0] == -1) & (staged.between[0].min(axis=1) >= 0))
+    stopped = int(joints[0])
+    mates = np.setdiff1d(np.concatenate([staged.joints_of(0, int(volume)) for volume in staged.between[0, stopped]]),
+                         [stopped])
+    staged.speed[0, stopped] = 3.0
+    speed_handover(staged, settings, 0, [stopped])
+    gained = staged.speed[0, mates]
+    others = np.setdiff1d(np.flatnonzero(staged.kind[0] == -1), mates)
+    shares = gained / staged.rate[0, mates]
+    print(f"a joint with speed 3 handed over: its speed {staged.speed[0, stopped]}, {mates.size} spring neighbours gained "
+          f"{gained.sum():.12f} together, gain over clock rate between {shares.min():.6f} and {shares.max():.6f}")
+    assert staged.speed[0, stopped] == 0.0 and not staged.speed[0, others].any()
+    assert (gained > 0.0).all() and abs(gained.sum() - 3.0) <= 1e-12
+    assert shares.max() - shares.min() <= 1e-12

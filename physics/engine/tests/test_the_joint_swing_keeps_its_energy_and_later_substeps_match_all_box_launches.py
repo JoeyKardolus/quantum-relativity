@@ -12,6 +12,15 @@
    fluid never leaves its cell, so this must give, to the last bit, what launches over
    all boxes give. Staged: new_universe(4, 10, seed 3) with one plus box raised to 30
    times its quanta (a steep face in one volume), 5 steps each way.
+3. When joints fly inward by many times their own size in one step, the rounds do not
+   settle at the substeps the stiffest spring asks for; the swing then takes the whole
+   step again with 4 times as many (joint_swing.py), the same equation at a shorter
+   substep (before 2026-11-17 it raised, ending 37 of the fit search's 105 universes).
+   Staged on new_universe(8, 10, seed 1): every other joint of one energy volume is given
+   the speed that carries it inward 20 times its size in one step, the volume's other
+   joints the opposite speed shared out (the speeds add up to nothing). One swing: the
+   first try does not settle, the swing still returns, and the swing energy and the
+   summed size change by less than 1e-9 of themselves.
 """
 from __future__ import annotations
 
@@ -21,6 +30,7 @@ import numpy as np
 
 from physics.engine import Settings, cell_count, cell_laws, joint_swing, new_universe, step
 from physics.engine.tests._gpu import needs_gpu
+from physics.engine.tests.swing_energy import swing_energy
 
 
 def _swing_energy(state, settings: Settings, load: np.ndarray) -> float:
@@ -148,3 +158,37 @@ def _counted(real, in_rooms: list, args: tuple):
     result = real(*args)
     in_rooms.append(bool(args[-1]) and result is not None)
     return result
+
+
+@needs_gpu
+def test_a_swing_whose_rounds_do_not_settle_is_taken_again_finer_and_keeps_its_energy(monkeypatch):
+    module = sys.modules["physics.engine.joint_swing"]
+    settings = Settings()
+    state = new_universe(8, 10, seed=1)
+    load = cell_count(state)
+    cell_laws(state, settings)
+    joints = (state.kind[0] == -1) & (state.wanted[0] > 0.0)
+    mates = state.joints_of(0, int(state.between[0, np.flatnonzero(joints)[0], 0]))
+    inward, outward = mates[::2], mates[1::2]
+    speed = np.zeros(state.speed.shape)
+    speed[0, inward] = -20.0 * state.size[0, inward] / settings.step_time
+    speed[0, outward] = -speed[0, inward].sum() / outward.size
+    state.speed = speed
+    unsettled = []
+    real = module._substep
+
+    def counted(*args):
+        result = real(*args)
+        unsettled.append(bool(result.any()))
+        return result
+
+    monkeypatch.setattr(module, "_substep", counted)
+    before = swing_energy(state, settings, load, joints)
+    summed = float(state.size[0, joints].sum())
+    joint_swing(state, settings, load)
+    energy_change = abs(swing_energy(state, settings, load, joints) - before) / abs(before)
+    size_change = abs(float(state.size[0, joints].sum()) - summed) / summed
+    print(f"tries that did not settle {sum(unsettled)}, substeps run {len(unsettled)}; swing energy changes by "
+          f"{energy_change:.2e} of itself, summed size by {size_change:.2e}")
+    assert sum(unsettled) >= 1
+    assert energy_change <= 1e-9 and size_change <= 1e-9

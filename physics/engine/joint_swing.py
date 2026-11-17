@@ -13,8 +13,10 @@ the joints' summed size is kept (bible rule 5: the joints are the springs of the
 they overshoot and swing round their balance). The swing is frictionless (axiom 4: the
 only friction is energy crossing a joint), so the step must neither gain nor lose swing
 energy: it is the discrete-gradient (Itoh-Abe) step of the Hamiltonian
-  E = 1/2 v^T M^+ v + sum_i U_i(s_i),  U_i(s) = push * wanted_i^6 / (5 s^5) - pull_i * s
-(M the clock-weighted graph Laplacian, -dU_i/ds = load_i), which keeps E exactly at any
+  E = 1/2 v^T M^+ v + sum_i U_i(s_i),  U_i(s) = push * wanted_i^p / ((p - 1) s^(p - 1)) - pull_i * s
+(p = push_steepness, above 1; M the clock-weighted graph Laplacian over the joints that
+swing, -dU_i/ds = load_i; before 2026-11-17 p was written in as 6 whatever the setting
+said), which keeps E exactly at any
 step length; it is implicit (numerics, not a rule: an explicit step gained energy at the
 steep wall and crushed joints to nothing) and solved on the GPU, every joint at once, by
 Newton's method with the Jacobian's diagonal (each joint's own spring; the neighbours'
@@ -25,13 +27,21 @@ number of joints (before 2026-11-17 a sparse direct solve on the host: 3 s a ste
 volume's joints run in one fixed order (swing_table.py), so one seed gives one run and a
 universe swings the same alone as in a batch. The step
 is cut into as many equal substeps as the stiffest joint needs for accuracy
-(omega * substep <= 1/2), at most MOST_SUBSTEPS. A joint whose size falls to the
+(omega * substep <= 1/2), at most MOST_SUBSTEPS; when the rounds do not settle on a
+substep's equation (joints flying inward by more than their own size in one substep),
+the whole step is taken again from its start with FINER times as many substeps in that
+universe, up to RETRIES times (numerics: the same equation at a shorter substep; before
+2026-11-17 the step raised, which ended 37 of the fit's 105 universes). A joint whose size falls to the
 collapse packing (its minus quanta over its size reach collapse_packing, size <= quanta /
 collapse_packing; owner, 2026-11-16: only too high a concentration collapses a joint,
-never too little energy) stops there, at rest, and is returned for collapse in the same
-step (axiom 6); an outer joint, with no second volume, cannot collapse: it is held at the
+never too little energy) stops there, at rest, hands its speed to the joints it shared
+springs with (speed_handover.py, as does a joint found past the limit) and is returned
+for collapse in the same step (axiom 6); an outer joint, with no second volume, cannot collapse: it is held at the
 limit size for the rest of the step. A joint already past the limit when the swing starts
-does not swing: the collapse that opens the next step takes it (step.py). state.speed is the
+does not swing: the collapse that opens the next step takes it (step.py). A joint that
+does not swing is in no spring: its neighbours trade size only with each other, so the
+swinging joints' summed size and the swing energy are kept (before 2026-11-17 it stood
+in its neighbours' springs with load 0, which swelled them without end). state.speed is the
 size change per unit of counter time (the clocks enter through the springs, so the
 summed size is kept exactly). Energy volumes are not moved (their size
 follows their energy). Returns a bool array (universes, capacity), True for each joint
@@ -45,29 +55,41 @@ import numpy as np
 import warp as wp
 
 from physics.engine.settings import Settings
+from physics.engine.speed_handover import speed_handover
 from physics.engine.state import State
 from physics.engine.swing_table import swing_table
 
 MOST_SUBSTEPS = 64
 ROUNDS = 400
 TOLERANCE = 1e-12
+FINER = 4
+RETRIES = 6
+_LOST = 1e150  # numerics: a miss this large will not come back; the step is taken again, finer
 _ACTIVE, _PAIRED, _HELD, _BORN = 1, 2, 4, 8
 
 
 @wp.func
-def _secant(before: wp.float64, after: wp.float64, hardness: wp.float64, load: wp.float64) -> wp.vec2d:
-    """(U(after) - U(before)) / (after - before) and its derivative in `after`, written without cancellation."""
-    slope = -load
-    bend = wp.float64(0.0)
-    low = wp.float64(1.0)
-    for power in range(1, 6):
-        low = low * before
-        high = wp.float64(1.0)
-        for fold in range(6 - power):
-            high = high * after
-        term = hardness / (low * high)
-        slope = slope - term
-        bend = bend + wp.float64(float(6 - power)) * term / after
+def _secant(before: wp.float64, after: wp.float64, hardness: wp.float64, load: wp.float64,
+            power: wp.float64) -> wp.vec2d:
+    """(U(after) - U(before)) / (after - before) and its derivative in `after`, written without cancellation.
+
+    U(s) = hardness / s**power - load * s, power = push_steepness - 1. With turn = ln(after / before),
+    (after**-power - before**-power) / (after - before) = -(after * before)**(-(power + 1) / 2) *
+    sinh(power * turn / 2) / sinh(turn / 2), the ratio going to `power` as the two sizes meet.
+    """
+    half = wp.float64(0.5)
+    turn = wp.log(after / before)
+    curve = power * (power * power - wp.float64(1.0)) / wp.float64(24.0)
+    ratio = power + curve * turn * turn
+    ratio_rate = wp.float64(2.0) * curve * turn
+    if wp.abs(turn) > wp.float64(1.0e-6):
+        low = wp.sinh(half * turn)
+        high = wp.sinh(half * power * turn)
+        ratio = high / low
+        ratio_rate = half * (power * wp.cosh(half * power * turn) * low - high * wp.cosh(half * turn)) / (low * low)
+    scale = hardness * wp.exp(-half * (power + wp.float64(1.0)) * wp.log(after * before))
+    slope = -load - scale * ratio
+    bend = scale * (half * (power + wp.float64(1.0)) * ratio - ratio_rate) / after
     return wp.vec2d(slope, bend)
 
 
@@ -82,7 +104,7 @@ def _begin(flags: wp.array2d(dtype=wp.int32), counts: wp.array(dtype=wp.int32), 
            sub_index: int, size: wp.array2d(dtype=wp.float64), speed: wp.array2d(dtype=wp.float64),
            hardness: wp.array2d(dtype=wp.float64), load: wp.array2d(dtype=wp.float64),
            start: wp.array2d(dtype=wp.float64), target: wp.array2d(dtype=wp.float64),
-           slope: wp.array2d(dtype=wp.float64)):
+           slope: wp.array2d(dtype=wp.float64), power: wp.float64):
     home, cell = wp.tid()
     slope[home, cell] = wp.float64(0.0)
     if sub_index >= counts[home] or (flags[home, cell] & _ACTIVE) == 0:
@@ -91,19 +113,25 @@ def _begin(flags: wp.array2d(dtype=wp.int32), counts: wp.array(dtype=wp.int32), 
     start[home, cell] = own
     target[home, cell] = own + spans[home] * speed[home, cell]
     if _moving(flags[home, cell]):
-        slope[home, cell] = _secant(own, own, hardness[home, cell], load[home, cell])[0]
+        slope[home, cell] = _secant(own, own, hardness[home, cell], load[home, cell], power)[0]
 
 
 @wp.kernel
 def _gather(offsets: wp.array2d(dtype=wp.int32), members: wp.array2d(dtype=wp.int32),
-            rate: wp.array2d(dtype=wp.float64), slope: wp.array2d(dtype=wp.float64),
-            pulled: wp.array2d(dtype=wp.float64)):
+            flags: wp.array2d(dtype=wp.int32), rate: wp.array2d(dtype=wp.float64),
+            slope: wp.array2d(dtype=wp.float64), pulled: wp.array2d(dtype=wp.float64),
+            rates: wp.array2d(dtype=wp.float64)):
+    """Per energy volume, over its joints that swing: their summed clock rate and rate times slope."""
     home, volume = wp.tid()
     total = wp.float64(0.0)
+    clocks = wp.float64(0.0)
     for index in range(offsets[home, volume], offsets[home, volume + 1]):
         joint = members[home, index]
-        total = total + rate[home, joint] * slope[home, joint]
+        if _moving(flags[home, joint]):
+            total = total + rate[home, joint] * slope[home, joint]
+            clocks = clocks + rate[home, joint]
     pulled[home, volume] = total
+    rates[home, volume] = clocks
 
 
 @wp.func
@@ -141,7 +169,7 @@ def _improve(flags: wp.array2d(dtype=wp.int32), live: wp.array(dtype=wp.int32), 
              rates: wp.array2d(dtype=wp.float64), hardness: wp.array2d(dtype=wp.float64),
              load: wp.array2d(dtype=wp.float64), start: wp.array2d(dtype=wp.float64),
              missed: wp.array2d(dtype=wp.float64), inertia: wp.float64, size: wp.array2d(dtype=wp.float64),
-             slope: wp.array2d(dtype=wp.float64)):
+             slope: wp.array2d(dtype=wp.float64), power: wp.float64):
     home, cell = wp.tid()
     if live[home] == 0 or not _moving(flags[home, cell]):
         return
@@ -153,12 +181,12 @@ def _improve(flags: wp.array2d(dtype=wp.int32), live: wp.array(dtype=wp.int32), 
         if sides[pick] >= 0:
             others = others + (rates[home, sides[pick]] - own_rate)
     guess = size[home, cell]
-    bend = _secant(start[home, cell], guess, hardness[home, cell], load[home, cell])[1]
+    bend = _secant(start[home, cell], guess, hardness[home, cell], load[home, cell], power)[1]
     better = guess - missed[home, cell] / (wp.float64(1.0) + scale * own_rate * others * bend)
     if better <= wp.float64(0.0):
         better = wp.float64(0.5) * guess
     size[home, cell] = better
-    slope[home, cell] = _secant(start[home, cell], better, hardness[home, cell], load[home, cell])[0]
+    slope[home, cell] = _secant(start[home, cell], better, hardness[home, cell], load[home, cell], power)[0]
 
 
 @wp.kernel
@@ -176,15 +204,15 @@ def _finish(flags: wp.array2d(dtype=wp.int32), counts: wp.array(dtype=wp.int32),
         speed[home, cell] = speed[home, cell] - spans[home] * spring / inertia
     if size[home, cell] <= floor[home, cell] and (flag & _PAIRED) != 0:
         flag = flag | _HELD
-    if (flag & _HELD) != 0:
-        if (flag & _BORN) == 0:
-            size[home, cell] = wp.max(size[home, cell], floor[home, cell])
-        speed[home, cell] = wp.float64(0.0)
+    if (flag & _HELD) != 0 and (flag & _BORN) == 0:
+        size[home, cell] = wp.max(size[home, cell], floor[home, cell])
     flags[home, cell] = flag
 
 
 def joint_swing(state: State, settings: Settings, pull: np.ndarray) -> np.ndarray:
     """Swing every joint's size one step, energy kept; returns the joints pressed to the collapse limit."""
+    if settings.push_steepness <= 1.0:
+        raise ValueError("push_steepness must be above 1 (the push's energy push * wanted**p / ((p - 1) size**(p - 1)))")
     table = swing_table(state)
     shape = state.kind.shape
     pressed = np.zeros(shape, dtype=bool)
@@ -197,34 +225,46 @@ def joint_swing(state: State, settings: Settings, pull: np.ndarray) -> np.ndarra
     floor = state.cell_quanta[rows, columns] / settings.collapse_packing
     size = state.size[rows, columns].astype(np.float64)
     born = size < floor
-    hardness = settings.push * state.wanted[rows, columns] ** 6 / 5.0
-    rates = _volume_rates(table, _spread(shape, rows, columns, rate))
-    counts = _counts(settings, rows, rate, rates, state.between[rows, columns], hardness, np.maximum(size, floor),
-                     state.universes)
+    for universe in np.unique(rows[born]):
+        speed_handover(state, settings, int(universe), columns[born & (rows == universe)])
+    power = settings.push_steepness - 1.0
+    hardness = settings.push * state.wanted[rows, columns] ** settings.push_steepness / power
+    counts = _counts(settings, rows, rate, _volume_rates(table, _spread(shape, rows, columns, rate)),
+                     state.between[rows, columns], hardness, np.maximum(size, floor), state.universes)
     paired = table["paired"][rows, columns]
     flags = np.zeros(shape, dtype=np.int32)
     flags[rows, columns] = _ACTIVE + paired * _PAIRED + born * (_HELD | _BORN)
-    on = {name: wp.array(_spread(shape, rows, columns, values, fill), dtype=wp.float64, device=device)
-          for name, values, fill in (("rate", rate, 0.0), ("hardness", hardness, 0.0), ("floor", floor, 0.0),
-                                     ("size", size, 1.0), ("speed", np.where(born, 0.0, state.speed[rows, columns]), 0.0),
-                                     ("load", pull[rows, columns], 0.0))}
-    on["rates"] = wp.array(rates, dtype=wp.float64, device=device)
-    on["spans"] = wp.array(settings.step_time / np.maximum(counts, 1), dtype=wp.float64, device=device)
-    for name in ("start", "target", "slope", "pulled", "missed"):
-        on[name] = wp.zeros(shape, dtype=wp.float64, device=device)
-    on["flags"] = wp.array(flags, dtype=wp.int32, device=device)
-    on["counts"] = wp.array(counts.astype(np.int32), dtype=wp.int32, device=device)
-    inertia = wp.float64(settings.joint_inertia)
+    host = {"rate": (rate, 0.0), "hardness": (hardness, 0.0), "floor": (floor, 0.0), "size": (size, 1.0),
+            "speed": (state.speed[rows, columns], 0.0), "load": (pull[rows, columns], 0.0)}
     largest = np.zeros(state.universes)
     np.maximum.at(largest, rows, np.abs(size))
     limit = TOLERANCE * np.maximum(1.0, largest)
-    for sub_index in range(int(counts.max())):
-        _substep(state, table, on, inertia, sub_index, counts, limit)
+    for attempt in range(RETRIES + 1):
+        on = {name: wp.array(_spread(shape, rows, columns, values, fill), dtype=wp.float64, device=device)
+              for name, (values, fill) in host.items()}
+        on["spans"] = wp.array(settings.step_time / np.maximum(counts, 1), dtype=wp.float64, device=device)
+        for name in ("start", "target", "slope", "pulled", "missed", "rates"):
+            on[name] = wp.zeros(shape, dtype=wp.float64, device=device)
+        on["flags"] = wp.array(flags, dtype=wp.int32, device=device)
+        on["counts"] = wp.array(counts.astype(np.int32), dtype=wp.int32, device=device)
+        on["inertia"], on["power"] = wp.float64(settings.joint_inertia), wp.float64(power)
+        unsolved = np.zeros(state.universes, dtype=bool)
+        for sub_index in range(int(counts.max())):
+            unsolved = _substep(state, table, on, sub_index, counts, limit)
+            if unsolved.any():
+                break
+        if not unsolved.any():
+            break
+        counts = np.where(unsolved, counts * FINER, counts)
+    else:
+        raise RuntimeError(f"joint swing: not solved in {ROUNDS} rounds with {int(counts.max()) // FINER} substeps")
     held = (on["flags"].numpy()[rows, columns] & _HELD) != 0
     state.size, state.speed = state.size.copy(), state.speed.copy()
     state.size[rows, columns] = on["size"].numpy()[rows, columns]
     state.speed[rows, columns] = on["speed"].numpy()[rows, columns]
     pressed[rows, columns] = paired & held & ~born
+    for universe in np.flatnonzero(pressed.any(axis=1)):
+        speed_handover(state, settings, int(universe), np.flatnonzero(pressed[universe]))
     state.cell_push = _push(state, settings)
     return pressed
 
@@ -236,36 +276,44 @@ def _spread(shape: tuple, rows: np.ndarray, columns: np.ndarray, values: np.ndar
     return table
 
 
-def _substep(state: State, table: dict, on: dict, inertia, sub_index: int, counts: np.ndarray,
-             limit: np.ndarray) -> None:
-    """One discrete-gradient substep of every universe still swinging, solved to TOLERANCE, swing energy kept."""
+def _substep(state: State, table: dict, on: dict, sub_index: int, counts: np.ndarray, limit: np.ndarray) -> np.ndarray:
+    """One discrete-gradient substep of every universe still swinging, solved to TOLERANCE, swing energy kept.
+
+    Returns per universe True when its rounds did not settle (the substep is then not finished in any universe).
+    """
     device = state.quanta.device
     shape = state.kind.shape
+    inertia = on["inertia"]
     wp.launch(_begin, dim=shape, device=device,
               inputs=[on["flags"], on["counts"], on["spans"], sub_index, on["size"], on["speed"], on["hardness"],
-                      on["load"], on["start"], on["target"], on["slope"]])
+                      on["load"], on["start"], on["target"], on["slope"], on["power"]])
     live = (counts > sub_index).astype(np.int32)
     worst = wp.zeros(state.universes, dtype=wp.float64, device=device)
     for _ in range(ROUNDS):
         live_d = wp.array(live, dtype=wp.int32, device=device)
         wp.launch(_gather, dim=shape, device=device,
-                  inputs=[table["offsets"], table["members"], on["rate"], on["slope"], on["pulled"]])
+                  inputs=[table["offsets"], table["members"], on["flags"], on["rate"], on["slope"], on["pulled"],
+                          on["rates"]])
         worst.zero_()
         wp.launch(_miss, dim=shape, device=device,
                   inputs=[on["flags"], live_d, on["spans"], table["between"], on["rate"], on["rates"], on["pulled"],
                           on["size"], on["target"], on["slope"], inertia, on["missed"], worst])
-        live = live * (worst.numpy() > limit)
+        miss = worst.numpy()
+        live = live * ((miss > limit) | ~np.isfinite(miss))
         if not live.any():
             break
+        if not np.all(miss < _LOST):
+            return live.astype(bool)
         wp.launch(_improve, dim=shape, device=device,
                   inputs=[on["flags"], wp.array(live, dtype=wp.int32, device=device), on["spans"], table["between"],
                           on["rate"], on["rates"], on["hardness"], on["load"], on["start"], on["missed"], inertia,
-                          on["size"], on["slope"]])
+                          on["size"], on["slope"], on["power"]])
     else:
-        raise RuntimeError(f"joint swing: not solved in {ROUNDS} rounds (largest miss {worst.numpy().max():.3e})")
+        return live.astype(bool)
     wp.launch(_finish, dim=shape, device=device,
               inputs=[on["flags"], on["counts"], on["spans"], sub_index, table["between"], on["rate"], on["rates"],
                       on["pulled"], on["slope"], on["floor"], inertia, on["size"], on["speed"]])
+    return np.zeros(state.universes, dtype=bool)
 
 
 def _volume_rates(table: dict, rate: np.ndarray) -> np.ndarray:
@@ -288,7 +336,8 @@ def _counts(settings: Settings, rows: np.ndarray, rate: np.ndarray, rates: np.nd
         others += np.where(volume >= 0, rates[rows, np.maximum(volume, 0)] - rate, 0.0)
     largest, stiffness = np.zeros(universes), np.zeros(universes)
     np.maximum.at(largest, rows, 2.0 * rate * others / settings.joint_inertia)
-    np.maximum.at(stiffness, rows, 30.0 * hardness / size ** 7)
+    steepness = settings.push_steepness
+    np.maximum.at(stiffness, rows, steepness * (steepness - 1.0) * hardness / size ** (steepness + 1.0))
     counts = np.zeros(universes, dtype=np.int64)
     for universe in np.unique(rows):
         omega = math.sqrt(largest[universe] * stiffness[universe])

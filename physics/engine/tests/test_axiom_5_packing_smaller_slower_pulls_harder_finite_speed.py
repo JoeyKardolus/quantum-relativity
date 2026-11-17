@@ -1,6 +1,6 @@
 """Axiom 5, Packing: more packed is smaller, slower and pulls harder; pull spreads at a finite speed, weaker with distance; squeezed minus pushes back steeply.
 
-The owner's axiom (bible physics/quantum-relativity, "The axioms", 2026-11-16), checked in 5 parts, each
+The owner's axiom (bible physics/quantum-relativity, "The axioms", 2026-11-16), checked in 6 parts, each
 kept whole from the file it came from (names that two parts shared carry a _P<n> suffix).
 
 Part 1 (was axiom 06). More energy makes a cell smaller, across the cells at every check.
@@ -71,12 +71,25 @@ source switched on at t = 0 the wave equation's pull inside the light cone is th
 walls' echo (back at r = 16 only at t = 64), the pull is compared with -G M / r. Each
 direction's mean ratio over its lattice points, and every single point, lies within 5% of
 1, and the three directions' means within 5% of each other.
+
+Part 6 (2026-11-17). Squeezed minus pushes back as steeply as the setting says, in the swing too.
+
+A joint's push is push * (wanted size / size) ** push_steepness (settings.py), and the
+joints swing on that push without friction (joint_swing.py), so one swing must keep
+the swing energy written with that same steepness (swing_energy.py). Before 2026-11-17
+the swing had 6 written in whatever the setting said, so a search over push_steepness
+moved nothing. new_universe(8, 10, seed 1), 20 steps of the whole engine with
+push_steepness 3.5 and with 8.25, then one more swing with the pull as load: the energy
+changes by less than 1e-9 of itself, and the same swing's energy written with steepness
+6 changes by more than 1e-6 of itself (the two steepnesses are told apart). Thresholds
+set before the run.
 """
 import numpy as np
 
 from scipy.stats import spearmanr
 from physics.engine.tests._gpu import needs_gpu
-from physics.engine import Settings, State, new_universe, pull_wave, step
+from physics.engine import Settings, State, cell_count, cell_laws, joint_swing, new_universe, pull_wave, step
+from physics.engine.tests.swing_energy import swing_energy
 
 
 MOST_P1 = -0.7
@@ -263,3 +276,28 @@ def test_the_pull_matches_minus_g_m_over_r_along_axes_and_diagonals():
     spread = (max(means.values()) - min(means.values())) / np.mean(list(means.values()))
     print(f"spread of the three means: {spread:.4f}")
     assert spread <= 0.05
+
+
+@needs_gpu
+def test_the_swing_pushes_back_as_steeply_as_the_setting_says():
+    import dataclasses
+    for steepness in (3.5, 8.25):
+        settings = Settings(push_steepness=steepness)
+        other = dataclasses.replace(settings, push_steepness=6.0)
+        state = new_universe(8, 10, seed=1)
+        for _ in range(20):
+            step(state, settings)
+        load = cell_count(state)
+        cell_laws(state, settings)
+        joints = (state.kind[0] == -1) & (state.wanted[0] > 0.0)
+        before = swing_energy(state, settings, load, joints)
+        before_other = swing_energy(state, other, load, joints)
+        assert np.abs(state.speed[0, joints]).max() > 1e-3
+        pressed = joint_swing(state, settings, load)
+        change = abs(swing_energy(state, settings, load, joints) - before) / abs(before)
+        change_other = abs(swing_energy(state, other, load, joints) - before_other) / abs(before_other)
+        print(f"push_steepness {steepness}: swing energy changes by {change:.2e} of itself; written with steepness 6 "
+              f"it changes by {change_other:.2e}; pressed {int(pressed.sum())}")
+        assert not pressed.any()
+        assert change <= 1e-9
+        assert change_other > 1e-6

@@ -30,8 +30,9 @@ side; the detail ladder (`physics/ladder`) can sit beside the boxes.
   whirl cores hold. The volumes' fluid presses joints (`wall_press`), so
   joints swing from the start. Cells start with at least `least_cell_boxes` (216).
 - **Joints swing, volumes follow.** `joint_swing`: frictionless, energy-keeping spring
-  step, on the GPU. Boxes follow sizes (`exchange`, `mortar_shift`, by room order); a
-  box changes cell only once emptied, every volume wrapped on 26 sides.
+  step on the GPU, steepness from the setting, retried finer when unsettled. A stopped
+  joint is in no spring and hands on its speed (`speed_handover`). Boxes follow sizes
+  (`exchange`, `mortar_shift`); a box changes cell only once emptied.
 - **No rule copies every box to the host.** `new_universe` builds on the GPU
   (`_start.py`), a tear and a collapse read only their room (`cells_span`), each cell
   takes its own fluid substeps (`later_substeps`).
@@ -40,12 +41,11 @@ side; the detail ladder (`physics/ladder`) can sit beside the boxes.
 - **Local clocks**: every per-cell rule runs at its cell's rate (`clock_rate`).
 - **Wrapping**: margin 0 wraps on an even side. Universes never touch (`reach`).
 
-## Measured (2026-11-16, RTX 5080, defaults, seed 1)
+## Measured (2026-11-17, RTX 5080, defaults, seed 1)
 
-Default universe (88^3, 512 volumes), 2000 steps: amount exact, 0 collapses, 0 splits,
-lumps 126 -> 131, joints' share of boxes 25% -> 30%. Strict xfail: axiom 2 swing (1 of
-1536 joints turns twice in 300 steps, riding a drift). Sizes:
-`bench/CLAUDE.md`.
+24 places wrapping, 16,000 steps: amount exact, 0 collapses, 0 tears, nothing sealed
+(squeeze at most 0.33, seal 1). Open space: tears cascade. Issue #1.
+Strict xfail: axiom 2 swing. Sizes: `bench/CLAUDE.md`.
 
 ## Run
 

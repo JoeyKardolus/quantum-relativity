@@ -19,7 +19,8 @@ volume stays wrapped on all 26 sides and the joints stay one web. Every box of B
 (bit 2): B and J are no more. A joint B had with a volume X becomes A's; where A and B
 both had a joint with X the two become one joint (the higher id's boxes join the
 lower's, bit 2, sizes and speeds added), so two neighbouring volumes still share exactly
-one joint. A's clock is the box weighted mean of A's and B's. tallies[u, 1] counts the
+one joint. J's speed goes to the joints it shared springs with (speed_handover.py: the
+springs only trade size). A's clock is the box weighted mean of A's and B's. tallies[u, 1] counts the
 boxes turned plus, tallies[u, 3] their quanta, state.collapses the joints collapsed. The
 boxes are changed on the host: only the room the joint, its two volumes and their joints
 lie in is read and written back (cells_span.py), when the joint boxes left beside the
@@ -35,6 +36,7 @@ from physics.engine.cells_span import cells_span
 from physics.engine.group_label import group_label
 from physics.engine.near import near
 from physics.engine.settings import Settings
+from physics.engine.speed_handover import speed_handover
 from physics.engine.state import State
 from physics.engine.window_read import window_read
 from physics.engine.window_write import window_write
@@ -57,6 +59,7 @@ def collapse(state: State, settings: Settings, pressed: np.ndarray | None = None
         for joint in sorted(np.flatnonzero(ready[universe]), key=lambda cell: -packing[universe, cell]):
             if state.kind[universe, joint] != -1 or state.between[universe, joint].min() < 0:
                 continue
+            speed_handover(state, settings, int(universe), [int(joint)])
             flipped, amount = _collapse_one(state, int(universe), int(joint))
             tallies[universe, 1] += flipped
             tallies[universe, 3] += amount
