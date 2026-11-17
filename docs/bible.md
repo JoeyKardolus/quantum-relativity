@@ -935,12 +935,12 @@ Owner, 2026-11-15, replacing every earlier picture of the structure:
 
 The owner's eight axioms (2026-11-16); the rules below spell them out, and the engine has one test per rule.
 
-1. **Energy**: an always-moving quantum fluid, one whole signed number of quanta per Planck box at each moment of local time; the total is fixed; zero is empty space, which does nothing.
+1. **Energy**: an always-moving quantum fluid, one whole signed number of quanta per Planck box at each moment of local time; the total is not fixed (owner, 2026-11-17): a squeezed joint makes more minus energy out of itself, and a collapse takes the joint's energy off the rest, so black holes keep the total from running away; zero is empty space, which does nothing.
 2. **Cells are swirls**: plus only pulls, minus only pushes, both oscillate in whole steps.
-3. **Structure**: plus never touches plus; thin minus wraps every plus and forms one web.
+3. **Structure**: plus never touches plus; minus wraps every plus and forms one web. The cells are the grid (owner, 2026-11-17): a perfect A B A B pattern that never breaks and never flickers; a cell has no geometry of its own, only relations to its neighbours and a size set by its energy alone, more energy smaller, for volumes and joints alike. Lumps warp the grid by making their cells small. Planck boxes are not space: they sit inside each cell only to compute its fluid.
 4. **Crossing**: energy diffuses between plus swirls only through minus; that is the only friction, and it becomes heat.
 5. **Packing**: more packed is smaller, slower and pulls harder; pull spreads at a finite speed, weaker with distance; squeezed minus pushes back steeply.
-6. **Limits**: squeezed minus collapses into a merge of its two volumes; overstretched plus tears, and only that cell splits.
+6. **Limits**: a joint's energy rises only while it is squeezed, so a fresh joint is the fattest it will ever be and thins as it is squeezed; squeezed too far it collapses, its energy is taken off the rest, and its two volumes merge; overstretched plus tears, and only that cell splits.
 7. **Quantum**: each box's fluid also carries a phase, so waves add and cancel. Moving energy can split over several routes at once. Every split gets a direct pull between its halves, private to them, and its own oscillation, a shared state that keeps turning (not time, not a local clock), starting at the split at a speed set at that split that nobody can know. At each turn a pointer jumps to one of the halves' cells, with that cell's share of the energy as its chance. When something reacts with a half, or the energy loses its momentum, it settles whole in the cell the pointer is on.
 8. **Nothing else.**
 
