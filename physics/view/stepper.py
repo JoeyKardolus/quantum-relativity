@@ -3,13 +3,13 @@
 Contract: `Stepper(source, steps_per_frame, paused=False)` starts a daemon thread that
 publishes the start, then runs `steps_per_frame` source steps, then publishes a
 Snapshot, and repeats while not paused. A Snapshot carries the step count, the
-triangles to draw (positions float32 (n, 3), colours uint8 (n, 4), `grid_triangles` of
-the source's `view()`; the source interface is in `cells_source.py`), the cells drawn,
+triangles to draw (corners, colours and pattern, `grid_triangles` of the source's
+`view()`; the source interface is in `cells_source.py`), the cells drawn,
 the grid's bounding corners low and high, the latest stats (refreshed at most every
 STATS_EVERY seconds, and on every reset, pause or change of view), steps per second,
 paused, error, generation (bumped on each reset, so the window can re-fit) and layer
-(the slice's lattice index along z, None for the whole grid). It starts on the slice
-at `middle_layer`. `latest()` returns the newest Snapshot, or None when none is new
+(the slice's lattice index along z, None for the whole grid). It starts on the whole
+grid; the slice starts at `middle_layer`. `latest()` returns the newest Snapshot, or None when none is new
 since the last call. `show(kinds)` picks which kinds are drawn (`grid_triangles`
 SHOW_ENERGY_VOLUMES, SHOW_JOINTS or SHOW_BOTH, the start; any other value raises
 ValueError). `toggle_whole()` switches between the slice and the whole grid.
@@ -40,8 +40,9 @@ class Snapshot:
     """What the window draws and titles: one moment of the source."""
 
     step: int
-    positions: np.ndarray
+    corners: np.ndarray
     colours: np.ndarray
+    pattern: np.ndarray
     drawn: int
     low: np.ndarray
     high: np.ndarray
@@ -58,7 +59,7 @@ class Stepper:
 
     def __init__(self, source, steps_per_frame: int = 1, paused: bool = False) -> None:
         self.source = source
-        self.whole = False
+        self.whole = True
         self.slice_offset = 0
         self.steps_per_frame = max(1, int(steps_per_frame))
         self.paused = paused
@@ -157,11 +158,11 @@ class Stepper:
     def _publish(self) -> None:
         pieces = self.source.view()
         layer = None if self.whole else (middle_layer(pieces.side) + self.slice_offset) % pieces.side
-        positions, colours, drawn = grid_triangles(pieces, self.shown, layer)
+        corners, colours, pattern, drawn = grid_triangles(pieces, self.shown, layer)
         now = time.perf_counter()
         if now - self._stats_at >= STATS_EVERY:
             self._stats, self._stats_at = self.source.stats(), now
-        snapshot = Snapshot(step=int(self.source.steps), positions=positions, colours=colours, drawn=drawn,
+        snapshot = Snapshot(step=int(self.source.steps), corners=corners, colours=colours, pattern=pattern, drawn=drawn,
                             low=pieces.low, high=pieces.high, stats=self._stats, steps_per_second=self._rate,
                             paused=self.paused, error=self.error, generation=self.generation, layer=layer)
         with self._lock:

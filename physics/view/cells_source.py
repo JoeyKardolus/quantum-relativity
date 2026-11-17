@@ -1,6 +1,6 @@
 """Cells source: the engine (physics.engine) behind the viewer's source interface.
 
-Contract (the source interface the `Stepper` and `slice_frames` read; a test may supply
+Contract (the source interface the `Stepper` and `saved_frames` read; a test may supply
 any object that has the same):
   reset()      back to a fresh start: `new_universe(cells_per_side, seed, unevenness,
                slope)`, step 0

@@ -2,14 +2,16 @@
 
 Contract: `CellWindow(stepper)` opens a resizable pyglet window (vsync off) that, on
 every draw, uploads the stepper's newest snapshot (if any) to a `CellMesh` and draws it
-through an `orbit_camera`. Positions are in grid lengths (the sum of cell lengths). On
+through an `orbit_camera`, over black: the whole grid with its faces shaded and its
+opacity on the whole grid's scale (FACE_SHADE, WHOLE_POWER), the slice as it is.
+Positions are in grid lengths (the sum of cell lengths). On
 the first snapshot, after each reset (a new generation), whenever the grid outgrows the
 last fit (`view_fit`, REFIT_GROWTH) and on F, the view is fitted to the grid's bounds;
-turning is kept. It starts on the slice, seen straight on.
-Controls: space starts and pauses, C switches between the slice through the middle
-and the whole grid (the slice turns the camera to face it, looking along z; the whole
-grid turns it to the corner at lattice index 0, where the opened grid ends in energy
-volumes; the opposite faces end in a layer of joints and are all blue), arrow keys or [ and ] move the slice one lattice layer,
+turning is kept. It starts on what the stepper starts on: the whole grid, seen from
+the corner at lattice index 0.
+Controls: space starts and pauses, C switches between the whole grid and the slice
+through the middle (the slice turns the camera to face it, looking along z; the whole
+grid turns it back to the corner), arrow keys or [ and ] move the slice one lattice layer,
 1 shows only energy volumes, 2 only joints, 3 both, mouse drag rotates, wheel zooms,
 F fits the view, R resets the source (and the view), Esc quits. The title
 (`title_line`) refreshes 4 times a second. Closing the window stops the stepper.
@@ -23,8 +25,9 @@ import numpy as np
 import pyglet
 from pyglet.window import key
 
+from physics.view.cell_colours import WHOLE_POWER
 from physics.view.cell_mesh import CellMesh
-from physics.view.grid_triangles import SHOW_BOTH, SHOW_ENERGY_VOLUMES, SHOW_JOINTS
+from physics.view.grid_triangles import FACE_SHADE, SHOW_BOTH, SHOW_ENERGY_VOLUMES, SHOW_JOINTS
 from physics.view.orbit_camera import orbit_camera
 from physics.view.title_line import title_line
 from physics.view.view_fit import view_fit
@@ -52,7 +55,7 @@ class CellWindow(pyglet.window.Window):
         self.generation = -1
         self.centre, self.distance = np.zeros(3), 1.0
         self.fitted_extent = None
-        self.yaw, self.pitch = FACING
+        self.yaw, self.pitch = CORNER if stepper.whole else FACING
         self._frames, self._frames_since = 0, time.perf_counter()
         self.frames_per_second = 0.0
         self._titled_at = 0.0
@@ -61,7 +64,7 @@ class CellWindow(pyglet.window.Window):
         """Take the newest snapshot, draw it, count the frame."""
         snapshot = self.stepper.latest()
         if snapshot is not None:
-            self.mesh.upload(snapshot.positions, snapshot.colours)
+            self.mesh.upload(snapshot.corners, snapshot.colours, snapshot.pattern)
             if snapshot.generation != self.generation:
                 self.fitted_extent = None
                 self.generation = snapshot.generation
@@ -73,7 +76,10 @@ class CellWindow(pyglet.window.Window):
         self.clear()
         camera = orbit_camera(self.centre, self.distance, self.yaw, self.pitch,
                               width / max(height, 1), FOV_DEGREES)
-        self.mesh.draw(camera, width, height)
+        if self.snapshot is not None and self.snapshot.layer is None:
+            self.mesh.draw(camera, width, height, FACE_SHADE, WHOLE_POWER)
+        else:
+            self.mesh.draw(camera, width, height)
         self._count_frame()
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers) -> None:
