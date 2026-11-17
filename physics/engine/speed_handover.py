@@ -12,7 +12,9 @@ leave its neighbours' speeds adding up to its own, the other way, and the joints
 size drifting for good (before 2026-11-17: by 4,065 boxes in one step of a universe of
 2.3 million). A swinging joint is a joint holding quanta whose size is not below its
 collapse limit (quanta / collapse_packing) and that is not in `stopped`. A stopped joint
-with no swinging neighbour loses its speed. Reads state.kind, between, rate, size,
+with no swinging neighbour hands its speed to every swinging joint of the universe by
+clock rate (the web is one, so the speeds still add up to nothing; before 2026-11-17 it
+lost its speed); only when no joint of the universe swings is the speed lost. Reads state.kind, between, rate, size,
 cell_quanta; writes state.speed. The sums run in cell id order. Returns None.
 """
 from __future__ import annotations
@@ -52,6 +54,9 @@ def speed_handover(state: State, settings: Settings, universe: int, stopped: np.
     for pick in range(2):
         volume = sides[takers, pick]
         gain += np.where(volume >= 0, given[np.maximum(volume, 0)], 0.0)
+    alone = sum(np.where(sides[stopped, side] >= 0, rates[np.maximum(sides[stopped, side], 0)], 0.0) for side in range(2)) <= 0.0
+    if alone.any() and takers.size:
+        gain += float(speed[stopped][alone].sum()) / float(rate[takers].sum())
     state.speed = state.speed.copy()
     state.speed[universe, takers] += rate[takers] * gain
     state.speed[universe, stopped] = 0.0

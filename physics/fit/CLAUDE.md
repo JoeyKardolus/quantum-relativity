@@ -43,12 +43,12 @@ in `__init__.py`.
 
 ## Measured (2026-11-17, RTX 5080)
 
-24 places of 10 (1,728 volumes, 2.3M boxes, wrapping), 3,000 steps, 8 side by side,
+24 places of 10 (1,728 volumes, 2.3M boxes, wrapping), 3,000 steps, 8 at once,
 4.5 h: 105 runs, 51 measured, 37 died in `joint_swing`, 17 unfinished. **Void**: the
-swing then had three faults (steepness written in as 6, joints past their collapse limit
-swelling their neighbours without end, stopped joints' speed dropped; fixed that day),
-and the best point (`fitted/`, 0.387 against the defaults' 0.253) won on them: its
-growing room was joints swelling. Search again. Log: issue #1.
+swing had three faults (fixed that day), and the best point (`fitted/`, 0.387
+against the defaults' 0.253) won on them: its room was joints swelling. 22% of
+its joints start past the collapse limit and collapse at once: it falls in
+(24 places: 1,728 volumes to one in 4 steps). Search again (issue #1).
 
 ## Run
 

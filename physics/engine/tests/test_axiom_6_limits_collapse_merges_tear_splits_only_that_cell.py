@@ -1,6 +1,6 @@
 """Axiom 6, Limits: squeezed minus collapses into a merge of its two volumes; overstretched plus tears, and only that cell splits.
 
-The owner's axiom (bible physics/quantum-relativity, "The axioms", 2026-11-16), checked in 7 parts, each
+The owner's axiom (bible physics/quantum-relativity, "The axioms", 2026-11-16), checked in 9 parts, each
 kept whole from the file it came from (names that two parts shared carry a _P<n> suffix).
 
 Part 1 (was axiom 02). Plus and minus never cancel; only joint collapse turns minus into plus, only a tear turns plus into minus.
@@ -99,14 +99,17 @@ the default settings collapse no joint.
 
 Part 6 (2026-11-17). A joint already past its limit waits for its collapse and moves nothing else.
 
-A joint whose energy wants a size past the collapse packing does not swing (joint_swing.py:
-the collapse takes it once its boxes have followed), so it is in no spring: the joints
+A joint whose size is past the collapse packing does not swing (joint_swing.py: the
+collapse that opens the next step takes it), so it is in no spring: the joints
 that do swing trade size only with each other, without friction. Before 2026-11-17 such
 a joint stood in its neighbours' springs with load 0 and swelled them without end (in
 the fitted universe the joints' summed size grew from 582,000 to 1,305,000 boxes in 100
-steps, which the fit had counted as space growing). new_universe(8, 10, seed 1,
-joint_unevenness 0.8), Settings(): at least one joint starts past the limit; after 10
-steps of the whole engine, one more swing with the pull as load: the swinging joints'
+steps, which the fit had counted as space growing). new_universe(8, 10, seed 1),
+Settings(): after 10 steps of the whole engine every tenth joint between two volumes is
+put at half its limit size and hands its speed on (speed_handover.py; since 2026-11-17 the opening collapse takes a joint
+found past its limit, part 8, so none is left waiting after a step and the test places
+them; the start with joint_unevenness 0.8 used before is one volume after two steps);
+one more swing with the pull as load: the swinging joints'
 summed size and their swing energy (swing_energy.py) change by less than 1e-9 of
 themselves, no joint past the limit has moved, and none was pressed to the limit in
 that swing. Thresholds set before the run.
@@ -124,11 +127,37 @@ sizes added without sign. Staged on new_universe(5, 10, seed 1, unevenness 0, ma
 after its cells are counted: one joint is given speed 3 and handed over; its speed is 0,
 only joints that share a volume with it gained, each in proportion to its clock rate,
 and the gains add up to 3 within 1e-12. Thresholds set before the run.
+
+Part 8 (2026-11-17). A joint whose own size is past the collapse limit collapses at the next step, whatever its boxes say.
+
+The swing stops a joint at the size where its quanta over its size reach collapse_packing
+and returns it for collapse; a joint found past that size does not swing. Before
+2026-11-17 the opening collapse read only quanta per box, and a joint is a wall at least
+one box thick, so such a joint neither swung nor collapsed: it pushed nothing for good
+(943 of the fitted universe's 4,416 joints at step 200). The same start as part 6, its
+cells counted: at least one joint between two volumes is past the limit by its size and
+under it by its boxes; after one step() every one of them is gone (no tear happened, so
+no id was used again), at least one joint collapsed, and the plus total grew by exactly the quanta the collapses turned plus.
+Part 9 (2026-11-17). A tear and the collapse of its joint are mirrors: the joints the tear cut come back the size they were.
+
+A joint a torn volume shared with a neighbour is cut in two, each piece keeping the
+whole's squeeze (a piece holds less energy and wants more room); when the tear's joint
+collapses the two pieces are one joint again. Before 2026-11-17 their sizes were then
+added, so the joint came back 16 times bigger than it was (two halves each want 8 times
+the room) and pushed nothing. The 8-volume even start (new_universe(5, 10, seed 1,
+unevenness 0, margin 10)), its cells counted; volume_split alone with split_across 9 (a
+staging: the start's volumes are 10 across) tears one volume and cuts at least one of its
+joints; the cells are counted and the tear's joint is collapsed (collapse with it marked
+as pressed): the volumes and joints are as many as before the tear, and every joint that
+was cut is between a half and twice the size it had (not the same to the last digit: its
+boxes in the tear's plane went to the tear's joint). Thresholds set before the run.
 """
+import dataclasses
+
 import numpy as np
 
 from physics.engine import (Settings, State, cell_count, cell_laws, cells, collapse, group_label, host_boxes,
-                            joint_swing, near, new_universe, speed_handover, stats, step, totals)
+                            joint_swing, near, new_universe, speed_handover, stats, step, totals, volume_split)
 from physics.engine.tests._gpu import needs_gpu
 from physics.engine.tests.axiom_pressure import axiom_pressure
 from physics.engine.tests.axiom_contacts import axiom_contacts
@@ -376,12 +405,15 @@ def test_a_tear_keeps_one_web_every_volume_wrapped_and_no_joint_collapses_after_
 @needs_gpu
 def test_a_joint_past_its_limit_does_not_swing_and_moves_no_other_joint():
     settings = Settings()
-    state = new_universe(8, 10, seed=1, joint_unevenness=0.8)
+    state = new_universe(8, 10, seed=1)
     for _ in range(10):
         step(state, settings)
     load = cell_count(state)
     cell_laws(state, settings)
     joints = (state.kind[0] == -1) & (state.wanted[0] > 0.0)
+    staged = np.flatnonzero(joints & (state.between[0].min(axis=1) >= 0))[::10]
+    state.size[0, staged] = 0.5 * state.cell_quanta[0, staged] / settings.collapse_packing
+    speed_handover(state, settings, 0, staged)
     waiting = joints & (state.size[0] < state.cell_quanta[0] / settings.collapse_packing)
     swinging = joints & ~waiting
     summed = float(state.size[0, swinging].sum())
@@ -429,3 +461,62 @@ def test_a_stopped_or_collapsing_joint_hands_its_speed_on_so_the_speeds_add_up_t
     assert staged.speed[0, stopped] == 0.0 and not staged.speed[0, others].any()
     assert (gained > 0.0).all() and abs(gained.sum() - 3.0) <= 1e-12
     assert shares.max() - shares.min() <= 1e-12
+
+
+@needs_gpu
+def test_a_joint_past_the_limit_by_its_own_size_collapses_at_the_next_step():
+    settings = Settings()
+    state = new_universe(8, 10, seed=1, joint_unevenness=0.8)
+    cell_count(state)
+    cell_laws(state, settings)
+    paired = (state.kind[0] == -1) & (state.between[0].min(axis=1) >= 0) & (state.cell_quanta[0] > 0)
+    by_size = paired & (state.size[0] < state.cell_quanta[0] / settings.collapse_packing)
+    by_boxes = paired & (state.cell_quanta[0] / np.maximum(state.cell_boxes[0], 1) >= settings.collapse_packing)
+    waiting = np.flatnonzero(by_size & ~by_boxes)
+    plus_before = totals(state)["plus"]
+    step(state, settings)
+    left = int((state.kind[0, waiting] == -1).sum())
+    gained = int(totals(state)["plus"] - plus_before)
+    print(f"joints past the limit by size and under it by boxes at the start {waiting.size}; still joints after one "
+          f"step {left}; collapses {int(state.collapses[0])}, tears {int(state.splits[0])}; plus gained {gained}, "
+          f"collapsed quanta {int(state.tallies.numpy()[0, 3])}")
+    assert waiting.size >= 1 and state.splits[0] == 0
+    assert left == 0 and state.collapses[0] >= 1
+    assert gained == int(state.tallies.numpy()[0, 3])
+
+
+@needs_gpu
+def test_a_tear_and_the_collapse_of_its_joint_give_the_cut_joints_their_size_back():
+    settings = dataclasses.replace(Settings(), split_across=9.0)
+    state = new_universe(5, 10, seed=1, unevenness=0.0, margin=10)
+    cell_count(state)
+    cell_laws(state, settings)
+    joints = np.flatnonzero((state.kind[0] == -1) & (state.between[0].min(axis=1) >= 0))
+    before = np.flatnonzero(state.kind[0] == 1)
+    size, sides = state.size[0].copy(), state.between[0].copy()
+    assert volume_split(state, settings) == 1
+    cell_count(state)
+    cell_laws(state, settings)
+    torn = np.flatnonzero((state.kind[0] == -1) & (state.between[0].min(axis=1) >= 0))
+    boxes = host_boxes(state)
+    tear = int(np.unique(boxes["owner"][((state.marks.numpy() & 8) == 8) & (boxes["quanta"] < 0)])[0])
+    halves = set(int(cell) for cell in state.between[0, tear])
+    cut = joints[np.abs(state.size[0, joints] / size[joints] - 1.0) > 1e-9]
+    pressed = np.zeros(state.kind.shape, dtype=bool)
+    pressed[0, tear] = True
+    assert collapse(state, settings, pressed) == 1
+    after = np.flatnonzero(state.kind[0] == 1)
+    whole = int(np.intersect1d(after, list(halves))[0])
+    back = np.flatnonzero((state.kind[0] == -1) & (state.between[0].min(axis=1) >= 0))
+    ratios = []
+    for joint in cut:
+        other = int(sides[joint][~np.isin(sides[joint], list(halves))][0])
+        again = back[np.all(state.between[0, back] == sorted((other, whole)), axis=1)]
+        assert again.size == 1
+        ratios.append(float(state.size[0, again[0]] / size[joint]))
+    print(f"joints between two volumes {joints.size} -> {torn.size} after the tear -> {back.size} after its joint's "
+          f"collapse; volumes {before.size} -> {after.size}; joints cut {cut.size}, their size after over before "
+          f"{min(ratios):.3f} .. {max(ratios):.3f}")
+    assert cut.size >= 1 and torn.size == joints.size + 1 + cut.size
+    assert back.size == joints.size and after.size == before.size
+    assert min(ratios) >= 0.5 and max(ratios) <= 2.0

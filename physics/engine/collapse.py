@@ -3,7 +3,11 @@
 Contract: `collapse(state, settings, pressed=None)` collapses, most packed first, every
 joint that lies between two energy volumes and whose energy concentration, minus quanta
 per box (state.cell_quanta / state.cell_boxes, cell_count.py), is at least
-collapse_packing, or that `pressed` (bool per universe and cell id, joint_swing.py: its
+collapse_packing, or whose own size (state.size, its swing's) is below its quanta over
+collapse_packing (the swing's own test; such a joint does not swing, and before
+2026-11-17 it never collapsed either while its boxes, a wall at least one box thick, kept
+it under the limit: 943 of 4,416 joints of the fitted universe stood so at step 200), or
+that `pressed` (bool per universe and cell id, joint_swing.py: its
 swing reached the collapse packing within the step) marks. Owner, 2026-11-16: a joint
 collapses only when its energy concentration gets too high, never because it is low on
 energy or smaller than its energy wants (a fresh joint from a tear holds the least
@@ -18,9 +22,18 @@ to a neighbouring joint of A or B, else the nearest joint (marks bit 2), so the 
 volume stays wrapped on all 26 sides and the joints stay one web. Every box of B joins A
 (bit 2): B and J are no more. A joint B had with a volume X becomes A's; where A and B
 both had a joint with X the two become one joint (the higher id's boxes join the
-lower's, bit 2, sizes and speeds added), so two neighbouring volumes still share exactly
-one joint. J's speed goes to the joints it shared springs with (speed_handover.py: the
-springs only trade size). A's clock is the box weighted mean of A's and B's. tallies[u, 1] counts the
+lower's, bit 2, speeds added), so two neighbouring volumes still share exactly
+one joint; the joined joint holds both joints' quanta, so it wants less room than the two
+did (length = constant / energy), and its size is that wanted size times the two joints'
+pooled stretch (their summed size over their summed wanted size): it is as squeezed as
+they were together and pushes on as before, the mirror of a tear, whose pieces keep the
+whole's squeeze (volume_split.py). Before 2026-11-17 the sizes were added instead: the
+joined joint sat 16 times larger than its energy wants and pushed nothing (median squeeze
+-0.99 after the fitted universe's collapses), and a volume that tore and fell back
+together got its joints back 16 times or more bigger each time (ten steps running took
+the joints' summed size from 1.9e4 to 1.4e42 boxes in a universe of 290,000). J's speed goes to the joints it shared springs with (speed_handover.py: the
+springs only trade size), and so does the speed of a joint the joining left past its
+limit, which swings no more and collapses when the next step opens. A's clock is the box weighted mean of A's and B's. tallies[u, 1] counts the
 boxes turned plus, tallies[u, 3] their quanta, state.collapses the joints collapsed. The
 boxes are changed on the host: only the room the joint, its two volumes and their joints
 lie in is read and written back (cells_span.py), when the joint boxes left beside the
@@ -46,6 +59,7 @@ def collapse(state: State, settings: Settings, pressed: np.ndarray | None = None
     """Collapse every joint packed past the limit (or pressed there by its swing); its two volumes become one."""
     packing = state.cell_quanta / np.maximum(state.cell_boxes, 1)
     over = packing >= settings.collapse_packing
+    over |= (state.cell_quanta > 0) & (state.size < state.cell_quanta / settings.collapse_packing)
     if pressed is not None:
         over |= pressed
     if not over.any():
@@ -65,6 +79,9 @@ def collapse(state: State, settings: Settings, pressed: np.ndarray | None = None
             tallies[universe, 3] += amount
             state.collapses[universe] += 1
             done += 1
+        joined = (state.kind[universe] == -1) & (state.cell_quanta[universe] > 0)
+        joined &= state.size[universe] < state.cell_quanta[universe] / settings.collapse_packing
+        speed_handover(state, settings, int(universe), np.flatnonzero(joined))
     state.tallies.assign(tallies)
     return done
 
@@ -224,10 +241,27 @@ def _join_twins(state: State, universe: int, volume: int, owner: np.ndarray, mar
             moving = owner == twin
             owner[moving] = first
             marks[moving] |= 2
-            state.size[universe, first] += state.size[universe, twin]
+            _pool(state, universe, first, int(twin))
             state.speed[universe, first] += state.speed[universe, twin]
             state.kind[universe, twin] = 0
             state.size[universe, twin] = 0.0
             state.speed[universe, twin] = 0.0
             state.between[universe, twin] = -1
 
+
+
+def _pool(state: State, universe: int, first: int, twin: int) -> None:
+    """Give joint `first` the twin's quanta and the size they want together, times the two joints' pooled stretch."""
+    sizes = state.size[universe, [first, twin]]
+    wanted = state.wanted[universe, [first, twin]]
+    amount = int(state.cell_quanta[universe, [first, twin]].sum())
+    if amount <= 0 or wanted.sum() <= 0.0:
+        state.size[universe, first] = float(sizes.sum())
+        return
+    together = (float(state.size_energy[universe, 1]) / amount) ** 3
+    stretch = float(sizes.sum()) / float(wanted.sum())
+    state.size[universe, first] = stretch * together
+    state.wanted[universe, first] = together
+    state.cell_quanta[universe, first] = amount
+    state.cell_quanta[universe, twin] = 0
+    state.wanted[universe, twin] = 0.0
