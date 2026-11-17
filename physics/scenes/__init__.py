@@ -12,7 +12,7 @@ Module map:
   structure.py       structure: the clustering spectrum of the volumes' energy over time
   bound_lump.py      bound_lump: the most packed volume's length against the other volumes'
   orbit.py           orbit: extra energy beside a packed volume; how long it holds, where it goes
-  black_hole.py      black_hole: sealed region radius against its energy, per packed energy
+  black_hole.py      black_hole: how far round a packed core energy flows inward and the pull's depth reaches, against the core's energy
   two_lumps.py       two_lumps: the pull each of two placed lumps feels toward the other against distance, beside one over distance squared
   isotropy.py        isotropy: pull and arrived energy round one placed lump, on an axis against off it at the same distance
   spin.py            spin: a whirl placed inside one cell, its whole turns read at every step
