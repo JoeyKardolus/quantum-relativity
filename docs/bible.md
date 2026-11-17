@@ -933,7 +933,7 @@ Owner, 2026-11-15, replacing every earlier picture of the structure:
 
 ### The axioms
 
-The owner's eight axioms (2026-11-16); the rules below spell them out, and the engine has one test per rule.
+The owner's seven axioms (2026-11-16; an eighth, "nothing else", was dropped on 2026-11-17: with the seven done right it is a given). The engine is laid out by them: one directory per axiom, each with its definitions, its logic and its tests.
 
 1. **Energy**: an always-moving quantum fluid, one whole signed number of quanta per Planck box at each moment of local time; the total is not fixed (owner, 2026-11-17): a squeezed joint makes more minus energy out of itself, and a collapse takes the joint's energy off the rest, so black holes keep the total from running away; zero is empty space, which does nothing.
 2. **Cells are swirls**: plus only pulls, minus only pushes, both oscillate in whole steps.
@@ -942,7 +942,6 @@ The owner's eight axioms (2026-11-16); the rules below spell them out, and the e
 5. **Packing**: more packed is smaller, slower and pulls harder; pull spreads at a finite speed, weaker with distance; squeezed minus pushes back steeply.
 6. **Limits**: a joint's energy rises only while it is squeezed, so a fresh joint is the fattest it will ever be and thins as it is squeezed; squeezed too far it collapses, its energy is taken off the rest, and its two volumes merge; overstretched plus tears, and only that cell splits.
 7. **Quantum**: each box's fluid also carries a phase, so waves add and cancel. Moving energy can split over several routes at once. Every split gets a direct pull between its halves, private to them, and its own oscillation, a shared state that keeps turning (not time, not a local clock), starting at the split at a speed set at that split that nobody can know. At each turn a pointer jumps to one of the halves' cells, with that cell's share of the energy as its chance. When something reacts with a half, or the energy loses its momentum, it settles whole in the cell the pointer is on.
-8. **Nothing else.**
 
 Axiom 7 in the engine (built 2026-11-16; these readings are assumptions until the owner confirms them). A moving energy is tracked whole: how many quanta of each cell belong to it and its wave's phase there; the quanta stay in the boxes. **A split** is a frictionless handover that leaves it in two or more cells. The engine's own crossing takes all direction off what crosses, so only a scene places a splitter or a route (staged). The split's oscillation gets its speed at the split from its own draws and nothing reads it; the pointer jumps at every whole turn by share, and rides with energy handed on. **A reaction** is a detector a scene places in a cell, or a collapse or tear changing a half's cell. **Losing its momentum**: the share of a cell's quanta that crosses out by friction takes that share of the energy's direction; with none left it settles. Settling moves the other cells' parts into the pointer's cell at once, in whole quanta. Open: while split each cell really holds its share, so a reaction on one side changes the far cell's energy at once (300 quanta become 0 or 1000); a far detector's odds stay the same, but the far cell's size could tell, and a message could ride on that. Filter-angle tests on pairs of whirls are not built.
 
