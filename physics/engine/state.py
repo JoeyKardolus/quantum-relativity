@@ -1,385 +1,236 @@
-"""State: the engine's boxes on the GPU and its graph of cells, universes side by side.
+"""State: the grid of cells, their relations, and each cell's own block of compute boxes, on the GPU.
 
-Contract: `State.from_host(quanta, phase, seed=1, device=None, lattice=None, wrap=False)`
-copies signed quanta and phases (radians) and the cell graph to the GPU and returns the
-state step() advances. `quanta` is a cube (side, side, side) for one universe, or
-(universes, side, side, side) for a batch stepped side by side; `phase` has the same
-shape. Universe u holds first indices u * side .. u * side + side - 1 of every per-box
-array; no rule reads from one universe into the next (reach.py). `wrap` True makes
-every universe wrap round at its edges (opposite faces meet, no walls; an even side).
-Per box:
-  quanta     int32 whole quanta: plus = an energy volume's box, minus = a joint's box,
-             0 = no space. The amount ignoring sign is conserved exactly (bible rule 4)
-  phase      float32 in (-pi, pi], the quantum fluid's phase; the fluid's complex number
-             is sqrt(|quanta|) exp(i phase), never stored
-  pull       float32 the pull (energy per plus quantum), a wave at light speed
-  pull_rate  float32 its time derivative (leapfrog, pull_wave.py)
-  clock      float32 the proper time the box has lived, at its cell's clock rate
-  owner      int32 the cell the box belongs to, -1 for empty space
-  marks      uint8 per step which rule changed the box: 1 collapse, 2 owner change, 8 split
-The cells are a graph (owner, 2026-11-16): each cell keeps its own neighbours, so one
-volume can split or two merge without touching any other cell. Per universe and cell id
-(capacity `capacity`, the same for every universe; ids of cells that do not exist have
-kind 0), on the host (numpy, the cell rules run there, cell_laws.py):
-  kind        int8 1 energy volume, -1 joint, 0 no cell
-  between     int32 (.., 2) a joint's two energy volumes (lower id first; -1 for a side
-              that faces empty space or a wall); -1 for a volume
-  place       int32 (.., 3) the start lattice place of a cell new_universe built, -1
-              for a cell made later (a split's) or a start without a lattice
-  size        float64 the size in boxes the cell's rule gives it: an energy volume's is
-              its wanted size (size_energy[0] / quanta) ** 3 (bible rule 4, length =
-              constant / energy), a joint's swings round the size its energy wants
-              (joint_swing.py); the boxes follow it (exchange.py)
-  speed       float64 a joint's size change per unit of counter time (its clock enters
-              through its springs, joint_swing.py, so the summed size is kept)
-  wanted      float64 the size the cell's energy wants, (size_energy[k] / quanta) ** 3
-  cell_push   float64 a joint's push per quantum, push * (wanted / size) ** steepness;
-              0 for a volume (a volume only pulls)
-  rate        float64 the cell's clock rate, 1 / (1 + packing / clock_packing)
-  cell_clock  float64 the proper time the cell has lived
-  cell_quanta int64 and cell_boxes int64: the cell's quanta (ignoring sign) and boxes,
-              counted at the start of every step (cell_count.py)
-  crossed     int64 per joint the quanta that crossed it this step from between[0] to
-              between[1] (negative: the other way; cross.py)
-size_energy float64 (universes, 2): the constant of length = constant / energy for energy
-volumes and for joints, fixed once by the start's correction (new_universe) or, when a
-start does not give it, so that the start's cells want on average the room they hold.
-tallies int64 (universes, 4): quanta crossed joints (both ways), joint boxes collapsed,
-owner changes, minus quanta collapse turned plus. splits, torn, collapses (numpy, per
-universe): volume splits and the plus quanta their tears turned minus, joint collapses.
-`lattice` is None (the cells are read off the boxes: every 26-connected group of plus
-boxes one energy volume, every face-connected group of minus boxes one joint between the
-volumes it touches) or a dict, or one dict per universe, with "owner" (the box array),
-"kind", "between" and optionally "place", "size", "speed", "size_energy" (2,) and
-"cell_clock" per cell id, as host_boxes / lattice_of give them. Every box's sign must
-match its owner's kind (ValueError otherwise). `seed` is an int (universe u gets seed +
-u) or one int per universe; `keys` hash them for the rounding (a universe steps the same
-alone as side by side). `start` holds per universe the start's amounts and boxes.
-`substeps` and `later` are the fluid's substep plan per cell (substeps.py). `ladder` is
-None or the detail ladder's store (ladder_sync.py); `quantum` is None or the moving
-energies tracked whole (quantum_store.py); `swing` is None or the joint swing's table of
-each volume's joints (swing_table.py). Raises ValueError on a
-non-cubic or mismatched start, a seed count that is not one per universe, a box of 2**30
-quanta or more, or an odd side with wrap. `State.from_device(quanta, owner, graphs, seed,
-wrap)` builds the same state round boxes that are already on the GPU.
+Contract: `State(side, capacity, seed=1, device="cuda")` allocates an empty state for a
+lattice of `side` places per axis (even, at least 4; it wraps round, there is no edge and
+no empty space) with room for `capacity` cell ids; new_universe.py fills it. The cells
+are the grid (axiom 3, owner 2026-11-17): a perfect A B A B pattern, an energy volume
+where all three lattice indices are even, a joint everywhere else. A cell has no
+geometry: only its relations (its neighbours, by the 26 directions) and a length set by
+its energy alone, `size_energy[kind] / quanta`. Planck boxes are not space: every cell id
+owns one fixed block of BLOCK ** 3 = 216 compute boxes, row `cell` of `quanta` and
+`phase`, for good; no box ever changes cell and an id is never used again.
+Per box (GPU, shape (capacity, 6, 6, 6)):
+  quanta      int32 whole quanta: plus in an energy volume, minus in a joint, each box of
+              a living cell at least 1 in size; all 0 in an id that is not a cell
+  phase       float32 the fluid's phase; its complex number is sqrt(|quanta|) e^{i phase}
+Per cell id (GPU, read with `host(name)`):
+  kind        int32 1 energy volume, -1 joint, 0 no cell (ENERGY_VOLUME, JOINT)
+  cell_quanta int64 the cell's quanta ignoring sign, always the sum over its boxes
+  length      float32 its size by the law, exactly float32(size_energy[kind] / quanta)
+  packing     float32 (start length of its kind / length) ** 3
+  rate        float32 its local clock rate (clock_rate.py); clock float32 the time it lived
+  pull, pull_old  float32 the pull there (energy per plus quantum) now and a step ago
+  jiggle      float32 an energy volume's own heat per quantum (jiggle.py)
+  squeeze     float32 a joint's squeeze this step, pull across it over its push (squeeze.py)
+  gain, loss  int64 quanta the cell took and gave this step (crossing; a joint's gain is
+              what it made); crossed int64 quanta that crossed a joint this step
+  flags       int32 1 a joint to collapse, 2 a volume to tear, found this step
+  ways_n      int32 a joint: the ways it carries (volumes on its one side times volumes
+              on its other); a volume: the ways it is an end of; side_n int32 a joint:
+              the volumes on its first side
+`books` (GPU int64): [0] quanta made by squeeze, [1] quanta crossed, since the start.
+Relations. A cell whose neighbours are still the lattice's is pristine and stores
+nothing: its 26 neighbours and, for a face joint (one odd index), its one way (the two
+volumes it lies between) follow from its id (lattice_step.py). A cell changed by a tear
+or a collapse keeps its own list: on the host `adj_over[cell] = (ids, codes)` (code =
+(dx + 1) * 9 + (dy + 1) * 3 + dz + 1, the direction the neighbour lies in; one neighbour
+may fill several directions and one direction hold several neighbours) and
+`sides_over[joint] = (volumes on one side, volumes on the other)`: its ways are every
+pair of one volume from each side (a pair of a volume with itself is no way), kept as
+two lists so that a joint between two much-torn volumes stays small; relink() copies
+them to the GPU pools (adj_at, adj_n, adj_pool, way_at, side_n, way_pool). `version`
+counts tears and collapses.
+Host numbers: side, lattice (side ** 3), count (ids used), capacity, step, seed, key,
+size_energy {1: , -1: } the size law's constants, start_quanta {1: , -1: } the start's
+mean quanta per kind, start_length {1: , -1: }, collapses, merges, tears, torn (plus
+quanta turned minus by tears), taken_joint and taken_volumes (quanta a collapse took
+off the joint and off its volumes), fell_into {vanished volume: the
+volume it fell into}, start (totals at step 0), quantum (None or quantum_store.py).
+Methods: neighbours(cell) -> (ids, codes); set_neighbours; sides(joint) -> (first side,
+second side); set_sides (keeps every volume's count of ways, ways_h, in step);
+ways(joint) -> [(a, b)]; joints_of(cell); block(cell) -> (quanta, phase) copies;
+set_block; fill(cell, amount) stages a cell's quanta evenly; host(name); grow(); relink().
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
 import numpy as np
 import warp as wp
-from scipy import ndimage
 
-from physics.engine.group_label import group_label
+BLOCK = 6
+BOXES = BLOCK ** 3
+ENERGY_VOLUME = 1
+JOINT = -1
+CENTRE = 13
 
-_HEADROOM = 64
+_CELL_ARRAYS = {"kind": wp.int32, "cell_quanta": wp.int64, "length": wp.float32, "packing": wp.float32,
+                "rate": wp.float32, "clock": wp.float32, "pull": wp.float32, "pull_old": wp.float32,
+                "pull_new": wp.float32, "jiggle": wp.float32, "squeeze": wp.float32, "gain": wp.int64,
+                "loss": wp.int64, "crossed": wp.int64, "flags": wp.int32, "ways_n": wp.int32, "adj_at": wp.int32,
+                "adj_n": wp.int32, "way_at": wp.int32, "side_n": wp.int32}
 
 
-@dataclass
 class State:
-    """The engine's per-box arrays on the GPU, its cell graph, its universes' seeds and its step counter."""
+    """The cells, their relations and their blocks of compute boxes."""
 
-    side: int
-    universes: int
-    wrap: bool
-    quanta: wp.array3d
-    phase: wp.array3d
-    pull: wp.array3d
-    pull_rate: wp.array3d
-    clock: wp.array3d
-    owner: wp.array3d
-    marks: wp.array3d
-    tallies: wp.array
-    seeds: tuple
-    keys: wp.array
-    kind: np.ndarray
-    between: np.ndarray
-    place: np.ndarray
-    size_energy: np.ndarray
-    size: np.ndarray
-    speed: np.ndarray
-    cell_clock: np.ndarray
-    start: tuple = ()
-    step: int = 0
-    ladder: object = None
-    substeps: object = None
-    later: object = None
-    capped: object = None
-    splits: object = None
-    torn: object = None
-    collapses: object = None
-    wanted: object = None
-    cell_push: object = None
-    rate: object = None
-    cell_quanta: object = None
-    cell_boxes: object = None
-    crossed: object = None
-    device: object = None
-    quantum: object = None
-    swing: object = None
-    cells_d: dict = field(default_factory=dict)
+    def __init__(self, side: int, capacity: int, seed: int = 1, device: str = "cuda") -> None:
+        if side < 4 or side % 2:
+            raise ValueError(f"side must be even and at least 4, got {side}")
+        self.side, self.lattice, self.device = int(side), int(side) ** 3, device
+        if capacity < self.lattice:
+            raise ValueError("capacity must hold every lattice place")
+        self.capacity, self.count, self.step, self.seed = int(capacity), self.lattice, 0, int(seed)
+        self.key = int(np.random.default_rng((int(seed), 11)).integers(0, 2 ** 31 - 1))
+        self.quanta = wp.zeros((capacity, BLOCK, BLOCK, BLOCK), dtype=wp.int32, device=device)
+        self.phase = wp.zeros((capacity, BLOCK, BLOCK, BLOCK), dtype=wp.float32, device=device)
+        for name, dtype in _CELL_ARRAYS.items():
+            setattr(self, name, wp.zeros(capacity, dtype=dtype, device=device))
+        self.books = wp.zeros(4, dtype=wp.int64, device=device)
+        self.found = wp.zeros(2, dtype=wp.int32, device=device)
+        self.adj_pool = wp.zeros(1, dtype=wp.int32, device=device)
+        self.way_pool = wp.zeros(1, dtype=wp.int32, device=device)
+        self.kind_h = np.zeros(capacity, dtype=np.int8)
+        self.ways_h = np.zeros(capacity, dtype=np.int32)
+        places = np.arange(self.lattice)
+        odd = (places // (side * side)) % 2 + (places // side) % 2 + places % 2
+        self.kind_h[:self.lattice] = np.where(odd == 0, ENERGY_VOLUME, JOINT)
+        self.ways_h[:self.lattice] = np.where(odd == 0, 6, np.where(odd == 1, 1, 0))
+        self.adj_over, self.sides_over, self.fell_into = {}, {}, {}
+        self.version = 0
+        self.size_energy = {ENERGY_VOLUME: 0.0, JOINT: 0.0}
+        self.start_quanta = {ENERGY_VOLUME: 0.0, JOINT: 0.0}
+        self.start_length = {ENERGY_VOLUME: 0.0, JOINT: 0.0}
+        self.collapses = self.merges = self.tears = self.torn = 0
+        self.taken_joint = self.taken_volumes = 0
+        self.start, self.quantum = None, None
+        self.relink()
 
-    @property
-    def shape(self) -> tuple:
-        """The per-box arrays' shape: (universes * side, side, side)."""
-        return (self.universes * self.side, self.side, self.side)
+    def neighbours(self, cell: int) -> tuple:
+        """A cell's neighbours and the direction code each lies in."""
+        if cell in self.adj_over:
+            return self.adj_over[cell]
+        if not 0 <= cell < self.lattice:
+            raise ValueError(f"cell {cell} has no relations")
+        side = self.side
+        place = np.array([cell // (side * side), (cell // side) % side, cell % side])
+        codes = np.array([code for code in range(27) if code != CENTRE], dtype=np.int8)
+        steps = np.stack([codes // 9 - 1, (codes // 3) % 3 - 1, codes % 3 - 1], axis=1)
+        there = (place[None, :] + steps) % side
+        return ((there[:, 0] * side + there[:, 1]) * side + there[:, 2]).astype(np.int32), codes
 
-    @property
-    def capacity(self) -> int:
-        """Cell ids per universe."""
-        return int(self.kind.shape[1])
+    def set_neighbours(self, cell: int, ids, codes) -> None:
+        """Give a cell its own list of neighbours (no pair of id and code twice)."""
+        keys = np.unique(np.asarray(ids, dtype=np.int64) * 32 + np.asarray(codes, dtype=np.int64))
+        self.adj_over[int(cell)] = ((keys // 32).astype(np.int32), (keys % 32).astype(np.int8))
 
-    def universe(self, index: int) -> slice:
-        """The first-axis slice universe `index` holds."""
-        if not 0 <= index < self.universes:
-            raise ValueError(f"universe {index} is not one of {self.universes}")
-        return slice(index * self.side, (index + 1) * self.side)
+    def sides(self, joint: int) -> tuple:
+        """The energy volumes on a joint's one side and on its other; every pair across is a way."""
+        if joint in self.sides_over:
+            return self.sides_over[joint]
+        if not 0 <= joint < self.lattice or self.kind_h[joint] != JOINT:
+            return [], []
+        side = self.side
+        place = [joint // (side * side), (joint // side) % side, joint % side]
+        odd = [axis for axis in range(3) if place[axis] % 2]
+        if len(odd) != 1:
+            return [], []
+        ends = []
+        for shift in (-1, 1):
+            there = list(place)
+            there[odd[0]] = (there[odd[0]] + shift) % side
+            ends.append((there[0] * side + there[1]) * side + there[2])
+        return [ends[0]], [ends[1]]
 
-    def joints_of(self, universe: int, volume: int) -> np.ndarray:
-        """The ids of the joints an energy volume has (its neighbours in the graph)."""
-        sides = self.between[universe]
-        return np.flatnonzero((self.kind[universe] == -1) & ((sides[:, 0] == volume) | (sides[:, 1] == volume)))
+    def ways(self, joint: int) -> list:
+        """The pairs of energy volumes a joint lies between (energy crosses and presses along them)."""
+        first, second = self.sides(joint)
+        return [(near, far) for near in first for far in second if near != far]
 
-    def new_cell(self, universe: int, kind: int) -> int:
-        """A fresh cell id of `kind` in one universe, growing the capacity when needed."""
-        fresh = np.flatnonzero((self.kind[universe] == 0) & (self.place[universe, :, 0] < 0))
-        if fresh.size == 0:
-            self._grow(_HEADROOM)
-            return self.new_cell(universe, kind)
-        cell = int(fresh[0])
-        self.kind[universe, cell] = kind
-        self.between[universe, cell] = -1
-        self.place[universe, cell] = -1
-        for name in ("size", "speed", "cell_clock"):
-            getattr(self, name)[universe, cell] = 0.0
-        return cell
+    def set_sides(self, joint: int, first, second) -> None:
+        """Give a joint its two sides (each volume once per side); the volumes' counts of ways follow."""
+        self._count_ways(joint, -1)
+        self.sides_over[int(joint)] = (list(dict.fromkeys(int(one) for one in first)),
+                                       list(dict.fromkeys(int(one) for one in second)))
+        self.ways_h[joint] = len(self.sides_over[joint][0]) * len(self.sides_over[joint][1])
+        self._count_ways(joint, 1)
 
-    def _grow(self, more: int) -> None:
-        """Add `more` cell ids to every universe's table."""
-        def widen(values, fill):
-            extra = np.full((values.shape[0], more) + values.shape[2:], fill, dtype=values.dtype)
-            return np.concatenate([values, extra], axis=1)
-        self.kind = widen(self.kind, 0)
-        self.between = widen(self.between, -1)
-        self.place = widen(self.place, -1)
-        for name in ("size", "speed", "cell_clock"):
-            setattr(self, name, widen(getattr(self, name), 0.0))
-        self.substeps = wp.ones(self.kind.shape, dtype=wp.int32, device=self.quanta.device)
-        self.cells_d = {}
+    def _count_ways(self, joint: int, sign: int) -> None:
+        """Add (or take off) the joint's ways in the count of every volume on its sides."""
+        first, second = self.sides(joint)
+        both = set(first) & set(second)
+        for mine, others in ((first, second), (second, first)):
+            for volume in mine:
+                self.ways_h[volume] += sign * (len(others) - (volume in both))
 
-    @classmethod
-    def from_host(cls, quanta: np.ndarray, phase: np.ndarray, seed=1, device: str | None = None,
-                  lattice=None, wrap: bool = False) -> "State":
-        """Copy signed quanta, phases and the cell graph to the GPU; pull, clocks and tallies start at 0."""
-        quanta = np.asarray(quanta)
-        phase = np.asarray(phase)
-        if quanta.ndim == 3:
-            quanta, phase = quanta[None], phase[None] if phase.ndim == 3 else phase
-        if quanta.ndim != 4 or len(set(quanta.shape[1:])) != 1:
-            raise ValueError(f"quanta must be a cube or a batch of cubes, got shape {quanta.shape}")
-        if phase.shape != quanta.shape:
-            raise ValueError(f"phase shape {phase.shape} differs from quanta shape {quanta.shape}")
-        if np.abs(quanta.astype(np.int64)).max(initial=0) >= 2 ** 30:
-            raise ValueError("a box may hold fewer than 2**30 quanta (int32 headroom for moves)")
-        universes, side = int(quanta.shape[0]), int(quanta.shape[1])
-        if wrap and side % 2:
-            raise ValueError("a universe that wraps round needs an even side")
-        seeds = _seeds(seed, universes)
-        graphs = [_graph(quanta[index], _one(lattice, index), wrap) for index in range(universes)]
-        capacity = max(graph["kind"].size for graph in graphs) + _HEADROOM
-        stacked = (universes * side, side, side)
-        keys = np.array([(value * 2654435761 + 12345) & 0x7FFFFFFF for value in seeds], dtype=np.int32)
-        owner = np.concatenate([graph["owner"] for graph in graphs]).reshape(stacked)
-        state = cls(side=side, universes=universes, wrap=bool(wrap),
-                    quanta=wp.array(quanta.astype(np.int32).reshape(stacked), dtype=wp.int32, device=device),
-                    phase=wp.array(_wrapped(phase).reshape(stacked), dtype=wp.float32, device=device),
-                    pull=wp.zeros(stacked, dtype=wp.float32, device=device),
-                    pull_rate=wp.zeros(stacked, dtype=wp.float32, device=device),
-                    clock=wp.zeros(stacked, dtype=wp.float32, device=device),
-                    owner=wp.array(owner.astype(np.int32), dtype=wp.int32, device=device),
-                    marks=wp.zeros(stacked, dtype=wp.uint8, device=device),
-                    tallies=wp.zeros((universes, 4), dtype=wp.int64, device=device),
-                    seeds=seeds, keys=wp.array(keys, dtype=wp.int32, device=device),
-                    kind=_table(graphs, "kind", capacity, 0, np.int8),
-                    between=_table(graphs, "between", capacity, -1, np.int32),
-                    place=_table(graphs, "place", capacity, -1, np.int32),
-                    size_energy=np.stack([graph["size_energy"] for graph in graphs]),
-                    size=_table(graphs, "size", capacity, 0.0, np.float64),
-                    speed=_table(graphs, "speed", capacity, 0.0, np.float64),
-                    cell_clock=_table(graphs, "cell_clock", capacity, 0.0, np.float64),
-                    start=tuple(_start(cube) for cube in quanta),
-                    substeps=wp.ones((universes, capacity), dtype=wp.int32, device=device),
-                    capped=np.zeros(universes, dtype=np.int64), splits=np.zeros(universes, dtype=np.int64),
-                    torn=np.zeros(universes, dtype=np.int64), collapses=np.zeros(universes, dtype=np.int64),
-                    device=device)
-        for index, graph in enumerate(graphs):
-            state.start[index]["cells"] = int((graph["kind"] != 0).sum())
-        return state
+    def joints_of(self, cell: int) -> list:
+        """The joints beside a cell, each once, in id order."""
+        ids, _ = self.neighbours(cell)
+        return sorted({int(one) for one in ids if self.kind_h[one] == JOINT})
 
+    def block(self, cell: int) -> tuple:
+        """Copies of one cell's boxes: (quanta int32 (6, 6, 6), phase float32 (6, 6, 6))."""
+        return self.quanta[int(cell)].numpy(), self.phase[int(cell)].numpy()
 
-    @classmethod
-    def from_device(cls, quanta, owner, graphs: list, seed=1, wrap: bool = False) -> "State":
-        """A state round boxes already on the GPU (new_universe.py): no box is copied to the host.
+    def set_block(self, cell: int, quanta: np.ndarray, phase: np.ndarray | None = None) -> None:
+        """Write one cell's boxes; the caller keeps cell_quanta in step."""
+        self.quanta[int(cell)].assign(np.ascontiguousarray(quanta, dtype=np.int32))
+        if phase is not None:
+            self.phase[int(cell)].assign(np.ascontiguousarray(phase, dtype=np.float32))
 
-        `quanta` and `owner` are Warp int32 arrays (universes * side, side, side), kept, not
-        copied; `graphs` holds one dict per universe with "kind", "between", "place" and
-        "size_energy" per cell id (and optionally "size", "speed", "cell_clock", else 0),
-        which the caller vouches match the boxes. Phase, pull, clocks and tallies start at 0.
-        """
-        universes = len(graphs)
-        side = int(quanta.shape[1])
-        device = quanta.device
-        if wrap and side % 2:
-            raise ValueError("a universe that wraps round needs an even side")
-        seeds = _seeds(seed, universes)
-        for graph in graphs:
-            for name in ("size", "speed", "cell_clock"):
-                graph.setdefault(name, np.zeros(graph["kind"].size))
-        capacity = max(graph["kind"].size for graph in graphs) + _HEADROOM
-        stacked = (universes * side, side, side)
-        keys = np.array([(value * 2654435761 + 12345) & 0x7FFFFFFF for value in seeds], dtype=np.int32)
-        sums = wp.zeros((universes, 4), dtype=wp.int64, device=device)
-        wp.launch(_start_count, dim=stacked, device=device, inputs=[quanta, side, sums])
-        start = tuple({"amount": int(row[0] + row[1]), "plus": int(row[0]), "minus": int(row[1]),
-                       "boxes": int(row[2] + row[3]), "plus_boxes": int(row[2]),
-                       "cells": int((graph["kind"] != 0).sum())} for row, graph in zip(sums.numpy(), graphs))
-        return cls(side=side, universes=universes, wrap=bool(wrap), quanta=quanta,
-                   phase=wp.zeros(stacked, dtype=wp.float32, device=device),
-                   pull=wp.zeros(stacked, dtype=wp.float32, device=device),
-                   pull_rate=wp.zeros(stacked, dtype=wp.float32, device=device),
-                   clock=wp.zeros(stacked, dtype=wp.float32, device=device), owner=owner,
-                   marks=wp.zeros(stacked, dtype=wp.uint8, device=device),
-                   tallies=wp.zeros((universes, 4), dtype=wp.int64, device=device),
-                   seeds=seeds, keys=wp.array(keys, dtype=wp.int32, device=device),
-                   kind=_table(graphs, "kind", capacity, 0, np.int8),
-                   between=_table(graphs, "between", capacity, -1, np.int32),
-                   place=_table(graphs, "place", capacity, -1, np.int32),
-                   size_energy=np.stack([graph["size_energy"] for graph in graphs]),
-                   size=_table(graphs, "size", capacity, 0.0, np.float64),
-                   speed=_table(graphs, "speed", capacity, 0.0, np.float64),
-                   cell_clock=_table(graphs, "cell_clock", capacity, 0.0, np.float64), start=start,
-                   substeps=wp.ones((universes, capacity), dtype=wp.int32, device=device),
-                   capped=np.zeros(universes, dtype=np.int64), splits=np.zeros(universes, dtype=np.int64),
-                   torn=np.zeros(universes, dtype=np.int64), collapses=np.zeros(universes, dtype=np.int64),
-                   device=device)
+    def fill(self, cell: int, amount: int) -> None:
+        """Stage: give a living cell exactly `amount` quanta, shared evenly over its boxes, phases kept."""
+        if self.kind_h[cell] == 0 or amount < BOXES or amount >= BOXES * 2 ** 29:
+            raise ValueError(f"cell {cell} cannot hold {amount} quanta")
+        share = np.full(BOXES, amount // BOXES, dtype=np.int32)
+        share[:amount % BOXES] += 1
+        self.set_block(cell, int(self.kind_h[cell]) * share.reshape(BLOCK, BLOCK, BLOCK))
+        held = self.cell_quanta.numpy()
+        held[cell] = amount
+        self.cell_quanta.assign(held)
 
+    def host(self, name: str) -> np.ndarray:
+        """A host copy of one per-cell array, ids 0 .. count - 1."""
+        return getattr(self, name).numpy()[:self.count]
 
-@wp.kernel
-def _start_count(quanta: wp.array3d(dtype=wp.int32), side: int, sums: wp.array2d(dtype=wp.int64)):
-    ti, tj, tk = wp.tid()
-    amount = quanta[ti, tj, tk]
-    home = ti // side
-    if amount > 0:
-        wp.atomic_add(sums, home, 0, wp.int64(amount))
-        wp.atomic_add(sums, home, 2, wp.int64(1))
-    elif amount < 0:
-        wp.atomic_add(sums, home, 1, wp.int64(-amount))
-        wp.atomic_add(sums, home, 3, wp.int64(1))
+    def grow(self, needed: int) -> None:
+        """Make room for at least `needed` cell ids; every id keeps its row and its boxes."""
+        if needed <= self.capacity:
+            return
+        bigger = max(needed, self.capacity + self.capacity // 2)
+        for name in ("quanta", "phase") + tuple(_CELL_ARRAYS):
+            old = getattr(self, name)
+            new = wp.zeros((bigger,) + tuple(old.shape[1:]), dtype=old.dtype, device=self.device)
+            wp.copy(new, old, count=old.size)
+            setattr(self, name, new)
+        for name in ("kind_h", "ways_h"):
+            old = getattr(self, name)
+            new = np.zeros(bigger, dtype=old.dtype)
+            new[:self.capacity] = old
+            setattr(self, name, new)
+        self.capacity = bigger
 
-
-def _one(lattice, index: int):
-    """The universe's own graph dict, or None."""
-    if lattice is None or isinstance(lattice, dict):
-        return lattice
-    return lattice[index]
-
-
-def _table(graphs: list, name: str, capacity: int, fill, dtype) -> np.ndarray:
-    """One per-cell table over the batch, padded to the capacity."""
-    first = np.asarray(graphs[0][name])
-    table = np.full((len(graphs), capacity) + first.shape[1:], fill, dtype=dtype)
-    for index, graph in enumerate(graphs):
-        values = np.asarray(graph[name])
-        table[index, :values.shape[0]] = values
-    return table
-
-
-def _graph(cube: np.ndarray, lattice: dict | None, wrap: bool) -> dict:
-    """One universe's checked cell graph: owner per box, kind, between, place, sizes, size constants."""
-    graph = _read_off(cube, wrap) if lattice is None else _given(lattice, cube.shape)
-    owner = graph["owner"]
-    occupied = owner >= 0
-    kinds = np.asarray(graph["kind"], dtype=np.int8)
-    if owner.max(initial=-1) >= kinds.size:
-        raise ValueError(f"an owner lies outside the {kinds.size} cells of the graph")
-    if np.any(occupied != (cube != 0)) or not np.array_equal(kinds[owner[occupied]], np.sign(cube[occupied])):
-        raise ValueError("every box's sign must match its owner's kind (plus volume, minus joint, 0 no cell)")
-    amounts = np.bincount(owner[occupied], weights=np.abs(cube[occupied]).astype(np.float64), minlength=kinds.size)
-    boxes = np.bincount(owner[occupied], minlength=kinds.size).astype(np.float64)
-    if "size_energy" not in graph:
-        graph["size_energy"] = np.array([_constant(amounts, boxes, kinds == sign) for sign in (1, -1)])
-    if "size" not in graph:
-        graph["size"] = boxes
-    graph.setdefault("speed", np.zeros(kinds.size))
-    graph.setdefault("cell_clock", np.zeros(kinds.size))
-    graph.setdefault("place", np.full((kinds.size, 3), -1, dtype=np.int32))
-    graph["kind"] = kinds
-    graph["owner"] = owner.astype(np.int32)
-    return graph
-
-
-def _given(lattice: dict, shape: tuple) -> dict:
-    """A graph handed in by the caller, copied."""
-    graph = {name: np.array(value) for name, value in lattice.items() if name in (
-        "owner", "kind", "between", "place", "size", "speed", "size_energy", "cell_clock")}
-    graph["owner"] = np.broadcast_to(graph["owner"], shape).astype(np.int32)
-    return graph
-
-
-def _constant(amounts: np.ndarray, boxes: np.ndarray, members: np.ndarray) -> float:
-    """The constant C of length = C / energy with which the cells of one kind want, summed, the boxes they hold."""
-    held = members & (amounts > 0)
-    if not held.any():
-        return 1.0
-    return float(np.cbrt(boxes[held].sum() / (amounts[held] ** -3.0).sum()))
-
-
-def _read_off(cube: np.ndarray, wrap: bool) -> dict:
-    """Cells read off the signs: each 26-connected plus group a volume, each face-connected minus group a joint."""
-    plus, volumes = group_label(cube > 0, wrap, True)
-    minus, joints = group_label(cube < 0, wrap)
-    owner = np.full(cube.shape, -1, dtype=np.int32)
-    owner[cube > 0] = plus[cube > 0] - 1
-    owner[cube < 0] = minus[cube < 0] - 1 + volumes
-    kind = np.concatenate([np.ones(volumes, dtype=np.int8), -np.ones(joints, dtype=np.int8)])
-    between = np.full((volumes + joints, 2), -1, dtype=np.int32)
-    for joint in range(joints):
-        near = ndimage.binary_dilation(minus == joint + 1) & (cube > 0)
-        touching = np.unique(plus[near]) - 1
-        if touching.size:
-            between[volumes + joint, :min(2, touching.size)] = touching[:2]
-    return {"owner": owner, "kind": kind, "between": _ordered(between)}
-
-
-def _ordered(between: np.ndarray) -> np.ndarray:
-    """Each row's real ids first in rising order, -1 after."""
-    rows = np.where(between < 0, np.iinfo(np.int32).max, between)
-    rows = np.sort(rows, axis=1)
-    return np.where(rows == np.iinfo(np.int32).max, -1, rows).astype(np.int32)
-
-
-def _wrapped(phase: np.ndarray) -> np.ndarray:
-    """Phases brought into [-pi, pi) as float32, a zero array copied without arithmetic (large starts)."""
-    angles = np.asarray(phase, dtype=np.float32)
-    if not angles.any():
-        return angles.copy() if angles is phase else angles
-    return (np.remainder(angles.astype(np.float64) + np.pi, 2.0 * np.pi) - np.pi).astype(np.float32)
-
-
-def _seeds(seed, universes: int) -> tuple:
-    """One int seed per universe: seed + u for an int, else the given sequence."""
-    if np.ndim(seed) == 0:
-        return tuple(int(seed) + index for index in range(universes))
-    seeds = tuple(int(value) for value in seed)
-    if len(seeds) != universes:
-        raise ValueError(f"need one seed per universe ({universes}), got {len(seeds)}")
-    return seeds
-
-
-def _start(cube: np.ndarray) -> dict:
-    """One universe's start reference: its amounts and occupied boxes."""
-    plus = cube[cube > 0].astype(np.int64)
-    minus = -cube[cube < 0].astype(np.int64)
-    return {"amount": int(plus.sum() + minus.sum()), "plus": int(plus.sum()), "minus": int(minus.sum()),
-            "boxes": int(plus.size + minus.size), "plus_boxes": int(plus.size), "cells": None}
+    def relink(self) -> None:
+        """Copy the host's relations (kinds, own neighbour lists, ways) to the GPU."""
+        adj_at = np.full(self.capacity, -1, dtype=np.int32)
+        adj_n = np.full(self.capacity, 26, dtype=np.int32)
+        way_at = np.full(self.capacity, -1, dtype=np.int32)
+        pool, at = [], 0
+        for cell, (ids, _) in self.adj_over.items():
+            adj_at[cell], adj_n[cell] = at, len(ids)
+            pool.append(ids)
+            at += len(ids)
+        side_n = np.ones(self.capacity, dtype=np.int32)
+        ways, at = [], 0
+        for joint, (first, second) in self.sides_over.items():
+            way_at[joint], side_n[joint] = at, max(len(first), 1)
+            ways.extend(first)
+            ways.extend(second)
+            at += len(first) + len(second)
+        self.kind.assign(self.kind_h.astype(np.int32))
+        self.ways_n.assign(self.ways_h)
+        self.adj_at.assign(adj_at)
+        self.adj_n.assign(adj_n)
+        self.way_at.assign(way_at)
+        self.side_n.assign(side_n)
+        self.adj_pool = wp.array(np.concatenate(pool) if pool else np.zeros(1, dtype=np.int32), dtype=wp.int32,
+                                 device=self.device)
+        self.way_pool = wp.array(np.array(ways if ways else [0], dtype=np.int32), dtype=wp.int32, device=self.device)

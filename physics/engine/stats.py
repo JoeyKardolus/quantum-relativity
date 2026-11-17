@@ -1,137 +1,75 @@
-"""Stats: what one universe holds now, beside where it started (host numbers).
+"""Stats: what the universe holds now, beside where it started (host numbers).
 
-Contract: `stats(state, settings=None, universe=0)` copies that universe's boxes once
-(host_boxes.py), reads its cells (cells.py) and returns a dict of plain Python numbers:
-  amount, plus, minus  the whole quanta ignoring sign, the plus (pulling) and the minus
-                    (pushing) quanta, exact ints
-  energy_drift      amount - the start's amount, in quanta (0: exact, bible rule 4);
-                    relative_drift that over the start's amount
-  plus_share        plus / amount (collapse is the one rule that turns minus into plus)
-  cells, joints     energy volumes and joints of the cell graph (cells.py);
-                    cell_count_growth their number over the start's (start["cells"], set
-                    by new_universe; NaN when unknown)
-  seam_faces, seam_pairs  faces where two joints meet and how many joint pairs meet (seams.py)
-  collapses, collapsed_quanta, crossed, rehomes  joints collapsed and the minus quanta
-                    they turned plus, quanta that crossed joints and boxes that changed
-                    cell since the start (state tallies, state.collapses)
-  splits, torn      volume splits so far and the plus quanta their tears turned minus
-                    (volume_split.py)
-  occupied          boxes holding space; occupied_growth occupied / the start's
-  radius            root mean square distance of the occupied boxes from the cube's
-                    centre, in boxes
+Contract: `stats(state, settings=None)` returns a dict of plain Python numbers:
+  step, cells, volumes, joints   the counter and the living cells by kind
+  amount, plus, minus            the exact quanta (totals.py); made, taken_joint,
+                    taken_volumes, torn, crossed since the start
+  books_gap         amount - (start amount + made - taken_joint - taken_volumes): 0
+                    while the books are exact (axiom 1)
+  collapses, merges, tears   joints collapsed, volumes that fell into another,
+                    volumes torn
+  size              the size of the universe: the sum of every living cell's length;
+                    volume_size and joint_size its two parts; size_growth size over the
+                    start's (state.start["size"])
   lumps             energy volumes holding at least LUMP_FACTOR (2) times the start's
-                    mean plus quanta per plus box, per box; sealed_lumps those whose every
-                    joint is squeezed to the seal or past it (settings.seal_squeeze:
-                    nothing crosses)
-  wrap_breaks       energy volumes with a box that has an empty box or a wall among its
-                    26 neighbours (0 while every volume is fully wrapped; exchange.py
-                    keeps them wrapped)
-  web_pieces        face-connected pieces of all joint boxes together, joined round
-                    the edges of a wrapping universe (1: one web)
-  edge_share        share of the amount in the cube's outermost boxes (not ~0 in a
-                    universe with walls: the run reached them; a wrapping universe has
-                    no walls)
-  clock_min, clock_mean  clock rate over the occupied boxes, each its cell's
-                    (cell_laws.py: 1 / (1 + packing / clock_packing))
-  local_time_min, local_time_mean, local_time_max  the cells' mean clock readings, the
-                    proper time they lived
-  squeeze_max, squeeze_mean  joints' squeeze, wanted length / length - 1, the
-                    wanted length (size_energy[1] / quanta) ** 3 cubed rooted
-  volume_across     mean over energy volumes of their box count's cube root
-`settings` defaults to Settings(). Raises ValueError for a universe the batch lacks.
+                    mean volume quanta (at most half its length); lump_regions the
+                    groups of lumps joined through ways; largest_region the most
+                    volumes in one group
+  squeezed, sealed  joints with squeeze above 1 now; joints settings.seal_thin (the
+                    default Settings when none is given) or more times thinner than
+                    the start's mean joint; squeeze_max
+  clock_min, clock_mean   clock rates over the living cells
+  length_min, length_max  over the energy volumes
 """
 from __future__ import annotations
 
 import numpy as np
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import connected_components
 
-from physics.engine.cells import ENERGY_VOLUME, JOINT, cells
-from physics.engine.group_label import group_label
-from physics.engine.host_boxes import host_boxes
-from physics.engine.near import near
-from physics.engine.seams import seams
 from physics.engine.settings import Settings
-from physics.engine.state import State
+from physics.engine.state import ENERGY_VOLUME, JOINT, State
+from physics.engine.totals import totals
+from physics.engine.way_list import way_list
 
 LUMP_FACTOR = 2.0
 
 
-def stats(state: State, settings: Settings | None = None, universe: int = 0) -> dict:
-    """Amounts, drift, cells, seams, lumps, seals, wrapping, web, edge, space, clocks of one universe."""
-    settings = Settings() if settings is None else settings
-    boxes = host_boxes(state, universe)
-    quanta = boxes["quanta"].astype(np.int64)
-    found = cells(boxes)
-    start = state.start[universe]
-    plus = int(quanta[quanta > 0].sum())
-    minus = int(-quanta[quanta < 0].sum())
-    amount = plus + minus
-    occupied = quanta != 0
-    side = state.side
-    places = np.argwhere(occupied).astype(np.float64) - 0.5 * (side - 1)
-    edge = np.zeros(quanta.shape, dtype=bool) if state.wrap else np.ones(quanta.shape, dtype=bool)
-    edge[1:-1, 1:-1, 1:-1] = False
-    volumes = found["kind"] == ENERGY_VOLUME
-    joint_boxes = quanta < 0
-    squeeze = _squeeze(found, boxes["size_energy"][1])
-    rate = np.ones(found["kind"].size)
-    if settings.clock_packing > 0:
-        rate = 1.0 / (1.0 + found["quanta"] / np.maximum(found["boxes"], 1) / settings.clock_packing)
-    rate = rate[found["owner"][occupied]]
-    crossed, collapsed, rehomes, collapsed_quanta = (int(value) for value in state.tallies.numpy()[universe])
-    collapsed = int(state.collapses[universe])
-    lumps = _lumps(found, start)
-    meeting = seams(found)
-    return {
-        "amount": amount, "plus": plus, "minus": minus,
-        "energy_drift": amount - start["amount"],
-        "relative_drift": (amount - start["amount"]) / start["amount"] if start["amount"] else 0.0,
-        "plus_share": plus / amount if amount else 0.0,
-        "cells": int(volumes.sum()), "joints": int((~volumes).sum()),
-        "cell_count_growth": found["kind"].size / start["cells"] if start.get("cells") else float("nan"),
-        "seam_faces": meeting["faces"], "seam_pairs": int(len(meeting["pairs"])),
-        "collapses": collapsed, "collapsed_quanta": collapsed_quanta, "crossed": crossed, "rehomes": rehomes,
-        "splits": int(state.splits[universe]), "torn": int(state.torn[universe]),
-        "occupied": int(occupied.sum()),
-        "occupied_growth": float(occupied.sum() / start["boxes"]) if start["boxes"] else 0.0,
-        "radius": float(np.sqrt((places ** 2).sum(axis=1).mean())) if places.size else 0.0,
-        "lumps": int(lumps.size),
-        "sealed_lumps": sum(1 for lump in lumps if _sealed(found, lump, squeeze, settings)),
-        "wrap_breaks": _wrap_breaks(found["owner"], quanta, state.wrap),
-        "web_pieces": group_label(joint_boxes, state.wrap)[1],
-        "edge_share": float(np.abs(quanta[edge]).sum() / amount) if amount else 0.0,
-        "clock_min": float(rate.min()) if rate.size else 1.0,
-        "clock_mean": float(rate.mean()) if rate.size else 1.0,
-        "local_time_min": float(found["clock"].min()) if found["clock"].size else 0.0,
-        "local_time_mean": float(found["clock"].mean()) if found["clock"].size else 0.0,
-        "local_time_max": float(found["clock"].max()) if found["clock"].size else 0.0,
-        "squeeze_max": float(np.nanmax(squeeze)) if (~np.isnan(squeeze)).any() else 0.0,
-        "squeeze_mean": float(np.nanmean(squeeze)) if (~np.isnan(squeeze)).any() else 0.0,
-        "volume_across": float(np.cbrt(found["boxes"][volumes]).mean()) if volumes.any() else 0.0,
-    }
+def stats(state: State, settings: Settings | None = None) -> dict:
+    """Count the universe now: cells, books, events, size, lumps, squeeze and clocks."""
+    kind = state.kind_h[:state.count]
+    held, length, rate = state.host("cell_quanta"), state.host("length"), state.host("rate")
+    squeeze = state.host("squeeze")
+    volumes, joints = kind == ENERGY_VOLUME, kind == JOINT
+    found = totals(state)
+    start = state.start or found
+    seal = (settings or Settings()).seal_thin
+    size = float(length[kind != 0].astype(np.float64).sum())
+    lumps = volumes & (held >= LUMP_FACTOR * state.start_quanta[ENERGY_VOLUME])
+    regions, largest = _regions(state, lumps)
+    found.update(
+        step=state.step, cells=int((kind != 0).sum()), volumes=int(volumes.sum()), joints=int(joints.sum()),
+        books_gap=found["amount"] - (start["amount"] + found["made"] - found["taken_joint"] - found["taken_volumes"]),
+        collapses=state.collapses, merges=state.merges, tears=state.tears,
+        size=size, volume_size=float(length[volumes].astype(np.float64).sum()),
+        joint_size=float(length[joints].astype(np.float64).sum()), size_growth=size / start.get("size", size),
+        lumps=int(lumps.sum()), lump_regions=regions, largest_region=largest,
+        squeezed=int((squeeze[joints] > 1.0).sum()),
+        sealed=int((held[joints] >= seal * state.start_quanta[JOINT]).sum()),
+        squeeze_max=float(squeeze[joints].max()), clock_min=float(rate[kind != 0].min()),
+        clock_mean=float(rate[kind != 0].mean()), length_min=float(length[volumes].min()),
+        length_max=float(length[volumes].max()))
+    return found
 
 
-def _lumps(found: dict, start: dict) -> np.ndarray:
-    """Energy volumes packed at least LUMP_FACTOR times the start's mean plus quanta per plus box."""
-    rest = start["plus"] / start["plus_boxes"] if start["plus_boxes"] else 0.0
-    count = found["volumes"]
-    packed = found["quanta"][:count] >= LUMP_FACTOR * rest * np.maximum(found["boxes"][:count], 1)
-    return np.flatnonzero(packed)
-
-
-def _squeeze(found: dict, constant: float) -> np.ndarray:
-    """Each joint's squeeze, (wanted / size) ** (1/3) - 1; NaN for a volume."""
-    wanted = (constant / np.maximum(found["quanta"], 1).astype(np.float64)) ** 3
-    joints = found["kind"] == JOINT
-    return np.where(joints, np.cbrt(wanted / np.maximum(found["size"], 1e-6)) - 1.0, np.nan)
-
-
-def _sealed(found: dict, lump: int, squeeze: np.ndarray, settings: Settings) -> bool:
-    """True when every joint of the volume is squeezed to the seal or past it."""
-    around = np.flatnonzero((found["between"] == lump).any(axis=1))
-    return bool(around.size) and bool(np.all(squeeze[around] >= settings.seal_squeeze))
-
-
-def _wrap_breaks(owner: np.ndarray, quanta: np.ndarray, wrap: bool) -> int:
-    """Energy volumes with a box that has an empty box or a wall among its 26 neighbours."""
-    touched = owner[(quanta > 0) & near(quanta == 0, wrap, wall=True)]
-    return int(np.unique(touched).size)
+def _regions(state: State, lumps: np.ndarray) -> tuple:
+    """Groups of lump volumes joined through ways: (how many groups, volumes in the largest)."""
+    if not lumps.any():
+        return 0, 0
+    _, first, second = way_list(state)
+    joined = lumps[first] & lumps[second]
+    links = coo_matrix((np.ones(int(joined.sum()), dtype=np.int8), (first[joined], second[joined])),
+                       shape=(state.count, state.count))
+    _, labels = connected_components(links, directed=False)
+    sizes = np.bincount(labels[lumps])
+    return int((sizes > 0).sum()), int(sizes.max())

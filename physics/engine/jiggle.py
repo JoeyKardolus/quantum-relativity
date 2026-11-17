@@ -1,94 +1,61 @@
 """Jiggle: how hard the energy fluid jiggles inside each energy volume, per quantum, its heat.
 
-Contract: `jiggle(state)` returns (spread, weight), two float64 arrays (universes,
-capacity). Over every face between two plus boxes of the same cell (round the edges when
-the universe wraps), with n and m their quanta and d the phase difference across the
-face brought into (-pi, pi], weighted w = (n + m) / 2: per axis, spread sums
-sum(w d**2) - sum(w d)**2 / sum(w), the weighted spread of d about the cell's mean
-along that axis, over the three axes; weight sums w over all faces. With hbar = box
-mass = 1 the fluid's speed along an axis is its phase difference per box, so spread /
-weight is the quanta-weighted mean square of the speed's undirected part along one axis
-(the cell's mean flow, as when the whole cell falls, taken out): the energy of the
-fluid's own jiggling per quantum, its heat (bible: energy is an always-moving fluid;
-friction turns directed flow into jiggling). Crossing heat raises it (cross.py
-randomises arriving phases). Joints and empty boxes add nothing. Read only; the state is
-not changed. Summed in whole units of 1 / UNIT with int64 atomics, so the sums do not
-depend on the order the GPU adds them in (one seed, one run). cross.py pools the two
-volumes of a joint.
+Contract: `jiggle(state)` sets state.jiggle for every energy volume. Over every face
+between two boxes of the cell's own block, with n and m their quanta and d the phase
+difference across the face brought into (-pi, pi], weighted w = (n + m) / 2: per axis
+the weighted spread of d about the cell's mean along that axis, sum(w d ** 2) -
+sum(w d) ** 2 / sum(w), summed over the three axes and divided by the summed weights.
+With hbar = box mass = 1 the fluid's speed along an axis is its phase difference per
+box, so this is the quanta-weighted mean square of the speed's undirected part along
+one axis: the energy of the fluid's own jiggling per quantum, its heat (friction turns
+directed flow into jiggling; pour.py raises it where energy arrives). Each cell is
+summed by one thread in a fixed order. Joints get nothing. Returns None.
 """
 from __future__ import annotations
 
-import numpy as np
 import warp as wp
 
-from physics.engine.face_step import face_step
-from physics.engine.reach import reach
-from physics.engine.state import State
+from physics.engine.state import BLOCK, State
+
+wp.set_module_options({"fuse_fp": False})
 
 PI = 3.14159265358979
-UNIT = 1048576.0  # numerics: fixed point for order-free sums, 2**20 per unit
-
-
-@wp.func
-def _flush(home: int, cell: int, square: wp.vec3d, first: wp.vec3d, weight: wp.vec3d,
-           squares: wp.array3d(dtype=wp.int64), firsts: wp.array3d(dtype=wp.int64),
-           weights: wp.array3d(dtype=wp.int64)):
-    """Add one run's whole-number sums to its cell."""
-    for axis in range(3):
-        if weight[axis] != wp.float64(0.0):
-            wp.atomic_add(squares, home, cell, axis, wp.int64(square[axis]))
-            wp.atomic_add(firsts, home, cell, axis, wp.int64(first[axis]))
-            wp.atomic_add(weights, home, cell, axis, wp.int64(weight[axis]))
 
 
 @wp.kernel
-def _faces(quanta: wp.array3d(dtype=wp.int32), phase: wp.array3d(dtype=wp.float32), owner: wp.array3d(dtype=wp.int32),
-           side: int, wrap: int, squares: wp.array3d(dtype=wp.int64), firsts: wp.array3d(dtype=wp.int64),
-           weights: wp.array3d(dtype=wp.int64)):
-    ti, tj = wp.tid()
-    home = ti // side
-    run = int(-1)
-    square = wp.vec3d(wp.float64(0.0), wp.float64(0.0), wp.float64(0.0))
-    first = wp.vec3d(wp.float64(0.0), wp.float64(0.0), wp.float64(0.0))
-    weight = wp.vec3d(wp.float64(0.0), wp.float64(0.0), wp.float64(0.0))
-    for tk in range(side):
-        held = quanta[ti, tj, tk]
-        cell = owner[ti, tj, tk]
-        if cell != run:
-            if run >= 0:
-                _flush(home, run, square, first, weight, squares, firsts, weights)
-            run = cell
-            square = wp.vec3d(wp.float64(0.0), wp.float64(0.0), wp.float64(0.0))
-            first = wp.vec3d(wp.float64(0.0), wp.float64(0.0), wp.float64(0.0))
-            weight = wp.vec3d(wp.float64(0.0), wp.float64(0.0), wp.float64(0.0))
-        if held > 0:
-            here = wp.vec3i(ti, tj, tk)
-            for axis in range(3):
-                there, valid = reach(here, face_step(2 * axis), home, side, wrap)
-                if valid and owner[there[0], there[1], there[2]] == cell:
-                    other = quanta[there[0], there[1], there[2]]
-                    if other > 0:
-                        turn = phase[there[0], there[1], there[2]] - phase[ti, tj, tk]
-                        turn = turn - 2.0 * PI * wp.floor((turn + PI) / (2.0 * PI))
-                        share = 0.5 * (float(held) + float(other))
-                        square[axis] = square[axis] + wp.float64(wp.round(share * turn * turn * UNIT))
-                        first[axis] = first[axis] + wp.float64(wp.round(share * turn * UNIT))
-                        weight[axis] = weight[axis] + wp.float64(wp.round(share * UNIT))
-    if run >= 0:
-        _flush(home, run, square, first, weight, squares, firsts, weights)
+def _jiggle(kind: wp.array(dtype=wp.int32), quanta: wp.array4d(dtype=wp.int32),
+            phase: wp.array4d(dtype=wp.float32), heat: wp.array(dtype=wp.float32), across: int):
+    cell = wp.tid()
+    if kind[cell] != 1:
+        return
+    spread = wp.float64(0.0)
+    weight = wp.float64(0.0)
+    for axis in range(3):
+        square = wp.float64(0.0)
+        first = wp.float64(0.0)
+        total = wp.float64(0.0)
+        step = wp.vec3i(0, 0, 0)
+        step[axis] = 1
+        for one in range(across):
+            for two in range(across):
+                for three in range(across):
+                    here = wp.vec3i(one, two, three)
+                    if here[axis] == across - 1:
+                        continue
+                    there = here + step
+                    share = wp.float64(0.5 * float(quanta[cell, one, two, three]
+                                                   + quanta[cell, there[0], there[1], there[2]]))
+                    turn = phase[cell, there[0], there[1], there[2]] - phase[cell, one, two, three]
+                    turn = turn - 2.0 * PI * wp.floor((turn + PI) / (2.0 * PI))
+                    square += share * wp.float64(turn * turn)
+                    first += share * wp.float64(turn)
+                    total += share
+        spread += square - first * first / total
+        weight += total
+    heat[cell] = wp.float32(spread / weight)
 
 
-def jiggle(state: State) -> tuple[np.ndarray, np.ndarray]:
-    """Each cell's quanta-weighted spread of in-cell phase differences about its mean flow, and the weights."""
-    shape = (state.universes, state.capacity, 3)
-    device = state.quanta.device
-    squares, firsts, weights = (wp.zeros(shape, dtype=wp.int64, device=device) for _ in range(3))
-    wp.launch(_faces, dim=state.shape[:2], device=device,
-              inputs=[state.quanta, state.phase, state.owner, state.side, int(state.wrap), squares, firsts, weights])
-    volumes = state.kind == 1
-    square, first, weight = (values.numpy()[volumes] / UNIT for values in (squares, firsts, weights))
-    spread = square - np.where(weight > 0.0, first ** 2 / np.maximum(weight, 1e-300), 0.0)
-    spreads, weighed = np.zeros(state.kind.shape), np.zeros(state.kind.shape)
-    spreads[volumes] = np.maximum(spread, 0.0).sum(axis=-1)
-    weighed[volumes] = weight.sum(axis=-1)
-    return spreads, weighed
+def jiggle(state: State) -> None:
+    """Measure each energy volume's own heat per quantum from its boxes."""
+    wp.launch(_jiggle, dim=state.count, device=state.device,
+              inputs=[state.kind, state.quanta, state.phase, state.jiggle, BLOCK])

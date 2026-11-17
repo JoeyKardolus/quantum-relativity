@@ -6,7 +6,6 @@ on first use: {"moving": [record, ...], "ended": [event, ...], "serial": int}. A
 routes at once; every split gets a direct pull between its halves, private to them, and
 its own oscillation with a pointer. A record is one moving energy, whole or split:
   serial    its number in this state, counted from 0
-  universe  the universe it lives in
   amount    its whole quanta; they sit in the boxes of its cells like any other energy
   cells     the energy volumes holding part of it (cell ids); two or more: it is split
   parts     per cell the whole quanta of this energy there (sum = amount, each >= 1);
@@ -20,10 +19,10 @@ its own oscillation with a pointer. A record is one moving energy, whole or spli
   turn      turns made since the split, jumps the pointer's jumps so far
   pointer   index into cells: the cell the pointer is on
   born      the step of the split (None while whole), launched the step it was named
-  seen, joints  the universe's collapses + volume splits last looked at, and per cell
-            its joints then, {joint: the volume on its other side} (quantum.py)
-  rng       the record's own draws, numpy Generator seeded by (universe seed, serial)
-An event is {"serial", "universe", "step", "cause", "cell", "amount", "drawn", "parts"}:
+  seen, joints  state.version when last looked at, and per cell its joints then
+            (quantum_joints.py, quantum.py)
+  rng       the record's own draws, numpy Generator seeded by (state seed, serial)
+An event is {"serial", "step", "cause", "cell", "amount", "drawn", "parts"}:
 cause "reaction", "momentum", "collapse or tear" (it settled whole in `cell`, `drawn`
 quanta pulled in from its other cells by the direct pull; `parts` what each cell held
 just before) or "merge" (a handover brought a split back together in `cell`, nothing

@@ -1,144 +1,121 @@
-"""Axiom run (test helper): the default universe, seed 1, 300 steps, measured at every step and every 10th, run once per session.
+"""Axiom run (test helper): two real runs checked at every step, each run once per session.
 
-Contract: `axiom_run()` builds `new_universe(seed=1)` with `Settings()` (nothing changed),
-steps it STEPS times and returns a dict, cached so every axiom test shares the one run:
-  start   totals() at step 0 (amount, plus, minus, boxes)
-  kinds   per cell id at the start: 1 energy volume, -1 joint, 0 no cell (state.kind)
-  steps   one dict per step, after it: step, amount, plus, minus, boxes; tallies (quanta
-          crossed, collapsed boxes, owner changes, collapsed quanta, cumulative); splits, torn;
-          touching (26-neighbour box pairs of two different volumes) and open_boxes
-          (plus boxes beside empty space or a wall, axiom_contacts.py); flips (boxes whose
-          sign differs from the step before: minus->plus marked collapse, minus->plus
-          that changed owner (emptied and refilled by another cell, rehoming), minus->plus
-          with neither mark; then the same three for plus->minus with the split mark);
-          cell_amount (int64 per cell id, its quanta ignoring sign after the step);
-          cell_size (float per cell id, the size its rule gives it, state.size: a
-          joint's swinging size); crossed (int64 per cell id, the quanta that crossed
-          each joint this step from between[0] to between[1], state.crossed) and
-          between (the joints' volumes that step); volumes (energy volumes alive);
-          collapses (joints collapsed so far)
-  cell_amount0  cell_amount at step 0
-  checks  at step 0 and every CHECK_EVERY steps: step; cells (cells() of the boxes:
-          kind, boxes, quanta, clock, place, between, volumes); web_pieces (face-connected
-          pieces of all minus boxes, joined round the edges when the universe wraps);
-          pull_reach (largest Chebyshev distance of a box with
-          nonzero pull beyond the bounding box of the plus boxes, in boxes);
-          plus_spread (how far the plus boxes' bounding box reaches beyond the start's);
-          pull_cover (share of occupied boxes with nonzero pull); pressure, size,
-          amount per cell id (axiom_pressure.py)
-The default universe wraps round at its edges (new_universe, margin 0).
+Contract: `axiom_run(name)` returns a dict for one of two runs, cached:
+  "default"   new_universe() (32 places a side, seed 1) with Settings(), 1,000 steps
+  "eventful"  new_universe(16, unevenness=0.3) with Settings(pull_strength=1e-6), ten
+              times the default pull, 60 steps: a start that opens with tears and runs
+              into a chain of collapses, hundreds of each
+with keys:
+  start    totals() at step 0; start_kind the kinds at step 0
+  steps    one dict per step, measured right after it (every count is over all cells):
+    step, amount, plus, minus, made, taken_joint, taken_volumes, torn, crossed (totals.py)
+    wrong_boxes, wrong_cells   boxes that break their cell, cells whose boxes do not
+                    sum to their quanta
+    size_wrong      living cells whose length is not exactly float32(constant / quanta)
+    kind_wrong      ids whose kind on the GPU is not the host's
+    events          tears and collapses this step (state.version's rise)
+    relinked        1 when any relation array on the GPU changed this step
+    revived         ids that were no cell before the step and are one after, below the
+                    old count (an id used again)
+    joint_fell      joints living before and after whose quanta fell
+    joint_rose      those whose quanta rose; joint_rose_loose those that rose with a
+                    squeeze of 1 or less this step; joint_gain_wrong those whose rise is
+                    not their gain
+    joint_loss      quanta any joint lost by crossing (state.loss over joints)
+    volume_wrong    volumes living before and after, in a step without events, whose
+                    quanta did not change by exactly gain - loss
+    gained, lost, crossed_step   quanta volumes gained, lost, and that crossed joints
+    crossed_at_volumes  state.crossed summed over energy volumes
+    clock_wrong     living cells whose clock did not move on by step_time * the rate
+                    the step began with (to 1e-4, the float32 clock's rounding)
+    still           of 8 sample cells, those whose boxes are the same as a step before
+    size, volumes, joints, collapses, merges, tears
+    quanta_max_is_shortest  1 when the volume with the most quanta is the shortest
+  patterns  [(step, pattern())] at step 0, after every step with events, every 100 steps
+  final    stats() at the end; settings; state the state itself (do not step it)
 Nothing is tuned; every number is the engine's.
 """
 from __future__ import annotations
 
 import functools
+import hashlib
 
 import numpy as np
-import warp as wp
-from physics.engine import Settings, cells, group_label, host_boxes, new_universe, step, totals
-from physics.engine.tests.axiom_contacts import axiom_contacts
-from physics.engine.tests.axiom_pressure import axiom_pressure
 
-STEPS = 300
-CHECK_EVERY = 10
+from physics.engine import ENERGY_VOLUME, JOINT, Settings, new_universe, pattern, stats, step, totals
 
-
-@wp.kernel
-def _flips(before: wp.array3d(dtype=wp.int32), after: wp.array3d(dtype=wp.int32), marks: wp.array3d(dtype=wp.uint8),
-           sums: wp.array(dtype=wp.int64)):
-    ti, tj, tk = wp.tid()
-    old = before[ti, tj, tk]
-    new = after[ti, tj, tk]
-    mark = marks[ti, tj, tk]
-    kind = int(-1)
-    if old < 0 and new > 0:
-        kind = 0
-    elif old > 0 and new < 0:
-        kind = 3
-    if kind < 0:
-        return
-    rule = wp.uint8(1)
-    if kind == 3:
-        rule = wp.uint8(8)
-    if (mark & rule) == rule:
-        wp.atomic_add(sums, kind, wp.int64(1))
-    elif (mark & wp.uint8(2)) == wp.uint8(2):
-        wp.atomic_add(sums, kind + 1, wp.int64(1))
-    else:
-        wp.atomic_add(sums, kind + 2, wp.int64(1))
+RUNS = {"default": ({}, {}, 1000),
+        "eventful": ({"cells_per_side": 16, "unevenness": 0.3}, {"pull_strength": 1e-6}, 60)}
+_RELATIONS = ("kind", "adj_at", "adj_n", "way_at", "ways_n", "adj_pool", "way_pool")
 
 
-@wp.kernel
-def _cell_amount(quanta: wp.array3d(dtype=wp.int32), owner: wp.array3d(dtype=wp.int32),
-                 sums: wp.array(dtype=wp.int64)):
-    ti, tj, tk = wp.tid()
-    held = quanta[ti, tj, tk]
-    if held != 0:
-        wp.atomic_add(sums, owner[ti, tj, tk], wp.int64(wp.abs(held)))
-
-
-@functools.lru_cache(maxsize=1)
-def axiom_run() -> dict:
-    """The default universe's 300 steps, measured; computed once per test session."""
-    settings = Settings()
-    state = new_universe(seed=1)
-    start = totals(state)
-    start_plus = _plus_box(host_boxes(state)["quanta"])
-    run = {"settings": settings, "start": start, "kinds": state.kind[0].copy(),
-           "cell_amount0": _amounts(state), "steps": [], "checks": [_check(state, settings, start_plus)]}
-    flips = wp.zeros(6, dtype=wp.int64, device=state.quanta.device)
-    for _ in range(STEPS):
-        before = wp.clone(state.quanta)
+@functools.lru_cache(maxsize=None)
+def axiom_run(name: str = "default") -> dict:
+    """Run one of the two universes, measuring every step."""
+    made, rules, count = RUNS[name]
+    state, settings = new_universe(**made), Settings(**rules)
+    run = {"start": totals(state), "start_kind": state.kind_h[:state.count].copy(), "steps": [],
+           "patterns": [(0, pattern(state))], "settings": settings, "state": state}
+    samples = np.linspace(0, state.lattice - 1, 8).astype(int)
+    for _ in range(count):
+        before = _before(state, samples)
         step(state, settings)
-        flips.zero_()
-        wp.launch(_flips, dim=state.shape, device=state.quanta.device,
-                  inputs=[before, state.quanta, state.marks, flips])
-        now = totals(state)
-        touching, open_boxes = axiom_contacts(state)
-        run["steps"].append({
-            "step": state.step, "amount": now["amount"], "plus": now["plus"], "minus": now["minus"],
-            "boxes": now["boxes"], "tallies": [int(value) for value in state.tallies.numpy()[0]],
-            "splits": int(state.splits[0]), "torn": int(state.torn[0]), "touching": touching,
-            "open_boxes": open_boxes, "flips": [int(value) for value in flips.numpy()],
-            "cell_amount": _amounts(state), "cell_size": state.size[0].copy(),
-            "crossed": state.crossed[0].copy(), "between": state.between[0].copy(),
-            "volumes": int((state.kind[0] == 1).sum()), "collapses": int(state.collapses[0])})
-        if state.step % CHECK_EVERY == 0:
-            run["checks"].append(_check(state, settings, start_plus))
+        run["steps"].append(_after(state, settings, before, samples))
+        if run["steps"][-1]["events"] or state.step % 100 == 0:
+            run["patterns"].append((state.step, pattern(state)))
+    run["final"] = stats(state)
     return run
 
 
-def _amounts(state) -> np.ndarray:
-    """Every cell's quanta ignoring sign, per cell id (universe 0)."""
-    sums = wp.zeros(state.capacity, dtype=wp.int64, device=state.quanta.device)
-    wp.launch(_cell_amount, dim=state.shape, device=state.quanta.device, inputs=[state.quanta, state.owner, sums])
-    return sums.numpy()
+def _links(state) -> str:
+    """One hash of every relation array on the GPU."""
+    digest = hashlib.sha1()
+    for name in _RELATIONS:
+        digest.update(getattr(state, name).numpy().tobytes())
+    return digest.hexdigest()
 
 
-def _plus_box(quanta: np.ndarray) -> np.ndarray:
-    """The plus boxes' bounding box, (2, 3): low and high index per axis."""
-    places = np.argwhere(quanta > 0)
-    return np.stack([places.min(axis=0), places.max(axis=0)])
+def _before(state, samples) -> dict:
+    return {"held": state.host("cell_quanta").copy(), "kind": state.kind_h[:state.count].copy(),
+            "clock": state.host("clock").copy(), "rate": state.host("rate").copy(), "version": state.version, "links": _links(state),
+            "count": state.count, "blocks": [state.block(cell)[0] for cell in samples]}
 
 
-def _beyond(places: np.ndarray, bounds: np.ndarray) -> int:
-    """Largest Chebyshev distance of `places` outside `bounds` (0 inside)."""
-    if places.size == 0:
-        return 0
-    outside = np.maximum(np.maximum(bounds[0] - places, places - bounds[1]), 0)
-    return int(outside.max())
-
-
-def _check(state, settings: Settings, start_plus: np.ndarray) -> dict:
-    """The heavy measures at one step: cells, web, pull reach and cover, pressures."""
-    boxes = host_boxes(state)
-    quanta = boxes["quanta"]
-    plus_bounds = _plus_box(quanta)
-    pulled = np.argwhere(boxes["pull"] != 0)
-    pressure, size, amount = axiom_pressure(state, settings)
-    return {"step": state.step, "cells": cells(boxes),
-            "web_pieces": group_label(quanta < 0, state.wrap)[1],
-            "pull_reach": _beyond(pulled, plus_bounds),
-            "plus_spread": int(max((start_plus[0] - plus_bounds[0]).max(), (plus_bounds[1] - start_plus[1]).max(), 0)),
-            "pull_cover": float((boxes["pull"][quanta != 0] != 0).mean()),
-            "pressure": pressure, "size": size, "amount": amount}
+def _after(state, settings, before, samples) -> dict:
+    found = totals(state)
+    old = before["count"]
+    kind_now = state.kind_h[:state.count]
+    held, length, rate = state.host("cell_quanta"), state.host("length"), state.host("rate")
+    squeeze, gain, loss, crossed = (state.host(name) for name in ("squeeze", "gain", "loss", "crossed"))
+    alive = kind_now != 0
+    law = np.zeros(state.count, dtype=np.float32)
+    for sort in (ENERGY_VOLUME, JOINT):
+        mine = kind_now == sort
+        law[mine] = (np.float64(state.size_energy[sort]) / held[mine].astype(np.float64)).astype(np.float32)
+    kind, was = kind_now[:old], before["kind"]
+    joints = (kind == JOINT) & (was == JOINT)
+    volumes = (kind == ENERGY_VOLUME) & (was == ENERGY_VOLUME)
+    change = held[:old] - before["held"]
+    events = state.version - before["version"]
+    lived = (kind != 0) & (was != 0)
+    tick = state.host("clock")[:old] - before["clock"]
+    all_volumes = kind_now == ENERGY_VOLUME
+    most = np.flatnonzero(all_volumes)[np.argmax(held[all_volumes])]
+    found.update(
+        step=state.step, size_wrong=int((length[alive] != law[alive]).sum()),
+        kind_wrong=int((state.host("kind") != kind_now).sum()), events=events,
+        relinked=int(_links(state) != before["links"]), revived=int(((was == 0) & (kind != 0)).sum()),
+        joint_fell=int((change[joints] < 0).sum()), joint_rose=int((change[joints] > 0).sum()),
+        joint_rose_loose=int(((change > 0) & joints & ~(squeeze[:old] > 1.0)).sum()),
+        joint_gain_wrong=int((change[joints] != gain[:old][joints]).sum()) if events == 0 else 0,
+        joint_loss=int(loss[kind_now == JOINT].sum()),
+        volume_wrong=int((change[volumes] != (gain[:old] - loss[:old])[volumes]).sum()) if events == 0 else 0,
+        gained=int(gain[all_volumes].sum()), lost=int(loss[all_volumes].sum()), crossed_step=int(crossed.sum()),
+        crossed_at_volumes=int(crossed[all_volumes].sum()),
+        clock_wrong=int((np.abs(tick[lived] - settings.step_time * before["rate"][lived]) > 1e-4).sum())
+        if events == 0 else 0,
+        still=sum(int(np.array_equal(state.block(cell)[0], block)) for cell, block in zip(samples, before["blocks"])),
+        size=float(length[alive].astype(np.float64).sum()), volumes=int(all_volumes.sum()),
+        joints=int((kind_now == JOINT).sum()), collapses=state.collapses, merges=state.merges, tears=state.tears,
+        quanta_max_is_shortest=int(length[most] == length[all_volumes].min()))
+    return found

@@ -1,8 +1,7 @@
 """Quantum hand: a moving energy is handed on between two neighbouring energy volumes without friction, its waves adding and cancelling.
 
-Contract: `quantum_hand(state, giver, taker, turn, universe=None)` acts on every moving
-energy (quantum_store.py) with a part in energy volume `giver` or `taker`, in one
-universe or in all of the batch. The two parts, each a wave sqrt(part) e^{i phase},
+Contract: `quantum_hand(state, giver, taker, turn)` acts on every moving energy
+(quantum_store.py) with a part in energy volume `giver` or `taker`. The two parts, each a wave sqrt(part) e^{i phase},
 take the fluid's own exact two-box step (pair_rotation.py, De Raedt 1987, here between
 two cells): their mean stays, their half difference turns by `turn` radians, and the
 flux becomes floor(flux + uniform) whole quanta moved from giver to taker (negative:
@@ -18,14 +17,12 @@ share that left, so its chance of being on a cell stays that cell's share. A han
 that leaves all of it in one cell is the merge back: the oscillation stops, logged as
 "merge". Staged: the engine's own crossing (cross.py) takes all direction off what
 crosses, so only a scene calls this, where it places a splitter or a route. Raises
-ValueError unless both cells are energy volumes sharing a joint. Returns [(serial,
+ValueError unless both cells are energy volumes at the two ends of a joint's way. Returns [(serial,
 moved), ...].
 """
 from __future__ import annotations
 
 import math
-
-import numpy as np
 
 from physics.engine.quantum_joints import quantum_joints
 from physics.engine.quantum_move import quantum_move
@@ -35,20 +32,19 @@ from physics.engine.state import State
 SPEEDS = (4.0, 256.0)
 
 
-def quantum_hand(state: State, giver: int, taker: int, turn: float, universe: int | None = None) -> list:
+def quantum_hand(state: State, giver: int, taker: int, turn: float) -> list:
     """Hand moving energy on between two neighbouring volumes by one exact pair rotation of its two parts."""
     store = quantum_store(state)
-    met = [record for record in store["moving"] if universe in (None, record["universe"])
-           and (giver in record["cells"] or taker in record["cells"])]
+    met = [record for record in store["moving"] if giver in record["cells"] or taker in record["cells"]]
     moves, handed = [], []
     for record in met:
-        _neighbours(state, record["universe"], giver, taker)
+        _neighbours(state, giver, taker)
         moved = _rotate(record, giver, taker, turn)
         if moved > 0:
-            moves.append((record["universe"], giver, taker, moved))
+            moves.append((giver, taker, moved))
         elif moved < 0:
-            moves.append((record["universe"], taker, giver, -moved))
-        record["joints"] = {cell: record["joints"].get(cell) or quantum_joints(state, record["universe"], cell)
+            moves.append((taker, giver, -moved))
+        record["joints"] = {cell: record["joints"].get(cell) or quantum_joints(state, cell)
                             for cell in record["cells"]}
         handed.append((record["serial"], moved))
         _oscillation(state, store, record)
@@ -56,13 +52,13 @@ def quantum_hand(state: State, giver: int, taker: int, turn: float, universe: in
     return handed
 
 
-def _neighbours(state: State, universe: int, giver: int, taker: int) -> None:
-    """Raise unless giver and taker are two energy volumes of the universe sharing a joint."""
-    kinds, sides = state.kind[universe], state.between[universe]
-    pair = sorted((giver, taker))
-    if giver == taker or kinds[giver] != 1 or kinds[taker] != 1 or not np.any(
-            (kinds == -1) & (sides[:, 0] == pair[0]) & (sides[:, 1] == pair[1])):
-        raise ValueError(f"cells {giver} and {taker} of universe {universe} are not energy volumes sharing a joint")
+def _neighbours(state: State, giver: int, taker: int) -> None:
+    """Raise unless giver and taker are two energy volumes at the two ends of one joint's way."""
+    kinds = state.kind_h
+    apart = giver == taker or not (0 <= giver < state.count and 0 <= taker < state.count)
+    if apart or kinds[giver] != 1 or kinds[taker] != 1 or not any(
+            taker in ends for ends in quantum_joints(state, giver).values()):
+        raise ValueError(f"cells {giver} and {taker} are not energy volumes with a joint between them")
 
 
 def _rotate(record: dict, giver: int, taker: int, turn: float) -> int:
@@ -115,6 +111,6 @@ def _oscillation(state: State, store: dict, record: dict) -> None:
         record["born"] = int(state.step)
     elif len(record["cells"]) == 1 and record["speed"] is not None:
         record["speed"], record["born"], record["turn"] = None, None, 0.0
-        store["ended"].append({"serial": record["serial"], "universe": record["universe"], "step": int(state.step),
+        store["ended"].append({"serial": record["serial"], "step": int(state.step),
                                "cause": "merge", "cell": record["cells"][0], "amount": record["amount"], "drawn": 0,
                                "parts": {record["cells"][0]: record["amount"]}})

@@ -1,14 +1,15 @@
 # physics/
 
-Rules: `docs/bible.md#physicsquantum-relativity` ("The foundation" and "How the engine holds
-the foam" first); words: `CONTEXT.md` (Planck box, energy volume, joint; never node, edge,
+Rules: `docs/bible.md#physicsquantum-relativity` ("The foundation", "The axioms" and "How the engine holds
+the grid" first); words: `CONTEXT.md` (Planck box, energy volume, joint; never node, edge,
 vertex, or merge for joint collapse).
 
-`engine/` is the engine: a fixed grid of Planck boxes on the GPU (Warp,
-CUDA), each holding one signed whole number of quanta (plus: an energy volume's box, minus:
-a joint's, 0: no space) and the fluid's phase; every rule reads only neighbours;
-universes run side by side; each box belongs to a cell of a cell graph (a joint knows its
-two volumes; `engine/cells.py`, `engine/seams.py`). `ladder/` is the detail ladder the engine keeps
+`engine/` is the engine (rebuilt 2026-11-17): the cells are the grid, a perfect
+A B A B lattice on the GPU (Warp, CUDA); a cell has only its neighbours and a length set by
+its quanta, and owns a fixed block of 216 compute boxes (whole signed quanta and a
+phase) for its fluid; boxes are not space. `bench/`, `ladder/`, `view/`, `scenes/` and
+`fit/` were built on the earlier engine (boxes as space) and do not import until each
+is rebuilt on `cells`, `stats` and `State`. `ladder/` is the detail ladder the engine keeps
 beside its boxes once attached; `bench/` the side-by-side and size harness. `view/` is the
 only viewer, a pyglet window on the GPU. `scenes/` is the scorecard: each scene runs the
 engine and returns measured numbers, no verdict. `fit/` searches settings on the fit set
@@ -18,17 +19,13 @@ scenes share (dimension, whirl winding), CPU only.
 
 ## Must not get wrong
 
-- **The rules are the bible's**: A pulls, fading with distance, at light speed; B pushes,
-  steeply when squeezed, and collapses only when packed past `collapse_packing`, into one cell (the only way minus
-  turns plus); flow frictionless inside a cell; energy crosses A to A down the pull (plus
-  diffusion) through their one joint, the only friction, making heat, less when squeezed, none past the seal; every A
-  wrapped on all 26 sides, joints thin mortar in one web; only a too-big A tears; no size
-  at rest, no drift setting; a box changes cell only once emptied or split, sign only by
-  collapse or a split's tear. The amount ignoring sign is exact (bible rule 4).
-- **Open space**: `new_universe` defaults to margin 0 (wraps round when its side is even).
-  Open-space scenes start the block inside an empty margin as wide as the filled cube
-  (`scenes/open_margin.py`); space grows there as outer joints take empty boxes.
-  Cells reaching the closed walls (`stats()["edge_share"]`) end open space; report it.
+- **The rules are the bible's axioms**: plus pulls, minus pushes; the pattern never
+  breaks; size is energy alone; a squeezed joint makes minus energy out of itself and
+  collapses when thinned too far (its energy taken off the rest, its volumes merged);
+  only a too-big volume tears; energy crosses A to A through the joint between, bent by
+  the pull, the only friction, making heat. The total is not fixed; its books are exact.
+- **No open space**: the grid wraps round; the universe's size is the sum of its cells'
+  lengths (`stats()["size"]`).
 - **Honesty.** Never tune a setting, seed or threshold until a result passes; report every
   number, seed, settings and miss.
 - **Expansion check before any fit** (seed 1, defaults): the numbers are in

@@ -25,9 +25,9 @@ def quantum_settle(state: State, records: list, cause: str) -> list:
         drawn = 0
         for cell, part in zip(record["cells"], record["parts"]):
             if cell != home:
-                moves.append((record["universe"], cell, home, part))
+                moves.append((cell, home, part))
                 drawn += part
-        events.append({"serial": record["serial"], "universe": record["universe"], "step": int(state.step),
+        events.append({"serial": record["serial"], "step": int(state.step),
                        "cause": cause, "cell": home, "amount": record["amount"], "drawn": drawn,
                        "parts": dict(zip(record["cells"], record["parts"]))})
     quantum_move(state, moves)

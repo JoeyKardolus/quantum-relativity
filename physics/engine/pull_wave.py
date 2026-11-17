@@ -1,122 +1,83 @@
-"""Pull wave: the pull spreads box to box at light speed, a wave sourced by plus quanta, on local clocks.
+"""Pull wave: the pull spreads from cell to cell at light speed over the sizes of the cells it crosses.
 
-Contract: `pull_wave(state, settings)` advances the pull field one step of the wave
-equation d2(pull)/dt2 = c**2 (laplacian(pull) - 4 pi G rho), c = light_speed,
-G = pull_strength, rho = the plus quanta in the box (joints and empty boxes add none),
-by leapfrog on the 7-box stencil, each box on its own cell's clock (owner, 2026-11-16:
-everything in a cell, the pull too, runs on the cell's local clock): first pull_rate +=
-step_time * rate * c**2 * (...), then pull += step_time * rate * pull_rate, rate the
-box's cell's clock rate (state.rate; cell_laws.py runs first when the state has none).
-Each box reads only its six face neighbours, so a change travels at most one box per
-step. Its static limit is laplacian(pull) = 4 pi G rho, the pull falling as -G M / r.
-Space ends where the numbers reach zero: an empty box, and every place beyond a wall,
-holds pull 0. In a universe that wraps round (state.wrap) there is no wall to hold the
-pull's level, so the pull's level over the whole universe (its mean, which turns every
-plus box's phase alike and moves nothing) is taken out each step; that is a choice of
-zero, not a force. Returns None.
+Contract: `pull_wave(state, settings)` advances state.pull by one step of the wave
+equation on the cells' relations (leapfrog; state.pull_old is the pull a step ago).
+A cell knows only its neighbours and its distance to each, half its own length plus
+half the neighbour's, d = (length + neighbour length) / 2 (the sum of the sizes between
+their middles). With N neighbours the Laplacian in three dimensions is
+6 / N * sum((neighbour pull - pull) / d ** 2), so per step
+  pull' = 2 pull - pull_old + rate ** 2 * (sum(w * (neighbour pull - pull)) / N
+                                           - (light_speed * step_time) ** 2 * source)
+  w      = min(6 * (light_speed * step_time / d) ** 2, 1)
+  source = 4 pi G * plus quanta / length ** 3 for an energy volume, 0 for a joint
+`rate` is the cell's local clock (a packed cell passes the pull on slower). A change
+moves one neighbour per step at most (exactly: beyond that reach nothing changes), and
+its bulk travels at light speed over the sizes of the cells it crosses; at rest it is
+the static pull of the plus quanta, weaker with distance, deeper round a more packed
+(more energy, smaller) volume. Joints carry it and add none. The cap on w keeps the
+step stable for any cell size (cells shorter than a step of light pass the pull on
+slower, never faster). The lattice wraps, so the pull's mean has no meaning: the mean
+change is taken out every step (summed in whole 2 ** -40 units, the same in any order),
+which shifts every cell alike and changes no difference. Returns None.
 """
 from __future__ import annotations
 
-import numpy as np
 import warp as wp
 
-from physics.engine.cell_count import cell_count
-from physics.engine.cell_laws import cell_laws
-from physics.engine.cell_upload import cell_upload
-from physics.engine.face_step import face_step
-from physics.engine.reach import reach
+from physics.engine.neighbour import neighbour
 from physics.engine.settings import Settings
 from physics.engine.state import State
 
-PI = 3.14159265358979
-LEVEL_UNIT = 1.0e9
+wp.set_module_options({"fuse_fp": False})
+
+_UNIT = 1099511627776.0  # numerics: 2**40 per unit, whole-number sums
 
 
 @wp.kernel
-def _speed_up(quanta: wp.array3d(dtype=wp.int32), owner: wp.array3d(dtype=wp.int32),
-              rates: wp.array2d(dtype=wp.float32), pull: wp.array3d(dtype=wp.float32),
-              pull_rate: wp.array3d(dtype=wp.float32), side: int, wrap: int, kick: float, source: float):
-    ti, tj, tk = wp.tid()
-    amount = quanta[ti, tj, tk]
-    if amount == 0:
-        pull_rate[ti, tj, tk] = 0.0
+def _wave(kind: wp.array(dtype=wp.int32), cell_quanta: wp.array(dtype=wp.int64), length: wp.array(dtype=wp.float32),
+          rate: wp.array(dtype=wp.float32), pull: wp.array(dtype=wp.float32), pull_old: wp.array(dtype=wp.float32),
+          pull_new: wp.array(dtype=wp.float32), adj_at: wp.array(dtype=wp.int32), adj_n: wp.array(dtype=wp.int32),
+          adj_pool: wp.array(dtype=wp.int32), side: int, light_step: float, strength: float,
+          sums: wp.array(dtype=wp.int64)):
+    cell = wp.tid()
+    sort = kind[cell]
+    if sort == 0:
         return
-    home = ti // side
-    here = wp.vec3i(ti, tj, tk)
-    centre = pull[ti, tj, tk]
-    spread = -6.0 * centre
-    for face in range(6):
-        there, valid = reach(here, face_step(face), home, side, wrap)
-        if valid:
-            spread += pull[there[0], there[1], there[2]]
-    density = float(wp.max(amount, 0))
-    rate = rates[home, owner[ti, tj, tk]]
-    pull_rate[ti, tj, tk] = pull_rate[ti, tj, tk] + kick * rate * (spread - source * density)
+    count = adj_n[cell]
+    own = length[cell]
+    here = pull[cell]
+    total = float(0.0)
+    for index in range(count):
+        other = neighbour(cell, index, side, adj_at, adj_pool)
+        distance = 0.5 * (own + length[other])
+        total += wp.min(6.0 * light_step * light_step / (distance * distance), 1.0) * (pull[other] - here)
+    source = float(0.0)
+    if sort == 1:
+        source = strength * float(cell_quanta[cell]) / (own * own * own)
+    pace = rate[cell]
+    after = 2.0 * here - pull_old[cell] + pace * pace * (total / float(count) - light_step * light_step * source)
+    pull_new[cell] = after
+    wp.atomic_add(sums, 0, wp.int64(wp.float64(after - here) * wp.float64(_UNIT)))
+    wp.atomic_add(sums, 1, wp.int64(1))
 
 
 @wp.kernel
-def _move(quanta: wp.array3d(dtype=wp.int32), owner: wp.array3d(dtype=wp.int32),
-          rates: wp.array2d(dtype=wp.float32), pull_rate: wp.array3d(dtype=wp.float32),
-          pull: wp.array3d(dtype=wp.float32), side: int, step_time: float):
-    ti, tj, tk = wp.tid()
-    if quanta[ti, tj, tk] == 0:
-        pull[ti, tj, tk] = 0.0
+def _settle(kind: wp.array(dtype=wp.int32), pull: wp.array(dtype=wp.float32), pull_old: wp.array(dtype=wp.float32),
+            sums: wp.array(dtype=wp.int64)):
+    cell = wp.tid()
+    if kind[cell] == 0:
         return
-    rate = rates[ti // side, owner[ti, tj, tk]]
-    pull[ti, tj, tk] = pull[ti, tj, tk] + step_time * rate * pull_rate[ti, tj, tk]
-
-
-@wp.kernel
-def _level(quanta: wp.array3d(dtype=wp.int32), field: wp.array3d(dtype=wp.float32), side: int,
-           sums: wp.array2d(dtype=wp.int64)):
-    ti, tj = wp.tid()
-    total = wp.int64(0)
-    occupied = wp.int64(0)
-    for tk in range(side):
-        if quanta[ti, tj, tk] != 0:
-            total += wp.int64(wp.round(float(field[ti, tj, tk]) * LEVEL_UNIT))
-            occupied += wp.int64(1)
-    if occupied > wp.int64(0):
-        wp.atomic_add(sums, ti // side, 0, total)
-        wp.atomic_add(sums, ti // side, 1, occupied)
-
-
-@wp.kernel
-def _lower(quanta: wp.array3d(dtype=wp.int32), field: wp.array3d(dtype=wp.float32), side: int,
-           levels: wp.array(dtype=wp.float32)):
-    ti, tj, tk = wp.tid()
-    if quanta[ti, tj, tk] != 0:
-        field[ti, tj, tk] = field[ti, tj, tk] - levels[ti // side]
+    shift = wp.float32(wp.float64(sums[0]) / wp.float64(_UNIT) / wp.float64(sums[1]))
+    pull_old[cell] = pull[cell] + shift
 
 
 def pull_wave(state: State, settings: Settings) -> None:
-    """Advance the pull one leapfrog step of its wave equation on local clocks, neighbour boxes only."""
-    if state.rate is None or state.rate.shape != state.kind.shape:
-        cell_count(state)
-        cell_laws(state, settings)
-        cell_upload(state)
-    if "rate" not in state.cells_d:
-        cell_upload(state)
-    kick = settings.step_time * settings.light_speed ** 2
-    source = 4.0 * PI * settings.pull_strength
-    device = state.quanta.device
-    rates = state.cells_d["rate"]
-    wp.launch(_speed_up, dim=state.shape, device=device,
-              inputs=[state.quanta, state.owner, rates, state.pull, state.pull_rate, state.side, int(state.wrap),
-                      float(kick), float(source)])
-    wp.launch(_move, dim=state.shape, device=device,
-              inputs=[state.quanta, state.owner, rates, state.pull_rate, state.pull, state.side, settings.step_time])
-    if state.wrap:
-        for field in (state.pull_rate, state.pull):
-            _take_level(state, field)
-
-
-def _take_level(state: State, field) -> None:
-    """Subtract each universe's mean over its occupied boxes from `field`."""
-    device = state.quanta.device
-    sums = wp.zeros((state.universes, 2), dtype=wp.int64, device=device)
-    wp.launch(_level, dim=state.shape[:2], device=device, inputs=[state.quanta, field, state.side, sums])
-    totals = sums.numpy()
-    levels = (totals[:, 0] / LEVEL_UNIT / np.maximum(totals[:, 1], 1)).astype(np.float32)
-    wp.launch(_lower, dim=state.shape, device=device,
-              inputs=[state.quanta, field, state.side, wp.array(levels, dtype=wp.float32, device=device)])
+    """Advance the pull one step on the cells' relations, at light speed over their sizes."""
+    sums = wp.zeros(2, dtype=wp.int64, device=state.device)
+    wp.launch(_wave, dim=state.count, device=state.device,
+              inputs=[state.kind, state.cell_quanta, state.length, state.rate, state.pull, state.pull_old,
+                      state.pull_new, state.adj_at, state.adj_n, state.adj_pool, state.side,
+                      float(settings.light_speed * settings.step_time),
+                      float(4.0 * 3.14159265358979 * settings.pull_strength), sums])
+    wp.launch(_settle, dim=state.count, device=state.device, inputs=[state.kind, state.pull, state.pull_old, sums])
+    state.pull_old, state.pull, state.pull_new = state.pull_old, state.pull_new, state.pull
