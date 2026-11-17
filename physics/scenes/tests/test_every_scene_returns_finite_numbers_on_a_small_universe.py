@@ -1,13 +1,15 @@
 """Every scorecard scene runs on a small universe (8 lattice places a side, 64 energy volumes) and returns only finite numbers.
 
 The exceptions are NaN by contract: black_hole's radius_energy_power when fewer than two
-runs seal (at this size none does), and a q where the size did not move.
+runs seal (at this size none does), a q where the size did not move, and two_lumps'
+powers from a single distance.
 """
 import math
 
 import pytest
 
-from physics.scenes import black_hole, bound_lump, expansion, hubble_gap, orbit, space_dimension, structure, timescape
+from physics.scenes import (black_hole, bound_lump, expansion, hubble_gap, orbit, space_dimension, structure, timescape,
+                            two_lumps)
 from physics.scenes.tests._gpu import needs_gpu
 
 SCENES = {
@@ -19,6 +21,7 @@ SCENES = {
     "black_hole": lambda: black_hole(8, energies=(4.0, 8.0), steps=10),
     "space_dimension": lambda: space_dimension(8, steps=4, sources=4),
     "timescape": lambda: timescape(8, steps=12, every=2, observers=2),
+    "two_lumps": lambda: two_lumps(12, apart=(2,), steps=6, settle=2),
 }
 
 
@@ -37,7 +40,8 @@ def _numbers(value):
 @pytest.mark.parametrize("name", sorted(SCENES))
 def test_the_scene_returns_only_finite_numbers(name):
     result = SCENES[name]()
-    result.pop("radius_energy_power", None)
+    for power in ("radius_energy_power", "pull_power", "newton_power"):
+        result.pop(power, None)
     numbers = list(_numbers(result))
     assert numbers
     assert all(isinstance(number, (int, float)) and math.isfinite(number) for number in numbers)

@@ -1,8 +1,9 @@
 """Packed start: an even grid in which chosen energy volumes hold more energy (a placed start).
 
-Contract: `packed_start(cells_per_side, packed, seed=1, settings=None, device="cuda")`
-builds physics.engine.new_universe(cells_per_side, seed, unevenness=0.0) (every volume
-alike but for the jitter inside its boxes) and gives each energy volume named in
+Contract: `packed_start(cells_per_side, packed, seed=1, settings=None, device="cuda",
+start=None)` builds physics.engine.new_universe(cells_per_side, seed, unevenness=0.0,
+**start) (every volume alike but for the jitter inside its boxes; `start` passes other
+start amounts on, such as the fitted ones, never an unevenness) and gives each energy volume named in
 `packed`, {(i, j, k) lattice place, all three even: factor}, factor times the start's
 mean volume quanta, spread evenly over its own boxes (State.fill). Lengths, packings
 and clock rates follow at once (cell_laws) and the books start from this state
@@ -20,9 +21,10 @@ from physics.engine import ENERGY_VOLUME, Settings, State, cell_laws, new_univer
 
 
 def packed_start(cells_per_side: int, packed: dict, seed: int = 1, settings: Settings | None = None,
-                 device: str = "cuda") -> State:
+                 device: str = "cuda", start: dict | None = None) -> State:
     """An even universe with the named energy volumes packed to their factors."""
-    universe = new_universe(cells_per_side, seed, unevenness=0.0, device=device)
+    universe = new_universe(cells_per_side, seed, **{**(start or {}), "unevenness": 0.0, "joint_unevenness": 0.0},
+                            device=device)
     side = universe.side
     for place, factor in packed.items():
         if any(index % 2 or not 0 <= index < side for index in place):

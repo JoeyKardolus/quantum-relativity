@@ -2,14 +2,16 @@
 
 Contract: `new_universe(cells_per_side=32, seed=1, unevenness=0.1, slope=-3.0,
 box_quanta=3000, joint_quanta=100, inner_unevenness=0.1, volume_length=10.0,
-joint_length=1.0, spare=0.25, device="cuda")` returns a State (state.py) at step 0, phase
+joint_length=1.0, spare=0.25, device="cuda", joint_unevenness=0.0)` returns a State (state.py) at step 0, phase
 0, pull 0. The lattice has cells_per_side places per axis (even, at least 4) and wraps
 round: a place is an energy volume when all three indices are even and a joint
 everywhere else (faces, edges, corners), so every volume is wrapped by joints on all 26
 sides and the joints are one web. Energy: the uneven field g over the lattice
 (uneven_field.py: seed, slope, rms unevenness, ripples at every size; plain seeded
 noise below 8 places a side) gives a volume box_quanta * exp(g) / mean(exp(g)) quanta
-per box on average, a joint joint_quanta; each box then holds that times exp(inner
+per box on average, a joint joint_quanta (times exp(h) / mean(exp(h)) over the joints
+when joint_unevenness is above 0, h a second field of that rms from the same seed; 0,
+the default, leaves every joint alike); each box then holds that times exp(inner
 unevenness * a standard normal) (a hash of the box and the seed), rounded to whole
 quanta, at least 1, minus in a joint, so the fluid inside every cell starts moving at
 once. The default unevenness is slight (0.1): at 0.3 one volume in 70 starts longer
@@ -45,22 +47,30 @@ def _fill(kind: wp.array(dtype=wp.int32), base: wp.array(dtype=wp.float32), inne
     wp.atomic_add(cell_quanta, cell, wp.int64(amount))
 
 
+def _field(side: int, seed, slope: float, unevenness: float) -> np.ndarray:
+    """The uneven field over the lattice: ripples at every size, plain seeded noise below 8 places a side."""
+    if side >= 8:
+        return uneven_field(side, seed, slope, unevenness)
+    return np.random.default_rng(seed).standard_normal((side, side, side)) * unevenness
+
+
 def new_universe(cells_per_side: int = 32, seed: int = 1, unevenness: float = 0.1, slope: float = -3.0,
                  box_quanta: int = 3000, joint_quanta: int = 100, inner_unevenness: float = 0.1,
                  volume_length: float = 10.0, joint_length: float = 1.0, spare: float = 0.25,
-                 device: str = "cuda") -> State:
+                 device: str = "cuda", joint_unevenness: float = 0.0) -> State:
     """Build the start: the perfect grid of energy volumes and joints with slightly uneven energy."""
     if box_quanta < 3 or joint_quanta < 3:
         raise ValueError("box_quanta and joint_quanta must be at least 3")
+    if joint_unevenness < 0.0:
+        raise ValueError("joint_unevenness must be >= 0")
     side = int(cells_per_side)
     state = State(side, int(side ** 3 * (1.0 + spare)) + 2, seed=seed, device=device)
-    if side >= 8:
-        field = uneven_field(side, seed, slope, unevenness)
-    else:
-        field = np.random.default_rng(seed).standard_normal((side, side, side)) * unevenness
     volumes = state.kind_h[:state.lattice] == ENERGY_VOLUME
-    weight = np.exp(field).reshape(-1)
+    weight = np.exp(_field(side, seed, slope, unevenness)).reshape(-1)
     base = np.where(volumes, box_quanta * weight / weight[volumes].mean(), float(joint_quanta))
+    if joint_unevenness > 0.0:
+        weight = np.exp(_field(side, (seed, 1), slope, joint_unevenness)).reshape(-1)
+        base = np.where(volumes, base, joint_quanta * weight / weight[~volumes].mean())
     base_d = wp.array(base.astype(np.float32), dtype=wp.float32, device=device)
     wp.launch(_fill, dim=(state.lattice, BLOCK, BLOCK, BLOCK), device=device,
               inputs=[state.kind, base_d, float(inner_unevenness), int(seed), BOXES, BLOCK, state.quanta,

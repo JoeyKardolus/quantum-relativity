@@ -7,7 +7,7 @@ import pytest
 
 from physics.engine import Settings
 from physics.fit import load_fitted
-from physics.fit.fit_search import LINEAR_RANGES, LOG_RANGES, START_RANGES
+from physics.fit.fit_search import LINEAR_RANGES, LOG_RANGES
 
 
 def test_a_fitted_file_gives_settings_and_start_without_touching_the_defaults(tmp_path):
@@ -39,7 +39,7 @@ def test_the_shipped_fitted_file_names_only_real_settings_inside_the_searched_ra
     for name in stored["settings"]:
         assert ranges[name][0] <= getattr(fitted["settings"], name) <= ranges[name][1]
     for name, value in fitted["start"].items():
-        assert START_RANGES[name][0] <= value <= START_RANGES[name][1]
+        assert ranges[name][0] <= value <= ranges[name][1]
     assert fitted["fitted_on"]["status"]
     if not stored["settings"]:
         assert fitted["settings"] == Settings(), "with nothing fitted the fitted universe is the default one"

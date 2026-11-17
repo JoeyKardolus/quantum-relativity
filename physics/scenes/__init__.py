@@ -13,6 +13,7 @@ Module map:
   bound_lump.py      bound_lump: the most packed volume's length against the other volumes'
   orbit.py           orbit: extra energy beside a packed volume; how long it holds, where it goes
   black_hole.py      black_hole: sealed region radius against its energy, per packed energy
+  two_lumps.py       two_lumps: the pull each of two placed lumps feels toward the other against distance, beside one over distance squared
   timescape.py       timescape: growth timed by the counter, by the densest and by the emptiest volumes' clocks
   space_dimension.py space_dimension: ball and spectral dimension of the volume-neighbour graph, beside a grid's
   sampled_run.py     sampled_run: step a universe, measure it every few steps
@@ -39,8 +40,9 @@ from physics.scenes.sealed_region import sealed_region
 from physics.scenes.space_dimension import space_dimension
 from physics.scenes.structure import structure
 from physics.scenes.timescape import timescape
+from physics.scenes.two_lumps import two_lumps
 from physics.scenes.volume_field import volume_field
 
 __all__ = ["black_hole", "bound_lump", "deceleration", "expansion", "growth_rates", "hubble_gap", "observer_cells",
            "orbit", "packed_start", "power_spectrum", "sampled_run", "sealed_region", "space_dimension",
-           "structure", "timescape", "volume_field"]
+           "structure", "timescape", "two_lumps", "volume_field"]

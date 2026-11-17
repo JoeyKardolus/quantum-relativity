@@ -3,14 +3,18 @@
 Contract: fit_measure(universe, settings) -> dict of plain numbers for a physics.engine
 State, read from its cells (quanta, lengths, clock rates) and its ways (way_list). The
 universe wraps: there is no edge, so everything is measured inside it.
-  room          space between lumps, in lengths (bible: the size of space is the sum of
-                cell lengths): every joint's length plus the lengths of the least
-                packed energy volumes that together hold half the plus quanta (the
-                volume the half falls in counted in proportion). The most packed
-                volumes holding the other half are the lumps side of the cut; no
-                threshold, no cell followed.
+  size          the size of the universe: the sum of every living cell's length
   observer_rate the clock rate where the typical quantum sits: the energy volumes' clock
                 rates weighted by their quanta
+  alive         the share of the start's energy volumes that are still an energy volume
+                (one that fell into another at a joint collapse is gone): 1 at the
+                start, 1 / volumes when everything fell into a single cell
+  spent_share   the share of the size lying in energy volumes that are overstretched:
+                longer than settings.tear_length (about to tear, or too empty to), or
+                holding fewer than SPENT_BOXES (3) quanta per Planck box, the engine's
+                own floor, under which a volume can neither tear nor be read as a
+                fluid. 0 in a calm universe; a tear chain runs through overstretched
+                volumes down to the floor and takes it toward 1
   lump_volumes  energy volumes holding at least LUMP_FACTOR (physics.engine.stats, 2)
                 times the start's mean volume quanta
   lumps         groups of lump volumes joined through ways (lumps over regions, not
@@ -25,7 +29,8 @@ universe wraps: there is no edge, so everything is measured inside it.
   region_contrast  rms of (quanta in a block / mean - 1) over blocks of 2 x 2 x 2
                 lattice energy volumes: unevenness over regions larger than a cell (0
                 when the volumes a side are odd or fewer than 4)
-  volumes, joints, collapses, tears, crossed, squeeze_max, packing_max
+  plus, minus, amount   the quanta in energy volumes, in joints, and both together
+  volumes, joints, collapses, merges, tears, crossed, squeeze_max, packing_max
 """
 from __future__ import annotations
 
@@ -33,17 +38,19 @@ import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 
-from physics.engine import ENERGY_VOLUME, JOINT, Settings, State, way_list
+from physics.engine import BOXES, ENERGY_VOLUME, JOINT, Settings, State, way_list
 from physics.engine.stats import LUMP_FACTOR
+
+SPENT_BOXES = 3
 
 
 def fit_measure(universe: State, settings: Settings) -> dict:
-    """Room between lumps, observer clock rate, lumps as groups, seals, spread and region contrast."""
+    """Size, observer clock rate, what is left alive and spent, lumps as groups, seals, spread and region contrast."""
     kind = universe.kind_h[:universe.count]
     held = universe.host("cell_quanta").astype(np.float64)
     length = universe.host("length").astype(np.float64)
     volumes, joints = kind == ENERGY_VOLUME, kind == JOINT
-    plus = float(held[volumes].sum())
+    plus, size = float(held[volumes].sum()), float(length[kind != 0].sum())
     packed = volumes & (held >= LUMP_FACTOR * universe.start_quanta[ENERGY_VOLUME])
     carriers, first, second = way_list(universe)
     groups, lumps = _groups(universe.count, packed, first, second)
@@ -51,27 +58,27 @@ def fit_measure(universe: State, settings: Settings) -> dict:
     tight = held[carriers] >= settings.seal_thin * universe.start_quanta[JOINT]
     sealed = _sealed(packed, groups, first, second, tight, lumps)
     side = universe.side
-    field = np.where(volumes[:universe.lattice], held[:universe.lattice], 0.0).reshape(side, side, side)[::2, ::2, ::2]
-    return {"room": float(length[joints].sum()) + _thin_half(held[volumes], length[volumes]),
-            "observer_rate": float((universe.host("rate")[volumes] * held[volumes]).sum() / plus),
+    places = volumes[:universe.lattice]
+    field = np.where(places, held[:universe.lattice], 0.0).reshape(side, side, side)[::2, ::2, ::2]
+    return {"size": size, "observer_rate": float((universe.host("rate")[volumes] * held[volumes]).sum() / plus),
+            "alive": float(places.sum() / (side // 2) ** 3),
+            "spent_share": float(length[volumes & ((held < SPENT_BOXES * BOXES) | _torn(length, settings))].sum() / size),
             "lump_volumes": int(packed.sum()), "lumps": int(lumps),
             "largest_lump": int(np.bincount(groups[packed]).max()) if lumps else 0,
             "lump_share": float(lump_quanta.sum() / plus),
             "sealed_lumps": int(sealed.sum()), "sealed_share": float(lump_quanta[sealed].sum() / plus),
             "lump_spread": float(np.std(np.log(held[packed]))) if packed.sum() >= 3 else 0.0,
             "region_contrast": _region_contrast(field),
+            "plus": plus, "minus": float(held[joints].sum()), "amount": float(held[kind != 0].sum()),
             "volumes": int(volumes.sum()), "joints": int(joints.sum()), "collapses": int(universe.collapses),
-            "tears": int(universe.tears), "crossed": int(universe.books.numpy()[1]),
+            "merges": int(universe.merges), "tears": int(universe.tears), "crossed": int(universe.books.numpy()[1]),
             "squeeze_max": float(universe.host("squeeze")[joints].max()),
             "packing_max": float(universe.host("packing")[volumes].max())}
 
 
-def _thin_half(quanta: np.ndarray, length: np.ndarray) -> float:
-    """Summed length of the least packed volumes (the longest) that together hold half the plus quanta."""
-    order = np.argsort(-length, kind="stable")
-    before = np.concatenate([[0.0], np.cumsum(quanta[order])[:-1]])
-    share = np.clip((0.5 * quanta.sum() - before) / np.maximum(quanta[order], 1.0), 0.0, 1.0)
-    return float((share * length[order]).sum())
+def _torn(length: np.ndarray, settings: Settings) -> np.ndarray:
+    """Per cell: longer than the tear length (never, when tears are off)."""
+    return (length > settings.tear_length) if settings.tear_length > 0.0 else np.zeros(length.shape, dtype=bool)
 
 
 def _groups(count: int, packed: np.ndarray, first: np.ndarray, second: np.ndarray) -> tuple:

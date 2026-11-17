@@ -42,6 +42,21 @@ def test_the_start_is_the_perfect_pattern():
 
 
 @needs_gpu
+def test_an_uneven_start_of_the_joints_changes_only_their_amounts():
+    even, uneven = new_universe(8, seed=3), new_universe(8, seed=3, joint_unevenness=0.4)
+    joints = even.kind_h[:even.count] == JOINT
+    plain, spread = even.host("cell_quanta"), uneven.host("cell_quanta")
+    found = pattern(uneven)
+    law = uneven.size_energy[JOINT] / spread[joints].astype(np.float64)
+    print(f"joints' quanta spread (sd / mean) {plain[joints].std() / plain[joints].mean():.4f} even, "
+          f"{spread[joints].std() / spread[joints].mean():.4f} at joint_unevenness 0.4")
+    assert np.array_equal(plain[~joints], spread[~joints]), "the volumes are the same start"
+    assert spread[joints].std() / spread[joints].mean() > 0.3 > 0.02 > plain[joints].std() / plain[joints].mean()
+    assert found["web_pieces"] == 1 and not any(found[name] for name in _BREAKS)
+    assert np.array_equal(uneven.host("length")[joints], law.astype(np.float32)), "size is still the law of the quanta"
+
+
+@needs_gpu
 def test_the_pattern_never_breaks_in_either_run():
     for name in ("default", "eventful"):
         run = axiom_run(name)
