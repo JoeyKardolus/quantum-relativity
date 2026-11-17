@@ -20,8 +20,10 @@ said), which keeps E exactly at any
 step length; it is implicit (numerics, not a rule: an explicit step gained energy at the
 steep wall and crushed joints to nothing) and solved on the GPU, every joint at once, by
 Newton's method with the Jacobian's diagonal (each joint's own spring; the neighbours'
-come in through the next round), in float64, until the step's equation holds to
-TOLERANCE in every joint; nothing is solved on the host, so the cost grows only with the
+come in through the next round), in float64, until the step's equation holds in every
+joint to TOLERANCE of its own size (of one box for a joint smaller than a box; before
+2026-11-17 of the universe's largest joint, so one joint wanting 8e13 boxes after a
+tear let every other joint's step pass unsolved and the sizes stood still); nothing is solved on the host, so the cost grows only with the
 number of joints (before 2026-11-17 a sparse direct solve on the host: 3 s a step at
 10,000 joints, and a 32-place universe did not finish its first step). Sums over a
 volume's joints run in one fixed order (swing_table.py), so one seed gives one run and a
@@ -160,7 +162,7 @@ def _miss(flags: wp.array2d(dtype=wp.int32), live: wp.array(dtype=wp.int32), spa
     spring = _spring(home, cell, between[home, cell], rate[home, cell], slope[home, cell], rates, pulled)
     miss = size[home, cell] - target[home, cell] + scale * spring
     missed[home, cell] = miss
-    wp.atomic_max(worst, home, wp.abs(miss))
+    wp.atomic_max(worst, home, wp.abs(miss) / wp.max(wp.float64(1.0), size[home, cell]))
 
 
 @wp.kernel
@@ -236,9 +238,7 @@ def joint_swing(state: State, settings: Settings, pull: np.ndarray) -> np.ndarra
     flags[rows, columns] = _ACTIVE + paired * _PAIRED + born * (_HELD | _BORN)
     host = {"rate": (rate, 0.0), "hardness": (hardness, 0.0), "floor": (floor, 0.0), "size": (size, 1.0),
             "speed": (state.speed[rows, columns], 0.0), "load": (pull[rows, columns], 0.0)}
-    largest = np.zeros(state.universes)
-    np.maximum.at(largest, rows, np.abs(size))
-    limit = TOLERANCE * np.maximum(1.0, largest)
+    limit = np.full(state.universes, TOLERANCE)
     for attempt in range(RETRIES + 1):
         on = {name: wp.array(_spread(shape, rows, columns, values, fill), dtype=wp.float64, device=device)
               for name, (values, fill) in host.items()}

@@ -21,6 +21,13 @@
    joints the opposite speed shared out (the speeds add up to nothing). One swing: the
    first try does not settle, the swing still returns, and the swing energy and the
    summed size change by less than 1e-9 of themselves.
+4. Each joint's step is solved to a tolerance of its own size, not of the universe's
+   largest joint (a joint left with a few quanta by a tear wants, by length = constant /
+   energy, more boxes than the universe holds; with the tolerance taken from it every
+   other joint's step passed unsolved, sizes stood still while speeds ran on). Staged on
+   new_universe(8, 10, seed 1) after 20 steps: one joint's size is set to 1e13 boxes, at
+   rest; one swing with no load: the swing energy changes by less than 1e-9 of itself
+   and the other joints' sizes have moved.
 """
 from __future__ import annotations
 
@@ -192,3 +199,30 @@ def test_a_swing_whose_rounds_do_not_settle_is_taken_again_finer_and_keeps_its_e
           f"{energy_change:.2e} of itself, summed size by {size_change:.2e}")
     assert sum(unsettled) >= 1
     assert energy_change <= 1e-9 and size_change <= 1e-9
+
+
+@needs_gpu
+def test_one_giant_joint_does_not_let_the_other_joints_steps_pass_unsolved():
+    settings = Settings()
+    state = new_universe(8, 10, seed=1)
+    for _ in range(20):
+        step(state, settings)
+    cell_count(state)
+    cell_laws(state, settings)
+    joints = (state.kind[0] == -1) & (state.wanted[0] > 0.0)
+    giant = int(np.flatnonzero(joints)[0])
+    state.size[0, giant] = 1.0e13
+    state.speed[0, giant] = 0.0
+    state.speed[0, joints] -= state.speed[0, joints].sum() / joints.sum()
+    others = joints.copy()
+    others[giant] = False
+    load = np.zeros(state.size.shape)
+    before = swing_energy(state, settings, load, joints)
+    sizes = state.size[0, others].copy()
+    joint_swing(state, settings, load)
+    change = abs(swing_energy(state, settings, load, joints) - before) / abs(before)
+    moved = float(np.abs(state.size[0, others] - sizes).max())
+    print(f"with one joint 1e13 boxes big: swing energy changes by {change:.2e} of itself, the other joints moved by "
+          f"up to {moved:.3f} boxes")
+    assert moved > 1e-3
+    assert change <= 1e-9
