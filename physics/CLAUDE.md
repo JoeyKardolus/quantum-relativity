@@ -7,14 +7,12 @@ vertex, or merge for joint collapse).
 `engine/` is the engine (rebuilt 2026-11-17): the cells are the grid, a perfect
 A B A B lattice on the GPU (Warp, CUDA); a cell has only its neighbours and a length set by
 its quanta, and owns a fixed block of 216 compute boxes (whole signed quanta and a
-phase) for its fluid; boxes are not space. `bench/`, `ladder/`, `view/`, `scenes/` and
-`fit/` were built on the earlier engine (boxes as space) and do not import until each
-is rebuilt on `cells`, `stats` and `State`. `ladder/` is the detail ladder the engine keeps
-beside its boxes once attached; `bench/` the side-by-side and size harness. `view/` is the
-only viewer, a pyglet window on the GPU. `scenes/` is the scorecard: each scene runs the
-engine and returns measured numbers, no verdict. `fit/` searches settings on the fit set
-only (expansion shape, structure), by random search or by Warp gradients through a smooth
-stand-in of the engine, and never changes a default. `measure/` holds the measures
+phase) for its fluid; boxes are not space. Everything else is built on its cells:
+`view/` is the only viewer, a pyglet window (or pictures without one) of the grid, every
+cell at its own size. `scenes/` is the scorecard: each scene runs the engine and returns
+measured numbers, no verdict. `fit/` searches settings on the fit set only (expansion
+shape, structure) by random search and never changes a default. `bench/` times the
+engine and finds the largest universe at a step a second. `measure/` holds the measures
 scenes share (dimension, whirl winding), CPU only.
 
 ## Must not get wrong
@@ -41,7 +39,7 @@ scenes share (dimension, whirl winding), CPU only.
 
 ```
 PYTHONPATH=. .venv/bin/pytest -q physics                 # all tests
-PYTHONPATH=. .venv/bin/python -m physics.view            # the window, starts paused, nearest look
+PYTHONPATH=. .venv/bin/python -m physics.view            # the window, starts paused on the middle slice
 ```
 
 Exempt from the test register (owner, 2026-11-14): plain pytest under `<package>/tests/`, no rows.

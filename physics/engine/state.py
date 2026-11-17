@@ -45,7 +45,8 @@ size_energy {1: , -1: } the size law's constants, start_quanta {1: , -1: } the s
 mean quanta per kind, start_length {1: , -1: }, collapses, merges, tears, torn (plus
 quanta turned minus by tears), taken_joint and taken_volumes (quanta a collapse took
 off the joint and off its volumes), fell_into {vanished volume: the
-volume it fell into}, start (totals at step 0), quantum (None or quantum_store.py).
+volume it fell into}, torn_from {id a tear made: (the volume torn, the axis 0 / 1 / 2 it
+tore along)} (a drawing lays a tear's cells out where the torn volume was), start (totals at step 0), quantum (None or quantum_store.py).
 Methods: neighbours(cell) -> (ids, codes); set_neighbours; sides(joint) -> (first side,
 second side); set_sides (keeps every volume's count of ways, ways_h, in step);
 ways(joint) -> [(a, b)]; joints_of(cell); block(cell) -> (quanta, phase) copies;
@@ -94,7 +95,7 @@ class State:
         odd = (places // (side * side)) % 2 + (places // side) % 2 + places % 2
         self.kind_h[:self.lattice] = np.where(odd == 0, ENERGY_VOLUME, JOINT)
         self.ways_h[:self.lattice] = np.where(odd == 0, 6, np.where(odd == 1, 1, 0))
-        self.adj_over, self.sides_over, self.fell_into = {}, {}, {}
+        self.adj_over, self.sides_over, self.fell_into, self.torn_from = {}, {}, {}, {}
         self.version = 0
         self.size_energy = {ENERGY_VOLUME: 0.0, JOINT: 0.0}
         self.start_quanta = {ENERGY_VOLUME: 0.0, JOINT: 0.0}

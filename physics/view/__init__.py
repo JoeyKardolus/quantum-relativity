@@ -1,45 +1,52 @@
-"""The viewer: the Planck-box engine in a GPU window, drawn as small squares (the only viewer).
+"""The viewer: the grid of cells in a GPU window, every cell at its own size (the only viewer).
 
-`python -m physics.view [--cells N] [--boxes-per-cell K] [--seed S] [--unevenness U] [--joint-unevenness J] [--slope S] [--set name=value ...] [--steps-per-frame F]`.
-Every occupied Planck box is a small square at its centre: red in an energy
-volume (A), blue in a joint (B); empty boxes are not drawn; keys 1, 2 and 3 show
-energy volumes, joints or both. Two looks (key G): nearest, the start, draws the
-squares depth-tested so the nearest box hides those behind it, coloured by kind,
-density only a brightness tint, so the structure reads; glow sums light along
-the line of sight, each box lit by its density over the start's mean of its own
-kind on a fixed log scale (an even universe nearly black, only denser zones glow,
-cell borders brighter), summed in a float buffer. Key S draws only a one-box
-slice through the middle; key C draws only a slab a few boxes thick through the
-middle in brighter colours (red energy volumes, blue joints, lighter cell borders,
-packed cells brighter), to see inside; arrows or [ ] move either; the view refits as space grows (F
-fits by hand). No link lines. A source is anything with reset(), step(), steps,
-view() and stats() (`cells_source.py` has the contract). The shown boxes are
-gathered on the GPU and copied to the host once per frame (CUDA-GL sharing fails
-under WSL2 with error 304), then uploaded to GL.
+`python -m physics.view [--cells N] [--seed S] [--unevenness U] [--slope S] [--set name=value ...] [--steps-per-frame F]`
+opens the window; with `--pictures DIR --steps N --every K` it saves slice pictures
+instead, without a window. The cells are the grid (bible `physics/quantum-relativity`,
+axiom 3): a perfect A B A B pattern, energy volumes red, joints blue, brighter the more
+packed on one fixed scale. A cell has no place of its own, so the drawing lays the
+pattern out from the cells' lengths alone (`cell_slots`, `cell_layout`): every cell
+keeps its place in the pattern from frame to frame and only sizes warp it. Planck boxes
+are not space and are never drawn. The window starts on a slice through the middle; key
+C switches between the slice and the whole grid, arrows or [ ] move the slice, 1 / 2 / 3
+show energy volumes, joints or both.
 
 Module map:
-  opacity.py           the light a box adds from its density contrast: fixed log scale (Warp)
-  light_code.py        a point's light as one log byte, decoded by the window (Warp)
-  start_reference.py   the start's mean density of each kind and boxes deep, the fixed unit
-  box_points.py        BoxPoints: selects (kind, slice, slab) and lights (nearest, glow, slab) drawn boxes on the GPU
-  orbit_camera.py      view-projection matrix of a camera circling a centre
-  view_fit.py          the camera fit to the occupied bounds, and when space has outgrown it
-  title_line.py        the window title from a snapshot's stats
-  gpu_driver.py        Mesa d3d12 variables so OpenGL draws on the NVIDIA card
-  cells_source.py      CellsSource: physics.engine's state behind the source interface
-  stepper.py           Stepper, Snapshot: steps a source on a thread, hands out snapshots
-  point_cloud.py       PointCloud: GL points, depth-tested or summed in a float buffer (needs GL)
-  point_window.py      PointWindow: the pyglet window, controls and title (needs GL)
-  __main__.py          the command line
-Only modules that need no OpenGL (nor the engine) are imported here, so tests run headless.
-"""
-from physics.view.opacity import opacity
-from physics.view.light_code import light_code
-from physics.view.start_reference import start_reference
-from physics.view.box_points import BoxPoints
-from physics.view.orbit_camera import orbit_camera
-from physics.view.view_fit import view_fit
-from physics.view.title_line import title_line
-from physics.view.gpu_driver import use_gpu_driver
+  cell_slots.py      cell_slots: the place in the pattern every cell is drawn in, and each place's widths
+  cell_layout.py     cell_layout: the warped grid's corner points from those widths
+  cell_pieces.py     cell_pieces, Pieces: every living cell as its block of the warped grid
+  cell_colours.py    cell_colours: red volumes, blue joints, brightness by packing, fixed scale
+  grid_triangles.py  grid_triangles: the triangles of a slice or of the whole grid
+  middle_layer.py    middle_layer: the even layer the slice starts at
+  slice_picture.py   slice_picture: a slice as an image, no window
+  write_png.py       write_png: an image to a PNG file
+  slice_frames.py    slice_frames: step a source, save a slice picture every few steps
+  orbit_camera.py    view-projection matrix of a camera circling a centre
+  view_fit.py        the camera fit to the grid's bounds, and when a fit is due
+  title_line.py      the window title from a snapshot's stats
+  gpu_driver.py      Mesa variables for the NVIDIA GPU under WSL2
+  cells_source.py    the engine as a source                              (needs the engine)
+  stepper.py         background stepping thread and frame snapshots
+  cell_mesh.py       GL triangles, depth-tested                          (needs OpenGL)
+  cell_window.py     pyglet window, controls                             (needs OpenGL)
+  __main__.py        command line
 
-__all__ = ["opacity", "light_code", "start_reference", "BoxPoints", "orbit_camera", "view_fit", "title_line", "use_gpu_driver"]
+This package imports no OpenGL and no engine, so its tests run headless; import
+`cell_mesh`, `cell_window` and `cells_source` by their module paths.
+"""
+from physics.view.cell_colours import cell_colours
+from physics.view.cell_layout import cell_layout
+from physics.view.cell_pieces import Pieces, cell_pieces
+from physics.view.cell_slots import cell_slots
+from physics.view.gpu_driver import use_gpu_driver
+from physics.view.grid_triangles import grid_triangles
+from physics.view.middle_layer import middle_layer
+from physics.view.orbit_camera import orbit_camera
+from physics.view.slice_frames import slice_frames
+from physics.view.slice_picture import slice_picture
+from physics.view.title_line import title_line
+from physics.view.view_fit import view_fit
+from physics.view.write_png import write_png
+
+__all__ = ["Pieces", "cell_colours", "cell_layout", "cell_pieces", "cell_slots", "grid_triangles", "middle_layer",
+           "orbit_camera", "slice_frames", "slice_picture", "title_line", "use_gpu_driver", "view_fit", "write_png"]

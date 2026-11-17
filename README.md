@@ -46,12 +46,11 @@ to the GPU by itself.
 
 | Path | What it is |
 |---|---|
-| `physics/engine/` | the engine: fixed Planck boxes, each one signed whole number of energy quanta and a fluid phase, on the GPU |
-| `physics/ladder/` | the detail ladder: quiet blocks of boxes stored coarse or shared, totals exact |
-| `physics/bench/` | the bench: many universes side by side, and the largest that runs a step a second |
-| `physics/view/` | the GPU window that shows it |
+| `physics/engine/` | the engine: a perfect grid of cells that have only neighbours and a size, each with its own block of compute boxes, on the GPU |
+| `physics/bench/` | the bench: the engine's speed, and the largest universe that runs a step a second |
+| `physics/view/` | the GPU window that shows the grid, every cell at its own size |
 | `physics/scenes/` | the scorecard: each scene runs the engine and returns measured numbers |
-| `physics/fit/` | the fit: searches the settings on expansion shape and structure, by random search and by gradients |
+| `physics/fit/` | the fit: searches the settings on expansion shape and structure, by random search |
 | `physics/measure/` | graph and whirl measures the scenes use (dimension, winding, circulation) |
 | `docs/bible.md` | how everything works; the theory is the chapter `physics/quantum-relativity` |
 

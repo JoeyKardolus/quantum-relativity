@@ -4,7 +4,7 @@ Contract: fit_score(samples) -> dict. `samples` are fit_measure dicts in time or
 with "tau", the observer's time at the sample (fit_run); the first is the start.
 score = 0.5 E + 0.5 S, both between 0 and 1, every part a change since the start, so a
 universe where nothing happens scores exactly 0, the worst (owner: an honest score).
-  E  expansion shape. a = cube root of `room` (space between lumps, in boxes). growth =
+  E  expansion shape. a = `room` (space between lumps, a sum of cell lengths). growth =
      a_end / a_start - 1; G = tanh(growth / 0.06), 0 when space between lumps did not
      grow. The run is cut in thirds of the observer's time and r1, r2, r3 are the
      growth rates of ln a in them; dip = min(r1 - r2, r3 - r2) / mean |r|, above 0 only
@@ -16,9 +16,9 @@ universe where nothing happens scores exactly 0, the worst (owner: an honest sco
      Ss  tanh(sealed_share at the end / 0.1): lumps sealed themselves
      Sp  tanh(gain of lump_spread / 0.3): the lump volumes' sizes spread out (needs 3)
      each 0 for a loss.
-The scales (0.06, 1.0, 0.4, 0.1, 0.3) were fixed on 2026-11-17 after one look at the
-default universe and before the first search with this score; they say only where a
-part stops counting more and are not fitted.
+The scales (0.06, 1.0, 0.4, 0.1, 0.3) were fixed on 2026-11-17 for the earlier engine
+and kept unchanged for the cell grid (where room is a length, no longer a box count's
+cube root); they say only where a part stops counting more and are not fitted.
 Raises ValueError for fewer than 4 samples or an observer's time that does not advance.
 """
 from __future__ import annotations
@@ -35,7 +35,7 @@ def fit_score(samples: list) -> dict:
     tau = np.array([sample["tau"] for sample in samples], dtype=np.float64)
     if not np.all(np.diff(tau) > 0.0):
         raise ValueError("the observer's time must advance between samples")
-    scale = np.cbrt(np.array([sample["room"] for sample in samples], dtype=np.float64))
+    scale = np.array([sample["room"] for sample in samples], dtype=np.float64)
     growth = float(scale[-1] / scale[0] - 1.0)
     cuts = np.interp(np.linspace(tau[0], tau[-1], 4), tau, np.log(scale))
     rates = np.diff(cuts) / ((tau[-1] - tau[0]) / 3.0)

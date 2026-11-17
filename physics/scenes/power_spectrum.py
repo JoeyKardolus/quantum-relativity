@@ -1,13 +1,13 @@
-"""Power spectrum: how the density contrast is shared over sizes (clustering spectrum).
+"""Power spectrum: how an energy contrast is shared over sizes (clustering spectrum).
 
-Contract: `power_spectrum(density)` takes a float array of energy per box, shape (side,
+Contract: `power_spectrum(density)` takes a float array of energy per place, shape (side,
 side, side), and returns (wavenumbers, power): two float64 arrays over the shells
-k = 1 .. side // 2 (cycles per cube side; wavelength side / k boxes). The field is the
-density contrast density / mean - 1 over the whole cube (the empty margin included, so
-the filled cube's edge adds power at small k), Fourier transformed as if periodic
-(numpy rfftn); power is the mean |mode|**2 / side**3 over the modes whose |k| rounds to
-the shell (each rfft half-mode counted twice, its mirror). An even field gives 0
-everywhere. Raises ValueError for a non-cube, side < 4 or a field holding no energy.
+k = 1 .. side // 2 (cycles per cube side; wavelength side / k places). The field is the
+contrast density / mean - 1 over the whole cube, Fourier transformed as periodic (numpy
+rfftn; the universe wraps); power is the mean |mode|**2 / side**3 over the modes whose
+|k| rounds to the shell (each rfft half-mode counted twice, its mirror). An even field
+gives 0 everywhere. Raises ValueError for a non-cube, side < 4 or a field holding no
+energy.
 """
 from __future__ import annotations
 

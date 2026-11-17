@@ -1,46 +1,47 @@
 # physics/scenes/
 
-The fit's scorecard (bible `physics/quantum-relativity`): each
-scene builds a start, runs the engine (`physics.engine`) and returns measured numbers. Module map in
-`__init__.py`.
+The fit's scorecard (bible `physics/quantum-relativity`): each scene builds a start, runs
+the engine (`physics.engine`) and returns measured numbers. Module map in `__init__.py`.
 
 ## Must not get wrong
 
 - **Numbers, no verdict.** A scene returns what it measured beside the known value where
-  there is one (Kepler's 4 pi^2 / GM, the Hubble 73.5 / 67.4). No pass/fail, no threshold,
-  and never change a default setting, seed or start to make a scene look better; report it.
-- **Only the engine's public face**: `new_universe`, `step`, `stats`, `Settings`, `cells`,
-  `host_boxes`, `State.from_host` (signed quanta, phase and `lattice=lattice_of(even)`) for
-  placed blobs and whirls, and `state.start`. Energy per box is |quanta| (whole numbers, plus pulls, minus pushes), the
-  fluid sqrt(|quanta|) e^(i phase) (`wave_field.py`), flow the phase's gradient. Energies
-  passed to blob_start are in units of 1000 quanta (the start's quanta per box). Cells are
-  the engine's cell graph (`engine/cells.py`: one joint per pair of neighbouring volumes);
-  collapse and split change it. Kernels must not be reached into. Belt trick alone writes phase (its drive).
-- **Local clocks.** Timescape (unfitted) times expansion by the most packed
-  energy volumes' mean box clock, volumes followed by shared boxes (`clocked_run.py`); the fit by the clock where the typical quantum sits.
-- **All rules on.** Scenes take `settings` (default `Settings()`); a rule switched off
-  is only for a side-by-side run.
-- **Open space.** Growth scenes and blob starts pass `margin=open_margin(...)` (the fit wraps and measures inside, `fit/fit_measure.py`);
-  `new_universe`'s own margin 0 wraps or has walls, where nothing grows outward.
-- **Box units.** Planck boxes are fixed; boxes change cell as cells follow their sizes, so the
-  occupied box count is the size of space and an energy radius says where the energy is.
-- **Placed starts** (orbit, black hole, isotropy, spin, belt trick) break "nothing placed by hand" on
-  purpose: each tests one mechanism. A blob is extra energy in an even start, never a ball in empty
-  space. A blob must cover energy-volume boxes (all-odd cell places). The other scenes start from
-  `new_universe`'s uneven field only.
-- **Orbit's blob is extra energy of whole volumes** (box jiggle outweighs it), lost at twice its start's.
-- **Small and quick**: uneven starts default to 7^3 cells of 10; placed starts keep 40 to
-  48 boxes a side. Tests run every scene on 5 to 7 lattice places of 6 boxes and check
-  only that the numbers are finite (n places give (n - 1) // 2 volumes a side unwrapped).
+  there is one (Kepler, the Hubble 73.5 / 67.4, q about -0.55). No pass/fail, no threshold,
+  and never change a default setting, seed or start to make a scene look better.
+- **Cells only.** A scene reads quanta, lengths, clocks and who neighbours whom, through
+  the engine's public face (`new_universe`, `step`, `stats`, `way_list`, `State.host`,
+  `State.fill`, `cell_laws`, `totals`). Planck boxes are not space: no scene reads a box,
+  and there is no position, margin or empty space to measure in.
+- **Size is the sum of cell lengths** (`stats()["size"]`); the universe wraps. Distance
+  between volumes is counted in volumes along the lattice or in summed lengths, never in
+  boxes.
+- **A cell id is the same cell for good**, and `state.clock` is its own elapsed time: follow
+  a volume by its id. A volume that fell into another is gone (its quanta are in the
+  other); a tear's new cells have no lattice place (`volume_field` reports their share).
+- **All rules on.** Scenes take `settings` (default `Settings()`); a rule switched off is
+  only for a side-by-side run.
+- **Placed starts** (orbit, black hole) break "nothing placed by hand" on purpose, through
+  `packed_start`: extra energy in volumes of an even grid, books restarted. The other
+  scenes start from `new_universe`'s uneven field only.
+- **The orbit cannot be given a sideways speed**: crossing takes all direction off energy.
+  The scene measures how long the small blob holds and where its energy goes.
+- **Small and quick**: defaults are 16 places (512 volumes), 200 steps, under a second
+  each. Tests run every scene on 8 places and check only that the numbers are finite.
 
-## Measured (2026-11-17, seed 1, pass marks written first)
+## Measured (2026-11-17, seed 1, defaults, no pass marks written)
 
-Defaults and the fitted file (void): 2 of 13 pass in each, dimension (2.84, as a plain
-grid) and the staged quantum split. Misses:
-orbit's blob lost after 15 and 96 steps; bound lump x1.25, the
-rest x1.32; black hole 0 of 4 sealed; Hubble late/early 0.023; timescape q
-21.2 by the counter, 20.6 by lump clocks; the whirl holds one turn 107 steps; the belt
-trick's web turns by itself.
+Expansion: size 8,754.3 to 8,745.2 in 200 steps (x0.9990), rate trend -8e-6 then +4e-6.
+Hubble late/early -0.91 (known 1.09). Structure: contrast 0.100 to 0.092, power x0.99 at
+the largest size to x0.68 at the smallest, 0 lumps. Bound lump: the fullest volume holds
+1.38 times the mean (no lump), length x1.006, the rest x0.998. Orbit: the blob keeps 85%
+and 89% of its extra energy at 200 steps, half is gone by step 400, turned -0.012 and
+0.006 of a turn. Black hole: 4 and 8 times the mean do not seal; 16 times seals its six
+joints (a region of one volume), no collapse. Timescape: dense clocks 0.857 of the
+emptiest; q 2,797 dense, 2,827 counter, 2,838 empty (the size hardly moves). Dimension:
+2.84 ball, 2.75 spectral, the plain grid's own numbers.
+
+Gone with boxes as space: isotropy, spin and belt trick (a whirl cannot cross a joint:
+no fluid does), blob starts in open space, energy radius.
 
 ## Run
 

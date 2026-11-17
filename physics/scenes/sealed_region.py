@@ -1,61 +1,45 @@
-"""Sealed region: the black hole round the most packed energy volume, measured in Planck boxes.
+"""Sealed region: the part of the grid round the most packed energy volume that nothing can leave.
 
-Contract: `sealed_region(universe, settings)` reads universe 0 of a physics.engine State
-(physics.engine cells) and takes the core: the energy volume with the most whole quanta
-per box. Its joints are the cells of the cell graph that lie between it and another
-volume or empty space (cells(...)["between"]). It is sealed when it has joints and every
-one is squeezed to settings.seal_squeeze or past it (squeeze = (wanted / size) ** (1/3)
-- 1, wanted = (size_energy[1] / quanta) ** 3, as stats counts sealed lumps: nothing
-crosses out). Returns
-a dict of floats:
-  sealed             1.0 when the core is sealed, else 0.0
-  sealed_boxes       boxes of the core and its joints when sealed, else 0
-  sealed_radius      radius of a ball of that many boxes, (3 * boxes / (4 pi))**(1/3)
-  sealed_energy      whole quanta in those boxes when sealed, else 0
-  collapsed_energy   the core's whole quanta (what fell together into it)
-  core_boxes         the core's box count
-  core_labels        how many start energy volumes' boxes it holds (start_volumes: the
-                     plus groups of the start, labelled the same way; 1 until joints
-                     collapsed between volumes; 0 without a start given)
-  core_compression_min   the least squeezed of its joints' squeeze (0 with none)
-`sealed_region(universe, settings, start_volumes=None)`: start_volumes is the start's
-owner array (cells(...)["owner"] at the start) used for core_labels.
-The boxes are fixed Planck boxes; a box count is a volume of space here.
+Contract: `sealed_region(universe, settings)` reads the engine's relations (way_list)
+and returns a dict of plain numbers:
+  core            the id of the energy volume holding the most quanta; core_quanta
+  core_joints     joints carrying a way from the core; core_sealed how many of them are
+                  sealed: settings.seal_thin times the start's mean joint quanta or more
+                  (cross.py lets nothing through such a joint)
+  sealed          1 when the region is closed: starting at the core and stepping from
+                  volume to volume through every joint that is not sealed does not reach
+                  every volume
+  volumes         energy volumes inside the region (the core and all reached that way);
+                  0 when not sealed
+  radius          the region's radius in lengths: half the cube root of the summed cubed
+                  lengths of its volumes (0 when not sealed)
+  energy          plus quanta inside the region (0 when not sealed)
 """
 from __future__ import annotations
 
-import math
-
 import numpy as np
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import breadth_first_order
 
-from physics.engine import Settings, State, cells, host_boxes
+from physics.engine import ENERGY_VOLUME, JOINT, Settings, State, way_list
 
 
-def sealed_region(universe: State, settings: Settings, start_volumes: np.ndarray | None = None) -> dict:
-    """Seal, boxes, ball radius and quanta round the most packed energy volume, and the core's quanta."""
-    boxes = host_boxes(universe)
-    quanta = boxes["quanta"].astype(np.int64)
-    found = cells(boxes)
-    count = found["volumes"]
-    if count == 0:
-        return {"sealed": 0.0, "sealed_boxes": 0.0, "sealed_radius": 0.0, "sealed_energy": 0.0,
-                "collapsed_energy": 0.0, "core_boxes": 0.0, "core_labels": 0.0, "core_compression_min": 0.0}
-    packing = found["quanta"][:count] / np.maximum(found["boxes"][:count], 1)
-    core = int(np.argmax(packing))
-    core_boxes = found["owner"] == core
-    joints = np.flatnonzero((found["between"] == core).any(axis=1))
-    wanted = (float(boxes["size_energy"][1]) / np.maximum(found["quanta"][joints], 1).astype(np.float64)) ** 3
-    squeezed = np.cbrt(wanted / np.maximum(found["size"][joints], 1e-6)) - 1.0
-    sealed = bool(joints.size) and bool(np.all(squeezed >= settings.seal_squeeze))
-    around = np.isin(found["owner"], joints)
-    region = core_boxes | around
-    region_boxes = float(region.sum()) if sealed else 0.0
-    labels = 0.0
-    if start_volumes is not None:
-        held = start_volumes[core_boxes]
-        labels = float(np.unique(held[(held >= 0)]).size)
-    return {"sealed": 1.0 if sealed else 0.0, "sealed_boxes": region_boxes,
-            "sealed_radius": (3.0 * region_boxes / (4.0 * math.pi)) ** (1.0 / 3.0),
-            "sealed_energy": float(np.abs(quanta[region]).sum()) if sealed else 0.0,
-            "collapsed_energy": float(found["quanta"][core]), "core_boxes": float(found["boxes"][core]),
-            "core_labels": labels, "core_compression_min": float(squeezed.min()) if squeezed.size else 0.0}
+def sealed_region(universe: State, settings: Settings) -> dict:
+    """The most packed volume and the region round it that sealed joints close off."""
+    held = universe.host("cell_quanta").astype(np.float64)
+    kind = universe.kind_h[:universe.count]
+    plus = np.where(kind == ENERGY_VOLUME, held, 0.0)
+    core = int(np.argmax(plus))
+    joints, first, second = way_list(universe)
+    tight = held[joints] >= settings.seal_thin * universe.start_quanta[JOINT]
+    mine = (first == core) | (second == core)
+    passable = coo_matrix((np.ones(int((~tight).sum())), (first[~tight], second[~tight])),
+                          shape=(universe.count, universe.count)).tocsr()
+    reached = breadth_first_order(passable, core, directed=False, return_predecessors=False)
+    closed = len(reached) < int((kind == ENERGY_VOLUME).sum())
+    length = universe.host("length").astype(np.float64)[reached]
+    return {"core": core, "core_quanta": int(plus[core]), "core_joints": int(len(np.unique(joints[mine]))),
+            "core_sealed": int(len(np.unique(joints[mine & tight]))), "sealed": int(closed),
+            "volumes": len(reached) if closed else 0,
+            "radius": float(0.5 * np.cbrt((length ** 3).sum())) if closed else 0.0,
+            "energy": int(plus[reached].sum()) if closed else 0}

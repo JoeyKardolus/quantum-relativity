@@ -25,7 +25,8 @@ The pattern stays A B A B: both halves are wrapped by joints in all 26 direction
 old joints on their side, the joints round the middle, the new joint between them),
 neither touches a volume, and the new joint is part of the web through the joints round
 the middle. The new cells start with the volume's pull, clock and heat. Counts
-state.tears and state.version; the caller has made room for two more ids.
+state.tears and state.version, and notes in state.torn_from which volume, along which
+axis, the two new ids came from; the caller has made room for two more ids.
 """
 from __future__ import annotations
 
@@ -76,6 +77,7 @@ def tear(state: State, held: dict, volume: int, tear_length: float) -> bool:
             state.set_sides(beside, [end for one in first for end in (halves if one == volume else [one])],
                             [end for one in second for end in (halves if one == volume else [one])])
     state.set_sides(joint, [volume], [twin])
+    state.torn_from[joint] = state.torn_from[twin] = (volume, axis)
     state.torn += int(thirds[1][0].sum())
     state.tears += 1
     state.version += 1

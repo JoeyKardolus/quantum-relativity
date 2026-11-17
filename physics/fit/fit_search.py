@@ -19,16 +19,13 @@ A run that raises, or does not finish within `seconds` of wall time (it is stopp
 between steps, or killed after twice that), is recorded with score 0 and its error,
 never dropped. `seconds` defaults to 3000: the 2026-11-17 search used 1800, about three
 times a default universe's run, and cut eventful universes at 2,200 to 2,900 steps.
-Settings searched, ranges fixed 2026-11-17 before the first search on the rebuilt
-engine (wider than 2026-11-16's, which never ran on it): pull_strength 1e-9 .. 1e-5,
-light_speed (the pull's speed) 0.25 .. 2, push 0.05 .. 5, collapse_packing 2.7e3 ..
-2.7e5, crossing_rate 1.3e-4 .. 1.3e-1, seal_squeeze 0.02 .. 2 (all log); push_steepness
-2 .. 10, split_across (the tear size) 11 .. 30 (linear); and the start's two
-unevennesses (energy volumes, joints: separate settings of new_universe), each linear
-in 0 .. 0.9 (owner, 2026-11-16). Every default lies inside. Not searched, kept at their
-defaults: step_time, joint_inertia, clock_packing, least_cell_boxes (measured) and the
-numerics. NAMES are the six the stand-in also reads, in its order. No dark-energy or
-base-push setting is searched (bible rule 8).
+Settings searched, ranges fixed 2026-11-17 with the cell-grid engine and before any
+search on it: pull_strength 1e-9 .. 1e-5, light_speed (the pull's speed) 0.25 .. 2,
+push_strength 2e-8 .. 2e-4, squeeze_rate 0.01 .. 100, crossing_rate 1.3e-4 .. 1.3e-1
+(all log); seal_thin 1.1 .. 5, collapse_thin 1.5 .. 10, tear_length 11 .. 40 (linear);
+and the start's unevenness, linear in 0 .. 0.9 (owner, 2026-11-16). Every default lies
+inside. Not searched, kept at their defaults: step_time, clock_packing, fluid_pressure.
+No dark-energy or base-push setting is searched (bible rule 8).
 """
 from __future__ import annotations
 
@@ -43,11 +40,10 @@ import numpy as np
 
 from physics.fit.fit_run import fit_run
 
-LOG_RANGES = {"pull_strength": (1e-9, 1e-5), "light_speed": (0.25, 2.0), "push": (0.05, 5.0),
-              "collapse_packing": (2.7e3, 2.7e5), "crossing_rate": (1.3e-4, 1.3e-1), "seal_squeeze": (0.02, 2.0)}
-LINEAR_RANGES = {"push_steepness": (2.0, 10.0), "split_across": (11.0, 30.0)}
-NAMES = ["pull_strength", "push", "collapse_packing", "crossing_rate", "push_steepness", "seal_squeeze"]
-START_RANGES = {"unevenness": (0.0, 0.9), "joint_unevenness": (0.0, 0.9)}
+LOG_RANGES = {"pull_strength": (1e-9, 1e-5), "light_speed": (0.25, 2.0), "push_strength": (2e-8, 2e-4),
+              "squeeze_rate": (0.01, 100.0), "crossing_rate": (1.3e-4, 1.3e-1)}
+LINEAR_RANGES = {"seal_thin": (1.1, 5.0), "collapse_thin": (1.5, 10.0), "tear_length": (11.0, 40.0)}
+START_RANGES = {"unevenness": (0.0, 0.9)}
 START_NAMES = list(START_RANGES)
 SEARCHED = list(LOG_RANGES) + list(LINEAR_RANGES) + START_NAMES
 
@@ -143,13 +139,13 @@ def _task(phase, index, unit, seed):
             "overrides": {} if unit is None else _unit_to_overrides(unit)}
 
 
-def fit_search(results, cells=24, boxes=10, steps=3000, every=100, workers=8, seconds=3000.0, default_seeds=(1, 2, 3),
+def fit_search(results, cells=24, steps=3000, every=100, workers=8, seconds=3000.0, default_seeds=(1, 2, 3),
                random_points=100, refine_rounds=3, refine_best=5, refine_count=5, recheck_top=4, recheck_seeds=(2, 3),
                sweep_at=(0.1, 0.37, 0.63, 0.9), lattice_seed=20261117):
     """Run the search's runs not yet in `results` and return every record in the file."""
     results = pathlib.Path(results)
     results.parent.mkdir(parents=True, exist_ok=True)
-    size = (cells, boxes, steps, every)
+    size = (cells, steps, every)
     generator = np.random.default_rng(lattice_seed)
     lattice = np.stack([(generator.permutation(random_points) + generator.random(random_points)) / max(random_points, 1)
                         for _ in SEARCHED], axis=1)

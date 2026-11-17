@@ -1,39 +1,9 @@
 {
- "settings": {
-  "pull_strength": 4.778854141030444e-07,
-  "light_speed": 1.109755510436599,
-  "push": 2.7975264178138577,
-  "collapse_packing": 199903.24286813443,
-  "crossing_rate": 0.00029390982276474703,
-  "seal_squeeze": 0.023660395076030113,
-  "push_steepness": 7.239991570704071,
-  "split_across": 26.57765726054272
- },
- "start": {
-  "unevenness": 0.2405435838982646,
-  "joint_unevenness": 0.8229311435500647
- },
+ "settings": {},
+ "start": {},
  "fitted_on": {
   "date": "2026-11-17",
-  "search": "physics.fit fit_search, random phase cut at 55 of 100 points, 19 refine runs, recheck of the 4 best on seeds 2 and 3",
-  "universe": "24 places of 10 boxes, wrapping: 1,728 energy volumes, 5,184 joints, 2,299,968 boxes; 3,000 steps, sampled every 100",
-  "point": "random:13",
-  "seeds": [
-   1,
-   2,
-   3
-  ],
-  "scores": [
-   0.3867,
-   0.3914,
-   0.3816
-  ],
-  "default_scores": [
-   0.2659,
-   0.2439,
-   0.2482
-  ],
-  "status": "void: fitted on an engine whose joint swing had three faults (fixed 2026-11-17, physics/engine/joint_swing.py); search again before use",
-  "caveat": "its score was won on the faults: 1,120 of its 5,184 joints start past the collapse limit, and each one swelled its neighbours without end (the joints' summed size went from 582,000 to 1,305,000 boxes in 100 steps, 2.8e21 by step 750), which the fit counted as space growing; push_steepness was never read by the swing (6 was written in)"
+  "seeds": [],
+  "status": "none: no search has run on the cell-grid engine (rebuilt 2026-11-17). The earlier candidate was fitted on an engine that treated Planck boxes as space and named settings that no longer exist; it was void and is gone. Until a search runs, the fitted universe is the default one."
  }
 }

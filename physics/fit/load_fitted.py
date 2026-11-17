@@ -2,11 +2,11 @@
 
 Contract: load_fitted(path=None) -> dict with
   settings   physics.engine Settings with the fitted values in place of the defaults
-  start      the fitted start unevennesses, keyword arguments of new_universe
-             (unevenness, joint_unevenness)
+  start      the fitted start unevenness, a keyword argument of new_universe
   fitted_on  what the file says about the search that chose them (sizes, seeds, scores)
 `path` defaults to physics/fit/fitted/settings.json, written after a search from its best
-rechecked point. The defaults themselves never change (Settings() stays the default run):
+rechecked point; until a search has run on the cell-grid engine it holds no values, so
+the fitted universe is the default one and fitted_on says so. The defaults themselves never change (Settings() stays the default run):
 a scene that wants the fitted universe asks for it by name,
   fitted = load_fitted(); new_universe(..., **fitted["start"]); step(universe, fitted["settings"])
 A fitted value is a candidate until the unfitted scenes pass with it (fit/CLAUDE.md).
@@ -20,7 +20,7 @@ import pathlib
 
 from physics.engine import Settings
 
-_START_KEYS = ("unevenness", "joint_unevenness")
+_START_KEYS = ("unevenness",)
 _FITTED = pathlib.Path(__file__).parent / "fitted" / "settings.json"
 
 

@@ -2,14 +2,14 @@
 
 Contract: `largest_universe(build, sizes, min_rate=1.0, steps=3, warmup=1)` searches the
 ascending list `sizes` by bisection, assuming a bigger size is never faster. For a size,
-`build(size)` returns `(advance, boxes)`: a callable advancing one universe by one step
-and its Planck box count; a MemoryError from build marks the size too big (it does not
+`build(size)` returns `(advance, cells)`: a callable advancing one universe by one step
+and its cell count; a MemoryError from build marks the size too big (it does not
 fit). The probe is timed with `throughput` and passes at steps_per_second >= min_rate.
 Returns a dict:
   size              the largest passing size, or None when the smallest fails
-  boxes             its box count (None with it)
+  cells             its cell count (None with it)
   steps_per_second  its measured rate (None with it)
-  probes            every probe in order: {size, boxes, steps_per_second, fits}
+  probes            every probe in order: {size, cells, steps_per_second, fits}
 Each probe's universe is dropped and the device synchronized before the next, so probes
 do not stack in memory. Raises ValueError for an empty or unsorted list, min_rate <= 0.
 """
@@ -41,20 +41,20 @@ def largest_universe(build: Callable[[int], tuple[Callable[[], None], int]], siz
         else:
             failing = middle
     if passing < 0:
-        return {"size": None, "boxes": None, "steps_per_second": None, "probes": probes}
+        return {"size": None, "cells": None, "steps_per_second": None, "probes": probes}
     best = next(probe for probe in probes if probe["size"] == ordered[passing])
-    return {"size": best["size"], "boxes": best["boxes"], "steps_per_second": best["steps_per_second"],
+    return {"size": best["size"], "cells": best["cells"], "steps_per_second": best["steps_per_second"],
             "probes": probes}
 
 
 def _probe(build: Callable[[int], tuple[Callable[[], None], int]], size: int, steps: int, warmup: int) -> dict:
     """Build one size and time it; a MemoryError from build is a size that does not fit."""
     try:
-        advance, boxes = build(size)
+        advance, cells = build(size)
     except MemoryError:
-        return {"size": size, "boxes": None, "steps_per_second": None, "fits": False}
-    rate = throughput(advance, 1, boxes, steps=steps, warmup=warmup)["steps_per_second"]
+        return {"size": size, "cells": None, "steps_per_second": None, "fits": False}
+    rate = throughput(advance, 1, cells, steps=steps, warmup=warmup)["steps_per_second"]
     del advance
     gc.collect()
     wp.synchronize()
-    return {"size": size, "boxes": boxes, "steps_per_second": rate, "fits": True}
+    return {"size": size, "cells": cells, "steps_per_second": rate, "fits": True}

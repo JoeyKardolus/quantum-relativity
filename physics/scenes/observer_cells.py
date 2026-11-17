@@ -1,29 +1,20 @@
-"""Observer cells: where an astronomer sits, the most packed energy volumes (timescape's dense region).
+"""Observer cells: the most packed energy volumes, where an astronomer made of energy would sit.
 
-Contract: `observer_cells(universe, count, local)` returns an int64 array of up to `count`
-energy volume labels of a physics.engine State's universe 0 now (physics.engine cells),
-most packed first: volumes whose local-time column in `local` (clocked_run.py, shape
-(samples, columns); column v is the volume labelled v at the end) is finite at every
-sample, i.e. that existed and kept a clock for the whole run, ranked by whole quanta per
-box. The observer is picked at the end, as an astronomer lives in today's densest lump,
-and its clock is followed back over the run. Empty when no volume qualifies. Raises
-ValueError for count < 1.
+Contract: `observer_cells(universe, count)` returns the ids (int64 array, most packed
+first) of the `count` energy volumes holding the most quanta now (fewer when fewer
+live). A cell id is the same cell for good and state.clock is that cell's own elapsed
+local time, so an observer's clock is read straight from the engine.
 """
 from __future__ import annotations
 
 import numpy as np
 
-from physics.engine import State, cells, host_boxes
+from physics.engine import ENERGY_VOLUME, State
 
 
-def observer_cells(universe: State, count: int, local: np.ndarray) -> np.ndarray:
-    """The `count` most packed energy volumes that kept a clock for the whole run."""
-    if count < 1:
-        raise ValueError(f"need count >= 1, got {count}")
-    found = cells(host_boxes(universe))
-    volumes = min(found["volumes"], local.shape[1])
-    whole_run = np.isfinite(local[:, :volumes]).all(axis=0)
-    packing = found["quanta"][:volumes] / np.maximum(found["boxes"][:volumes], 1)
-    packing = np.where(whole_run, packing, -np.inf)
-    ranked = np.argsort(-packing, kind="stable")[:count]
-    return ranked[whole_run[ranked]].astype(np.int64)
+def observer_cells(universe: State, count: int) -> np.ndarray:
+    """Ids of the `count` energy volumes with the most quanta."""
+    held = universe.host("cell_quanta").astype(np.float64)
+    volumes = np.flatnonzero(universe.kind_h[:universe.count] == ENERGY_VOLUME)
+    order = volumes[np.argsort(-held[volumes], kind="stable")]
+    return order[:max(int(count), 0)].astype(np.int64)

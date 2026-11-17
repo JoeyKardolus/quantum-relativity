@@ -1,4 +1,4 @@
-"""The dimension scene's plain grid has as many nodes as the start has volumes, and wraps when it does."""
+"""The dimension scene's plain grid has as many nodes as the start has volumes, and wraps as the universe does."""
 from physics.scenes import space_dimension
 from physics.scenes.space_dimension import _plain_grid
 from physics.scenes.tests._gpu import needs_gpu
@@ -13,7 +13,7 @@ def test_a_wrapping_plain_grid_gives_every_node_six_neighbours():
 
 @needs_gpu
 def test_a_wrapping_start_is_measured_against_a_wrapping_grid_of_its_own_size():
-    result = space_dimension(8, 6, steps=0, sources=4)
+    result = space_dimension(8, steps=0, sources=4)
     assert result["reference"]["cells"] == result["start"]["cells"] == 64
     assert result["reference"]["ball_dimension"] == result["start"]["ball_dimension"]
     assert result["reference"]["spectral_dimension"] == result["start"]["spectral_dimension"]

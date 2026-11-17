@@ -34,8 +34,8 @@ compute boxes. GPU (Warp).
   at most. The thin joint web is the short way round a volume.
 - **Axiom 7** (`quantum*.py`): a moving energy is a record in `state.quantum`; only a
   scene splits it. Bell tests: not built.
-- **Gone**: universes side by side, empty space and margins, the ladder's hook. `bench`,
-  `ladder`, `view`, `scenes`, `fit` import the old face until rebuilt.
+- **Gone**: universes side by side, empty space and margins, the ladder. `state.torn_from`
+  tells the viewer where a tear's cells came from.
 
 ## Measured (2026-11-17, RTX 5080, seed 1)
 

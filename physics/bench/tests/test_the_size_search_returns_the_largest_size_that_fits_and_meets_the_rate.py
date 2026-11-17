@@ -12,7 +12,7 @@ from physics.bench import largest_universe
 def test_rate_limit_and_memory_limit():
     slow = largest_universe(lambda size: ((lambda: time.sleep(0.1 * size)), size ** 3), [1, 2, 4, 8, 16],
                             min_rate=3.0, steps=1, warmup=0)
-    assert slow["size"] == 2 and slow["boxes"] == 8 and slow["steps_per_second"] >= 3.0
+    assert slow["size"] == 2 and slow["cells"] == 8 and slow["steps_per_second"] >= 3.0
     assert len(slow["probes"]) <= 3
 
     def build(size):

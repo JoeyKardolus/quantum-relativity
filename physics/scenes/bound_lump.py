@@ -1,23 +1,21 @@
-"""Bound lump scene: the size of the biggest lump while its surroundings spread or fall.
+"""Bound lump scene: does the most packed energy volume keep its size while the rest of space changes?
 
-Contract: `bound_lump(cells_per_side=7, boxes_per_cell_side=10, seed=1, unevenness=0.3,
-steps=60, every=2, settings=None, device="cuda", joint_unevenness=0.0)` builds
-physics.engine.new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness,
-joint_unevenness)
-(nothing placed: the lump forms by itself), runs `steps` steps with settings (default
-Settings(), every rule on) and at the start and every `every` steps finds the lump
-holding the most quanta: of the energy volumes (physics.engine cells) whose quanta per
-box are at least physics.engine.stats LUMP_FACTOR times the start's mean plus quanta per
-plus box (as stats counts lumps), the one with the most quanta. That may be a different cell from one sample to the next. Returns a dict (no
-verdict):
-  cells_per_side, boxes_per_cell_side, seed, unevenness, joint_unevenness, steps, settings (dict)
-  time                 sample times
-  lump_boxes           Planck boxes the lump holds (0: no lump yet)
-  lump_energy          its whole quanta (0 with no lump)
-  lump_radius          RMS radius of its quanta about their centre, boxes (0 with no lump)
-  surroundings_radius  RMS radius of the quanta outside it (both signs) about their centre
-  lump_radius_change   last lump_radius over the first nonzero one (0 if never one)
-  surroundings_change  last surroundings_radius over the first
+Contract: `bound_lump(cells_per_side=16, seed=1, unevenness=0.1, steps=200, every=10,
+settings=None, device="cuda")` builds physics.engine.new_universe(cells_per_side, seed,
+unevenness), runs `steps` steps with settings (default Settings(), every rule on) and
+keeps every cell's length at the start and every `every` steps. At the end the lump is
+the energy volume holding the most quanta that has lived since the start (a cell id
+is the same cell for good). Returns a dict (no verdict):
+  cells_per_side, seed, unevenness, steps, settings (dict), time
+  lump             its cell id; lump_quanta_factor its quanta over the start's mean
+                   volume quanta at the end; is_lump whether that reaches LUMP_FACTOR
+                   (physics.engine.stats, 2)
+  lump_length      its length per sample; lump_growth its last length over its first
+  rest_length      mean length of the other energy volumes living then, per sample;
+                   rest_growth last over first
+  size_growth      the universe's size at the end over the start's
+  known            a bound object keeps its size while space grows: lump_growth 1 with
+                   rest_growth above 1
 """
 from __future__ import annotations
 
@@ -25,47 +23,33 @@ from dataclasses import asdict
 
 import numpy as np
 
-from physics.engine import Settings, State, cells, host_boxes, new_universe
+from physics.engine import ENERGY_VOLUME, Settings, new_universe, stats
 from physics.engine.stats import LUMP_FACTOR
-from physics.scenes.open_margin import open_margin
-from physics.scenes.box_energies import box_energies
-from physics.scenes.rms_radius import rms_radius
 from physics.scenes.sampled_run import sampled_run
 
 
-def bound_lump(cells_per_side: int = 7, boxes_per_cell_side: int = 10, seed: int = 1, unevenness: float = 0.3,
-               steps: int = 60, every: int = 2, settings: Settings | None = None, device: str = "cuda", joint_unevenness: float = 0.0) -> dict:
-    """Biggest lump's boxes, energy and radius, and the surroundings' radius, over time."""
+def bound_lump(cells_per_side: int = 16, seed: int = 1, unevenness: float = 0.1, steps: int = 200, every: int = 10,
+               settings: Settings | None = None, device: str = "cuda") -> dict:
+    """The most packed volume's length against the other volumes' mean length, over time."""
     settings = settings or Settings()
-    universe = new_universe(cells_per_side, boxes_per_cell_side, seed, unevenness, device=device,
-                            margin=open_margin(cells_per_side, boxes_per_cell_side),
-                            joint_unevenness=joint_unevenness)
-    samples = sampled_run(universe, settings, steps, every, lambda sampled: _measure(sampled, settings))
-    result = {"cells_per_side": cells_per_side, "boxes_per_cell_side": boxes_per_cell_side, "seed": seed,
-              "unevenness": unevenness, "joint_unevenness": joint_unevenness, "steps": steps, "settings": asdict(settings),
-              "time": [time for time, _ in samples]}
-    for key in ("lump_boxes", "lump_energy", "lump_radius", "surroundings_radius"):
-        result[key] = [measured[key] for _, measured in samples]
-    radii = result["lump_radius"]
-    first_radius = next((radius for radius in radii if radius > 0.0), 0.0)
-    result["lump_radius_change"] = radii[-1] / first_radius if first_radius > 0.0 else 0.0
-    result["surroundings_change"] = result["surroundings_radius"][-1] / result["surroundings_radius"][0]
-    return result
-
-
-def _measure(universe: State, settings: Settings) -> dict:
-    a_energy, b_energy = box_energies(universe)
-    energy = a_energy + b_energy
-    found = cells(host_boxes(universe))
-    count = found["volumes"]
-    held = found["quanta"][:count].astype(np.float64)
-    boxes = found["boxes"][:count]
-    start = universe.start[0]
-    rest = start["plus"] / max(start["plus_boxes"], 1)
-    is_lump = (boxes > 0) & (held >= LUMP_FACTOR * rest * np.maximum(boxes, 1))
-    if not is_lump.any():
-        return {"lump_boxes": 0.0, "lump_energy": 0.0, "lump_radius": 0.0,
-                "surroundings_radius": rms_radius(energy)}
-    lump = found["owner"] == int(np.argmax(np.where(is_lump, held, -1.0)))
-    return {"lump_boxes": float(lump.sum()), "lump_energy": float(energy[lump].sum()),
-            "lump_radius": rms_radius(energy, lump), "surroundings_radius": rms_radius(energy, ~lump)}
+    universe = new_universe(cells_per_side, seed, unevenness, device=device)
+    first = universe.lattice
+    samples = sampled_run(universe, settings, steps, every,
+                          lambda sampled: (sampled.host("length")[:first].astype(np.float64),
+                                           sampled.kind_h[:first] == ENERGY_VOLUME))
+    held = universe.host("cell_quanta")[:first].astype(np.float64)
+    held[universe.kind_h[:first] != ENERGY_VOLUME] = 0.0
+    lump = int(np.argmax(held))
+    lump_length = [float(length[lump]) for _, (length, _) in samples]
+    rest_length = []
+    for _, (length, living) in samples:
+        others = living.copy()
+        others[lump] = False
+        rest_length.append(float(length[others].mean()))
+    factor = float(held[lump] / universe.start_quanta[ENERGY_VOLUME])
+    return {"cells_per_side": cells_per_side, "seed": seed, "unevenness": unevenness, "steps": steps,
+            "settings": asdict(settings), "time": [time for time, _ in samples], "lump": lump,
+            "lump_quanta_factor": factor, "is_lump": int(factor >= LUMP_FACTOR), "lump_length": lump_length,
+            "lump_growth": lump_length[-1] / lump_length[0], "rest_length": rest_length,
+            "rest_growth": rest_length[-1] / rest_length[0],
+            "size_growth": stats(universe, settings)["size_growth"]}
