@@ -1,7 +1,7 @@
 """Space dimension scene: the ball and the spectral dimension of the volume-neighbour graph, beside a plain grid's.
 
 Contract: `space_dimension(cells_per_side=16, steps=20, sources=8, seed=1, settings=None,
-device="cuda")` builds new_universe(cells_per_side, seed) (the uneven start), measures
+device="cuda", start=None)` builds new_universe(cells_per_side, seed, **start) (the uneven start), measures
 it, takes `steps` steps (default settings Settings(), every rule on) and measures it
 again. A measurement reads only which energy volumes neighbour which, as an unweighted
 graph (bible rule 1: no coordinates): two volumes neighbour when a joint carries a way
@@ -32,10 +32,10 @@ KNOWN_DIMENSION = 3
 
 
 def space_dimension(cells_per_side: int = 16, steps: int = 20, sources: int = 8, seed: int = 1,
-                    settings: Settings | None = None, device: str = "cuda") -> dict:
+                    settings: Settings | None = None, device: str = "cuda", start: dict | None = None) -> dict:
     """Ball and spectral dimension of the volume-neighbour graph at the start and after the steps."""
     settings = settings or Settings()
-    universe = new_universe(cells_per_side, seed=seed, device=device)
+    universe = new_universe(cells_per_side, seed=seed, device=device, **(start or {}))
     start = _measured(_neighbour_matrix(universe), sources)
     for _ in range(steps):
         step(universe, settings)

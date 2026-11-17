@@ -1,8 +1,8 @@
 """Timescape scene: does the universe's growth look different timed by clocks in the most packed volumes?
 
 Contract: `timescape(cells_per_side=16, seed=1, unevenness=0.1, steps=200, every=10,
-observers=8, settings=None, device="cuda")` builds physics.engine.new_universe(
-cells_per_side, seed, unevenness), runs `steps` steps with settings (default
+observers=8, settings=None, device="cuda", start=None)` builds physics.engine.new_universe(
+cells_per_side, seed, unevenness; `start` passes other start amounts on), runs `steps` steps with settings (default
 Settings(), every rule on) and keeps, at the start and every `every` steps, the
 universe's size (stats "size") and every cell's own clock (state.clock: time is local,
 a packed cell's clock runs slow). The observers are the `observers` energy volumes
@@ -35,10 +35,11 @@ KNOWN_Q = -0.55
 
 
 def timescape(cells_per_side: int = 16, seed: int = 1, unevenness: float = 0.1, steps: int = 200, every: int = 10,
-              observers: int = 8, settings: Settings | None = None, device: str = "cuda") -> dict:
+              observers: int = 8, settings: Settings | None = None, device: str = "cuda",
+              start: dict | None = None) -> dict:
     """The universe's deceleration by the counter, by the densest volumes' clocks and by the emptiest's."""
     settings = settings or Settings()
-    universe = new_universe(cells_per_side, seed, unevenness, device=device)
+    universe = new_universe(cells_per_side, seed, **{"unevenness": unevenness, **(start or {})}, device=device)
     first = universe.lattice
     samples = sampled_run(universe, settings, steps, every,
                           lambda sampled: (stats(sampled, settings)["size"],

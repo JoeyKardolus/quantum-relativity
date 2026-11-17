@@ -1,8 +1,8 @@
 """Orbit scene: extra energy in one volume beside a much more packed one; does it stay together and go round?
 
 Contract: `orbit(cells_per_side=16, distances=(2, 4), big_energy=8.0, small_energy=2.0,
-steps=200, every=5, settings=None, device="cuda")` runs one placed start per distance
-(packed_start.py): an even grid, the middle energy volume holding big_energy times the
+steps=200, every=5, settings=None, device="cuda", start=None)` runs one placed start per distance
+(packed_start.py, which `start` reaches): an even grid, the middle energy volume holding big_energy times the
 mean volume's quanta, and the volume `distance` volumes from it along x holding
 small_energy times. The engine has no way to give energy a sideways speed (crossing
 takes all direction off what crosses, bible "Axiom 7 in the engine"), so the small
@@ -41,7 +41,8 @@ from physics.scenes.volume_field import volume_field
 
 
 def orbit(cells_per_side: int = 16, distances: tuple = (2, 4), big_energy: float = 8.0, small_energy: float = 2.0,
-          steps: int = 200, every: int = 5, settings: Settings | None = None, device: str = "cuda") -> dict:
+          steps: int = 200, every: int = 5, settings: Settings | None = None, device: str = "cuda",
+          start: dict | None = None) -> dict:
     """Per distance: how long the small blob keeps its extra energy, and where that energy's centre goes."""
     settings = settings or Settings()
     across = cells_per_side // 2
@@ -51,7 +52,7 @@ def orbit(cells_per_side: int = 16, distances: tuple = (2, 4), big_energy: float
         small = ((middle + distance) % across, middle, middle)
         universe = packed_start(cells_per_side, {(2 * middle,) * 3: big_energy,
                                                  tuple(2 * index for index in small): small_energy},
-                                settings=settings, device=device)
+                                settings=settings, device=device, start=start)
         before, _ = volume_field(universe)
         before[small] = universe.start_quanta[ENERGY_VOLUME]
         samples = sampled_run(universe, settings, steps, every,

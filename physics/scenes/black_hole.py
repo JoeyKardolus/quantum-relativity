@@ -1,7 +1,7 @@
 """Black hole scene: does a packed volume seal itself, and does the sealed region grow with its energy?
 
 Contract: `black_hole(cells_per_side=12, energies=(4.0, 8.0, 16.0), steps=100,
-settings=None, device="cuda")` runs one placed start per energy (packed_start.py): an
+settings=None, device="cuda", start=None)` runs one placed start per energy (packed_start.py, which `start` reaches): an
 even grid whose middle energy volume holds `energy` times the mean volume's quanta.
 After `steps` steps with settings (default Settings(), every rule on) it reads the
 sealed region round the most packed volume (sealed_region.py). Returns a dict (no
@@ -28,13 +28,14 @@ from physics.scenes.sealed_region import sealed_region
 
 
 def black_hole(cells_per_side: int = 12, energies: tuple = (4.0, 8.0, 16.0), steps: int = 100,
-               settings: Settings | None = None, device: str = "cuda") -> dict:
+               settings: Settings | None = None, device: str = "cuda", start: dict | None = None) -> dict:
     """Per packed energy: whether the region round it sealed, its radius and energy."""
     settings = settings or Settings()
     middle = cells_per_side // 2 - (cells_per_side // 2) % 2
     runs = []
     for energy in energies:
-        universe = packed_start(cells_per_side, {(middle, middle, middle): energy}, settings=settings, device=device)
+        universe = packed_start(cells_per_side, {(middle, middle, middle): energy}, settings=settings, device=device,
+                                start=start)
         for _ in range(steps):
             step(universe, settings)
         final = stats(universe, settings)

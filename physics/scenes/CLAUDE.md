@@ -1,45 +1,45 @@
 # physics/scenes/
 
 The fit's scorecard (bible `physics/quantum-relativity`): each scene builds a start, runs
-the engine and returns measured numbers. Module map in `__init__.py`.
+the engine and returns numbers. Module map in `__init__.py`.
 
 ## Must not get wrong
 
-- **Numbers, no verdict.** A scene returns what it measured beside the known value where
-  there is one (Kepler, the Hubble 73.5 / 67.4, q about -0.55). No pass/fail, and never
-  change a default, seed or start to make a scene look better.
+- **Numbers, no verdict.** A scene returns what it measured beside the known value. Pass
+  marks are written to a file before a scorecard run and judged outside the scenes;
+  never change a default, seed or start to make a scene look better.
 - **Cells only.** A scene reads quanta, lengths, clocks and who neighbours whom, through
-  the engine's public face. Planck boxes are not space: no scene reads a box, and there
-  is no position, margin or empty space to measure in.
-- **Size is the sum of cell lengths** (`stats()["size"]`); the universe wraps. Distance is
-  counted in volumes along the lattice or in summed lengths, never in boxes.
-- **A cell id is the same cell for good**, and `state.clock` is its own elapsed time. A
-  volume that fell into another is gone; a tear's new cells have no lattice place.
-- **All rules on.** A rule switched off is only for a side-by-side run.
-- **Placed starts** (orbit, black hole, two lumps) break "nothing placed by hand" on
-  purpose, through `packed_start`: extra energy in volumes of an even grid, books
-  restarted (`start` passes fitted start amounts on).
-- **Two lumps reads the pull beside its known law**: the same measurement on a
-  1 / distance potential in the same wrapping box (`newton`), never a bare power; the
-  lump alone is subtracted, because the even grid's own jitter tilts the pull too.
-- **The orbit cannot be given a sideways speed**: crossing takes all direction off energy.
-- **Small and quick**: 16 places, 200 steps, under a second each (two lumps: 48 places,
-  minutes). Tests run every scene small and check only that the numbers are finite.
+  the engine; nothing is measured in boxes. Only `spin` reads a
+  block: a whirl lives inside a cell.
+- **Size is the sum of cell lengths**; the universe wraps. Distance is counted in volumes
+  or in summed lengths.
+- **All rules on.** A rule is off only in a side-by-side run (two lumps and isotropy
+  read the pull with crossing off beside the full run).
+- **Placed starts** (orbit, black hole, two lumps, isotropy) break "nothing placed by
+  hand" on purpose, through `packed_start`. Every scene takes `start`, a fit candidate's
+  start amounts.
+- **A pull is read beside its law in the same wrapping box**, never bare: the box is a
+  cube and its copies pull too (`two_lumps` `newton`, `isotropy` `_box_law`). The twin
+  run without the lump is subtracted: the even grid's jitter tilts the pull.
+- **A slow pull has not arrived**: at light speed 0.1 to 0.3 (the fit's candidates) a
+  2,000-step placed scene reads the pull before it settles.
+- **No sideways speed** (crossing takes all direction off energy), **no belt trick** (no
+  rule carries phase from cell to cell), and **quantum is staged** (`quantum_split`).
+- No scene has an end rule: in a tear chain it takes seconds a step.
 
-## Measured (2026-11-17, seed 1, defaults, no pass marks written)
+## Measured (2026-11-17, seed 1; default = fitted, as nothing is fitted)
 
-Expansion: size 8,754.3 to 8,745.2 in 200 steps (x0.9990). Hubble late/early -0.91 (known
-1.09). Structure: contrast 0.100 to 0.092, 0 lumps. Bound lump: the fullest volume holds
-1.38 times the mean (no lump). Orbit: the blob keeps 85% and 89% of its extra energy at
-200 steps, half is gone by step 400. Black hole: 4 and
-8 times the mean do not seal; 16 times seals its six joints, no collapse. Timescape:
-dense clocks 0.857 of the emptiest; q is meaningless (the size hardly moves). Dimension:
-2.84 ball, 2.75 spectral, the plain grid's own numbers. Two lumps (48 places, 4 times
-packed, 2, 3, 4, 6, 8 volumes apart, 2,000 steps): with crossing off the pull falls
-1, 0.39, 0.21, 0.084, 0.040 beside 1, 0.27, 0.13, 0.048, 0.024 for one over distance
-squared; from 3 volumes on its power is -2.00 beside -2.10. Every rule on: the lumps'
-extra energy moves 0.28, 0.18, 0.35, 0.22, 0.04 volumes toward each other (alone: 0.02
-at most) while 88% of it spreads away.
+Marks written first; 24 places, 5,000 steps, hold 20,000.
+**2 of 12 pass**, the same on seeds 2 and 3. Misses: orbit 0.011 of a turn; bound lump: fullest volume 1.03 times the mean; black hole: 8, 16, 32 times
+seal one volume each, radius goes as energy to the power -1.00 (known +1), 64 times puts
+all 512 volumes in one cell; Hubble 0.02, of two shrinking rates (known 1.09); timescape:
+lump clocks 0.971 of the emptiest's, nothing grows; expansion x0.9942; structure:
+contrast 0.101 to 0.014; isotropy: pull off / on a row 0.90 to 1.20, arrived energy 0.84 to 1.29
+(crossing off: pull within 0.5% of the box law); spin: one of four single whirls read 0 in one layer for a step (core at the
+wall), a double whirl is gone by step 94; gravity: fall-off -1.94 beside -2.10 passes,
+but lumps keep 11 to 14% of their energy. Passes: dimension 2.87 and 2.94 (the plain
+grid's own; no event) and quantum. Candidates: steadiest 3 of 12 (structure by the letter, its universe x39 and
+tearing at 20,000); best short 1 of 12, over by step 4,934.
 
 ## Run
 

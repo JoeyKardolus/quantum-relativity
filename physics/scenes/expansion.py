@@ -1,8 +1,8 @@
 """Expansion scene: does the universe grow, and does its growth slow, then speed up?
 
 Contract: `expansion(cells_per_side=16, seed=1, unevenness=0.1, steps=200, every=10,
-settings=None, device="cuda")` builds physics.engine.new_universe(cells_per_side, seed,
-unevenness), runs `steps` steps with settings (default Settings(), every rule on),
+settings=None, device="cuda", start=None)` builds physics.engine.new_universe(cells_per_side, seed,
+unevenness; `start` passes other start amounts on, such as a fit candidate's), runs `steps` steps with settings (default Settings(), every rule on),
 measuring at the start and every `every` steps (sampled_run.py). The size of the
 universe is the sum of its cells' lengths (bible: it wraps, there is no edge and no
 empty space; it grows or shrinks purely from where the energy sits). Returns a dict
@@ -33,10 +33,10 @@ _KEPT = ("size", "size_growth", "volume_size", "joint_size")
 
 
 def expansion(cells_per_side: int = 16, seed: int = 1, unevenness: float = 0.1, steps: int = 200, every: int = 10,
-              settings: Settings | None = None, device: str = "cuda") -> dict:
+              settings: Settings | None = None, device: str = "cuda", start: dict | None = None) -> dict:
     """The universe's size over time, its growth rate and whether the rate turns."""
     settings = settings or Settings()
-    universe = new_universe(cells_per_side, seed, unevenness, device=device)
+    universe = new_universe(cells_per_side, seed, **{"unevenness": unevenness, **(start or {})}, device=device)
     samples = sampled_run(universe, settings, steps, every,
                           lambda sampled: {name: stats(sampled, settings)[name] for name in _KEPT})
     times = [time for time, _ in samples]

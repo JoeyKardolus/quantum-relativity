@@ -1,8 +1,8 @@
 """Bound lump scene: does the most packed energy volume keep its size while the rest of space changes?
 
 Contract: `bound_lump(cells_per_side=16, seed=1, unevenness=0.1, steps=200, every=10,
-settings=None, device="cuda")` builds physics.engine.new_universe(cells_per_side, seed,
-unevenness), runs `steps` steps with settings (default Settings(), every rule on) and
+settings=None, device="cuda", start=None)` builds physics.engine.new_universe(cells_per_side, seed,
+unevenness; `start` passes other start amounts on), runs `steps` steps with settings (default Settings(), every rule on) and
 keeps every cell's length at the start and every `every` steps. At the end the lump is
 the energy volume holding the most quanta that has lived since the start (a cell id
 is the same cell for good). Returns a dict (no verdict):
@@ -29,10 +29,10 @@ from physics.scenes.sampled_run import sampled_run
 
 
 def bound_lump(cells_per_side: int = 16, seed: int = 1, unevenness: float = 0.1, steps: int = 200, every: int = 10,
-               settings: Settings | None = None, device: str = "cuda") -> dict:
+               settings: Settings | None = None, device: str = "cuda", start: dict | None = None) -> dict:
     """The most packed volume's length against the other volumes' mean length, over time."""
     settings = settings or Settings()
-    universe = new_universe(cells_per_side, seed, unevenness, device=device)
+    universe = new_universe(cells_per_side, seed, **{"unevenness": unevenness, **(start or {})}, device=device)
     first = universe.lattice
     samples = sampled_run(universe, settings, steps, every,
                           lambda sampled: (sampled.host("length")[:first].astype(np.float64),

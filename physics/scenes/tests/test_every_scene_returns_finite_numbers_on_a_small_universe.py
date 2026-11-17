@@ -8,8 +8,8 @@ import math
 
 import pytest
 
-from physics.scenes import (black_hole, bound_lump, expansion, hubble_gap, orbit, space_dimension, structure, timescape,
-                            two_lumps)
+from physics.scenes import (black_hole, bound_lump, expansion, hubble_gap, isotropy, orbit, quantum_split, space_dimension,
+                            spin, structure, timescape, two_lumps)
 from physics.scenes.tests._gpu import needs_gpu
 
 SCENES = {
@@ -21,6 +21,9 @@ SCENES = {
     "black_hole": lambda: black_hole(8, energies=(4.0, 8.0), steps=10),
     "space_dimension": lambda: space_dimension(8, steps=4, sources=4),
     "timescape": lambda: timescape(8, steps=12, every=2, observers=2),
+    "isotropy": lambda: isotropy(16, steps=6, settle=2, pairs=(((3, 0, 0), (2, 2, 1)),), diagonals=((2, 0, 0), (2, 2, 2))),
+    "spin": lambda: spin(8, steps=6, cases=(("volume", 1), ("joint", -1))),
+    "quantum_split": lambda: quantum_split(8, draws=8),
     "two_lumps": lambda: two_lumps(12, apart=(2,), steps=6, settle=2),
 }
 

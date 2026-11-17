@@ -1,8 +1,8 @@
 """Structure scene: how the clustering spectrum of the energy volumes' energy changes over time.
 
 Contract: `structure(cells_per_side=16, seed=1, unevenness=0.1, steps=200, every=50,
-settings=None, device="cuda")` builds physics.engine.new_universe(cells_per_side, seed,
-unevenness), runs `steps` steps with settings (default Settings(), every rule on) and
+settings=None, device="cuda", start=None)` builds physics.engine.new_universe(cells_per_side, seed,
+unevenness; `start` passes other start amounts on), runs `steps` steps with settings (default Settings(), every rule on) and
 measures the quanta of every energy volume on the volumes' own grid (volume_field.py)
 at the start and every `every` steps. Returns a dict (no verdict):
   cells_per_side, seed, unevenness, steps, settings (dict)
@@ -31,10 +31,10 @@ from physics.scenes.volume_field import volume_field
 
 
 def structure(cells_per_side: int = 16, seed: int = 1, unevenness: float = 0.1, steps: int = 200, every: int = 50,
-              settings: Settings | None = None, device: str = "cuda") -> dict:
+              settings: Settings | None = None, device: str = "cuda", start: dict | None = None) -> dict:
     """The energy contrast's spectrum, RMS and lump counts at each sample, and the spectrum's growth."""
     settings = settings or Settings()
-    universe = new_universe(cells_per_side, seed, unevenness, device=device)
+    universe = new_universe(cells_per_side, seed, **{"unevenness": unevenness, **(start or {})}, device=device)
     samples = sampled_run(universe, settings, steps, every, lambda sampled: _measure(sampled, settings))
     first, last = np.asarray(samples[0][1]["power"]), np.asarray(samples[-1][1]["power"])
     names = ("power", "rms_contrast", "lumps", "largest_region", "left_out_share")
