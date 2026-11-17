@@ -12,9 +12,10 @@ side facing empty space links nothing). It runs physics.measure's ball_dimension
 size, the same rule as the measures' validation: with R a quarter of the first
 source's farthest reachable distance in steps (at least 3), radii 2..R and walk times
 max(2, R**2 // 10)..R**2. The same rule run on a plain cubic grid of as many nodes a side
-as the start has energy volumes a side ((cells_per_side - 1) // 2, grid_graph) gives the
-reference: the number the estimator returns for
-true dimension 3 at this size, since a small graph pulls both estimates off 3.
+as the start has energy volumes a side (the cube root of their count), closed round on
+itself when the universe wraps (an even cells_per_side does), gives the reference: the
+number the estimator returns for true dimension 3 at this size and shape, since a small
+graph pulls both estimates off 3.
 Returns a dict (no verdict):
   cells_per_side, boxes_per_cell_side, steps, seed, settings (dict), known_dimension (3)
   reference, start, end   each: ball_dimension, spectral_dimension, radii, times,
@@ -42,10 +43,21 @@ def space_dimension(cells_per_side: int = 16, boxes_per_cell_side: int = 6, step
     for _ in range(steps):
         step(universe, settings)
     end = _measured(_neighbour_matrix(universe), sources)
-    low, high, node_count = grid_graph(max((cells_per_side - 1) // 2, 2), KNOWN_DIMENSION)
+    low, high, node_count = _plain_grid(max(round(start["cells"] ** (1.0 / 3.0)), 2), universe.wrap)
     return {"cells_per_side": cells_per_side, "boxes_per_cell_side": boxes_per_cell_side, "steps": steps,
             "seed": seed, "settings": asdict(settings), "known_dimension": KNOWN_DIMENSION,
             "reference": _measured(adjacency(low, high, node_count), sources), "start": start, "end": end}
+
+
+def _plain_grid(side: int, wrap: bool) -> tuple[np.ndarray, np.ndarray, int]:
+    """A plain cubic grid's neighbouring pairs, closed round on itself when the universe wraps."""
+    low, high, node_count = grid_graph(side, KNOWN_DIMENSION)
+    if not wrap or side < 3:
+        return low, high, node_count
+    ids = np.arange(node_count, dtype=np.int64).reshape((side,) * KNOWN_DIMENSION)
+    first = [np.moveaxis(ids, axis, 0)[0].ravel() for axis in range(KNOWN_DIMENSION)]
+    last = [np.moveaxis(ids, axis, 0)[-1].ravel() for axis in range(KNOWN_DIMENSION)]
+    return np.concatenate([low, *first]), np.concatenate([high, *last]), node_count
 
 
 def _neighbour_matrix(universe: State):

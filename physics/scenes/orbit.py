@@ -12,18 +12,24 @@ speed sqrt(G (M + m) / distance) for G = settings.pull_strength and the two ball
 quanta M, m (energies in units of blob_start's BOX_QUANTA, 1000 quanta), the big ball moving the other way so the pair's momentum is 0. Empty
 space holds no boxes, so the blobs move through the foam (bible: the space between
 masses is cells). Each run takes `steps` steps (default settings Settings(), every rule
-on), measuring after every step. A blob is the plus quanta above the even foam's
-BOX_QUANTA per plus box (the excess, clipped at 0). The big centre is the excess's centre within big_radius + 3
-of its last place; the small blob is all excess farther than that from the new big
-centre, and its centre is that excess's centre; with no excess left there it has
-fallen in (radius 0).
+on), measuring after every step. A blob is extra energy of whole energy volumes: a volume's
+quanta above the even foam's volume (the median volume of the first sample), clipped at 0 and
+laid evenly over its boxes. Jiggle inside a cell moves no energy between cells, so it is
+no blob (box by box, the whole-number jiggle of 7 million boxes outweighed the small blob
+within 8 steps, 2026-11-17). The big centre is the excess's centre within big_radius + 3
+of its last place. The small blob is followed the same way: the excess within one cell
+spacing (boxes_per_cell_side + 1) of its last centre and outside the big blob's reach. It
+is lost (radius 0 from then on) when no excess is left there (fallen in or spread out) or
+when that excess is over LOST_FACTOR (2) times its start's: the big blob's own spreading
+has reached it and the two can no longer be told apart. A run's summary (mean radius,
+turns, period, kepler) covers the samples up to the loss; `followed_time` is its last one.
 Returns a dict (no verdict):
   cells_per_side, boxes_per_cell_side, steps, settings (dict), distances, big_energy,
   small_energy
   runs        per distance: time, radius (centre to centre, boxes), angle (unwrapped,
               radians, in the x-y plane), spread (RMS radius of the small blob's excess
               about its centre, rms_radius.py) and small_energy (its excess quanta) per
-              sample, mean_radius, min_radius, max_radius,
+              sample, followed_time, mean_radius, min_radius, max_radius,
               turns (angle swept / 2 pi), period (2 pi / |least-squares angular speed|,
               inf when it does not turn), early_period (the same over the first quarter of
               the samples, at least 2), kepler (period**2 / mean_radius**3),
@@ -44,14 +50,14 @@ from dataclasses import asdict
 
 import numpy as np
 
-from physics.engine import Settings, State
+from physics.engine import Settings, State, cells, host_boxes
 from physics.scenes.blob_start import BOX_QUANTA, blob_start
-from physics.scenes.box_energies import box_energies
 from physics.scenes.energy_centre import energy_centre
 from physics.scenes.rms_radius import rms_radius
 from physics.scenes.sampled_run import sampled_run
 
 TRACK_MARGIN = 3.0
+LOST_FACTOR = 2.0
 
 
 def orbit(cells_per_side: int = 19, boxes_per_cell_side: int = 6, distances: tuple[float, ...] = (10.0, 20.0),
@@ -69,7 +75,8 @@ def orbit(cells_per_side: int = 19, boxes_per_cell_side: int = 6, distances: tup
              "velocity": (0.0, -speed * small_energy / big_energy, 0.0)},
             {"offset": (distance, 0.0, 0.0), "radius": small_radius, "energy": small_energy,
              "velocity": (0.0, speed, 0.0)}], device=device)
-        tracker = _Tracker(np.full(3, (universe.side - 1) / 2.0), big_radius)
+        middle = np.full(3, (universe.side - 1) / 2.0)
+        tracker = _Tracker(middle, big_radius, middle + np.array([distance, 0.0, 0.0]), boxes_per_cell_side + 1.0)
         samples = sampled_run(universe, settings, steps, 1, tracker.measure)
         runs.append(_summary([time for time, _ in samples], [measured for _, measured in samples]))
     return {"cells_per_side": cells_per_side, "boxes_per_cell_side": boxes_per_cell_side, "steps": steps,
@@ -79,22 +86,42 @@ def orbit(cells_per_side: int = 19, boxes_per_cell_side: int = 6, distances: tup
 
 
 class _Tracker:
-    """Follows the big centre from sample to sample; measure() gives the small blob's offset."""
+    """Follows both blobs from sample to sample; measure() gives the small blob's offset from the big one."""
 
-    def __init__(self, big: np.ndarray, big_radius: float):
+    def __init__(self, big: np.ndarray, big_radius: float, small: np.ndarray, small_reach: float):
         self.big, self.reach = big, big_radius + TRACK_MARGIN
+        self.small, self.small_reach = small, small_reach
+        self.even = None
+        self.first = None
+        self.lost = False
 
     def measure(self, universe: State) -> dict:
-        a_energy, _ = box_energies(universe)
-        energy = np.where(a_energy > 0, np.maximum(a_energy - BOX_QUANTA, 0.0), 0.0)
+        energy = self._excess(universe)
         axis = np.arange(universe.side, dtype=np.float64)
         self.big = energy_centre(energy, _distance(axis, self.big) <= self.reach)
-        outside = _distance(axis, self.big) > self.reach
-        small = energy_centre(energy, outside)
-        if np.isnan(small).any():
+        near = (_distance(axis, self.small) <= self.small_reach) & (_distance(axis, self.big) > self.reach)
+        small = energy_centre(energy, near)
+        held = float(energy[near].sum())
+        if self.first is None:
+            self.first = held
+        if self.lost or np.isnan(small).any() or held > LOST_FACTOR * self.first:
+            self.lost = True
             return {"offset": np.zeros(3), "spread": 0.0, "small_energy": 0.0}
-        return {"offset": small - self.big, "spread": rms_radius(energy, outside),
-                "small_energy": float(energy[outside].sum())}
+        self.small = small
+        return {"offset": small - self.big, "spread": rms_radius(energy, near),
+                "small_energy": held}
+
+    def _excess(self, universe: State) -> np.ndarray:
+        """Per box, its energy volume's quanta above the even foam's volume, laid evenly over the volume."""
+        found = cells(host_boxes(universe))
+        count = found["volumes"]
+        held = found["quanta"][:count].astype(np.float64)
+        if self.even is None:
+            self.even = float(np.median(held))
+        per_box = np.maximum(held - self.even, 0.0) / np.maximum(found["boxes"][:count], 1)
+        owner = found["owner"]
+        in_volume = (owner >= 0) & (owner < count)
+        return np.where(in_volume, per_box[np.clip(owner, 0, count - 1)], 0.0)
 
 
 def _distance(axis: np.ndarray, centre: np.ndarray) -> np.ndarray:
@@ -103,6 +130,16 @@ def _distance(axis: np.ndarray, centre: np.ndarray) -> np.ndarray:
 
 
 def _summary(times: list[float], measured: list[dict]) -> dict:
+    energies = [sample["small_energy"] for sample in measured]
+    followed = next((index for index, held in enumerate(energies) if held <= 0.0), len(energies))
+    whole = {"time": list(times), "radius": [float(np.linalg.norm(sample["offset"])) for sample in measured],
+             "spread": [sample["spread"] for sample in measured], "small_energy": energies,
+             "followed_time": float(times[max(followed - 1, 0)])}
+    if followed < 3:
+        return whole | {"angle": [0.0] * len(times), "mean_radius": 0.0, "min_radius": 0.0, "max_radius": 0.0,
+                        "turns": 0.0, "period": math.inf, "early_period": math.inf, "kepler": math.inf,
+                        "angular_momentum": [0.0] * len(times), "angular_momentum_change": math.nan}
+    times, measured = times[:followed], measured[:followed]
     offsets = np.array([sample["offset"] for sample in measured])
     radius = np.linalg.norm(offsets, axis=1)
     angle = np.unwrap(np.arctan2(offsets[:, 1], offsets[:, 0]))
@@ -110,14 +147,13 @@ def _summary(times: list[float], measured: list[dict]) -> dict:
     period = _period(times, angle)
     mean_radius = float(radius.mean())
     angular = _angular_momentum(times, offsets, [sample["small_energy"] for sample in measured])
-    return {"time": list(times), "radius": radius.tolist(), "angle": angle.tolist(),
-            "spread": [sample["spread"] for sample in measured],
-            "small_energy": [sample["small_energy"] for sample in measured], "mean_radius": mean_radius,
+    pad = [0.0] * (len(energies) - followed)
+    return whole | {"angle": angle.tolist() + pad, "mean_radius": mean_radius,
             "min_radius": float(radius.min()), "max_radius": float(radius.max()),
             "turns": float((angle[-1] - angle[0]) / (2.0 * math.pi)), "period": period,
             "early_period": _period(times[:early], angle[:early]),
             "kepler": period ** 2 / mean_radius ** 3 if mean_radius > 0 else math.inf,
-            "angular_momentum": angular.tolist(),
+            "angular_momentum": angular.tolist() + pad,
             "angular_momentum_change": float(angular[-1] / angular[0] - 1.0) if angular[0] != 0 else math.nan}
 
 

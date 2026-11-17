@@ -28,20 +28,22 @@ scene builds a start, runs the engine (`physics.engine`) and returns measured nu
   purpose: each tests one mechanism. A blob is extra energy in an even start, never a ball in empty
   space. A blob must cover energy-volume boxes (all-odd cell places). The other scenes start from
   `new_universe`'s uneven field only.
-- **Small and quick**: uneven starts default to 7^3 cells of 10 (bible: volumes start ~10
-  across); placed starts keep 40 to 48 boxes a side. Tests run every scene on
-  5 to 7 lattice places of 6 boxes (a cell needs `least_cell_boxes`, 216) and check only that the numbers are finite (a place
-  count n gives (n - 1) // 2 volumes a side without wrapping).
+- **Orbit's blob is extra energy of whole volumes** (box jiggle outweighs it), lost at twice its start's.
+- **Small and quick**: uneven starts default to 7^3 cells of 10; placed starts keep 40 to
+  48 boxes a side. Tests run every scene on 5 to 7 lattice places of 6 boxes and check
+  only that the numbers are finite (n places give (n - 1) // 2 volumes a side unwrapped).
 
-## Measured
+## Measured (2026-11-17, seed 1, pass marks written first)
 
-Every number from before the 2026-11-16 rebuild (cell graph) is void: re-measure before
-quoting. Last pre-rebuild reading (8^3 of 6^3, 60 steps): occupied x1.22, growth rate
-slowing, no lump, no orbit, nothing seals. Post-rebuild default run: issue #1.
+Defaults and the fitted file (void): 2 of 13 pass in each, dimension (2.84, as a plain
+grid) and the staged quantum split. Misses:
+orbit's blob lost after 15 and 96 steps; bound lump x1.25, the
+rest x1.32; black hole 0 of 4 sealed; Hubble late/early 0.023; timescape q
+21.2 by the counter, 20.6 by lump clocks; the whirl holds one turn 107 steps; the belt
+trick's web turns by itself.
 
 ## Run
 
 ```
 PYTHONPATH=. .venv/bin/pytest -q physics/scenes
-PYTHONPATH=. .venv/bin/python -c "from physics.scenes import orbit; print(orbit()['kepler'])"
 ```
