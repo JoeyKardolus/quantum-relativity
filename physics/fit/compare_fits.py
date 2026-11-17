@@ -1,6 +1,6 @@
 """Compare fits: the gradient fit against random search on the side-by-side stand-in, both checked on the real fit score.
 
-Contract: `compare_fits(out_dir, cells=7, boxes=10, random_points=64, starts=4, iterations=15,
+Contract: `compare_fits(out_dir, cells=8, boxes=10, random_points=64, starts=4, iterations=15,
 rate=0.05, steps=24, every=3, top=2, seeds=(1, 2, 3), lattice_seed=20261116)` runs, in order,
 and writes each part to out_dir as JSON:
   random.json    random_points Latin-hypercube points (fit_search's construction and seed)
@@ -8,7 +8,7 @@ and writes each part to out_dir as JSON:
   gradient.json  gradient_fit from `starts` points: the defaults' unit point and the first
                  starts - 1 of the same lattice, `iterations` Adam steps, with wall times
   real.jsonl     the real fit score (fit_run: the engine itself, whole quanta, moving cells and
-                 collapse, observers' clocks, 120 steps every 6) on every seed of `seeds`, for
+                 collapse, the observer's clock, 120 steps every 6, wrapping) on every seed of `seeds`, for
                  the defaults and the `top` best points of each method by stand-in score
                  (gradient: each start's last point)
 and returns a summary dict: for each method its evaluations, seconds, best stand-in score and
@@ -34,7 +34,7 @@ _REAL_STEPS = 120
 _REAL_EVERY = 6
 
 
-def compare_fits(out_dir, cells: int = 7, boxes: int = 10, random_points: int = 64, starts: int = 4,
+def compare_fits(out_dir, cells: int = 8, boxes: int = 10, random_points: int = 64, starts: int = 4,
                  iterations: int = 15, rate: float = 0.05, steps: int = 24, every: int = 3, top: int = 2,
                  seeds=(1, 2, 3), lattice_seed: int = 20261116) -> dict:
     """Random search and the gradient fit on the stand-in, then their best points on the real fit score."""
@@ -61,7 +61,7 @@ def compare_fits(out_dir, cells: int = 7, boxes: int = 10, random_points: int = 
     real = []
     with (out_dir / "real.jsonl").open("w") as handle:
         for method, unit, stand_in in candidates:
-            overrides = {} if unit is None else _unit_to_overrides(unit)
+            overrides = {} if unit is None else _unit_to_overrides(unit, NAMES)
             scores = [fit_run(overrides, seed, cells, boxes, _REAL_STEPS, _REAL_EVERY)["score"] for seed in seeds]
             entry = {"method": method, "unit": None if unit is None else [float(value) for value in unit],
                      "overrides": overrides, "stand_in": stand_in, "real": scores, "real_mean": float(np.mean(scores))}

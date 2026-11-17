@@ -16,11 +16,11 @@ scene builds a start, runs the engine (`physics.engine`) and returns measured nu
   passed to blob_start are in units of 1000 quanta (the start's quanta per box). Cells are
   the engine's cell graph (`engine/cells.py`: one joint per pair of neighbouring volumes);
   collapse and split change it. Kernels must not be reached into. Belt trick alone writes phase (its drive).
-- **Local clocks.** Timescape (unfitted) and the fit time expansion by the most packed
-  energy volumes' mean box clock, volumes followed by shared boxes (`clocked_run.py`).
+- **Local clocks.** Timescape (unfitted) times expansion by the most packed
+  energy volumes' mean box clock, volumes followed by shared boxes (`clocked_run.py`); the fit by the clock where the typical quantum sits.
 - **All rules on.** Scenes take `settings` (default `Settings()`); a rule switched off
   is only for a side-by-side run.
-- **Open space.** Growth scenes, blob starts and the fit pass `margin=open_margin(...)`;
+- **Open space.** Growth scenes and blob starts pass `margin=open_margin(...)` (the fit wraps and measures inside, `fit/fit_measure.py`);
   `new_universe`'s own margin 0 wraps or has walls, where nothing grows outward.
 - **Box units.** Planck boxes are fixed; boxes change cell as cells follow their sizes, so the
   occupied box count is the size of space and an energy radius says where the energy is.

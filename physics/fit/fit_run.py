@@ -1,111 +1,65 @@
-"""fit_run: one fit-set universe, stepped and scored on expansion shape and structure.
+"""fit_run: one fit-set universe, stepped, measured inside and scored on expansion shape and structure.
 
-Contract: fit_run(overrides, seed, cells, boxes, steps, every, observers=3) -> dict. Builds
-physics.engine new_universe(cells, boxes, seed, unevenness, joint_unevenness) in an empty margin as
-wide as the filled cube (physics.scenes.open_margin), the two
-start unevennesses taken from overrides when there (new_universe's defaults otherwise), and
-steps it with Settings(**the other overrides)
-keeping every energy volume's elapsed local time (physics.scenes.clocked_run) and samples every `every` steps. The
-expansion is timed as an astronomer times it: by the mean local clock of the `observers` most
-packed energy volumes at the end (physics.scenes.observer_cells; bible: time is local), not by
-the step counter. The baseline is the first sample after step 0 (kept from the cell
-engine, whose first step was a size correction). score = 0.5 E + 0.5 S:
-  E  expansion dip min(r1 - r2, r3 - r2) / mean |r| over the occupied radius's growth rate
-     against the observers' clock, in thirds of the run, clipped to +-1; -1 when space does
-     not grow or shrinks or no observer exists; minus 1 when edge_share > 0.01 (the walls are
-     reached, no longer open space). E > 0 only when growth slows, then speeds up.
-The settings searched hold no dark-energy or base-push term (bible rule 8: expansion is drift
-from imperfect transfer). Whether the observers' clock makes expansion look accelerating is the
-timescape scene's unfitted test, never part of this score.
-  S  mean of tanh(ln contrast ratio), tanh(lump gain / 5) and tanh(large-scale minus
-     small-scale ln power growth), on the central cube the start fills (whole quanta per box, both signs).
-Only the engine's public face and the scenes' shared measures, as the scenes use them.
+Contract: fit_run(overrides, seed, cells, boxes, steps, every, seconds=None) -> dict.
+Builds physics.engine new_universe(cells, boxes, seed) with margin 0, which must wrap (an
+even `cells` and an even side): the universe has no edge, so space is measured inside it
+(fit_measure: boxes between lumps), never where it meets nothing. The two start
+unevennesses (unevenness, joint_unevenness) are taken from `overrides` when there
+(new_universe's defaults otherwise), every other override is a Settings field. Samples
+fit_measure at the start and every `every` steps, with blocks two start cells across.
+Time is the observer's (bible: time is local): tau adds up, sample to sample, the
+counter time times the mean of the two samples' observer_rate, the clock where the
+typical quantum sits. An astronomer is made of energy, so the fit times the expansion on
+that clock; the counter-time shape is returned beside it (`counter`, the same score on
+the step counter) so the clock's part can be seen. Whether the densest observers see
+more speeding up than the emptiest is the timescape scene's unfitted test.
+Returns the overrides, sizes, every fit_score part, the series (one list per measured
+name, plus "step", "time", "tau"), wall `seconds`, and `unfinished`: True when
+`seconds` of wall time ran out before `steps` (the score is then 0 and "error" says so:
+a universe that cannot be stepped to the end was not measured). No dark-energy or
+base-push setting exists to pass (bible rule 8). Raises ValueError for a universe that
+does not wrap; the engine's errors propagate.
 """
 from __future__ import annotations
 
-import math
 import time
 
-import numpy as np
-
-from physics.engine import Settings, host_boxes, new_universe, stats
-from physics.scenes import box_energies, clocked_run, growth_rates, observer_cells, open_margin, power_spectrum
-
-
-def _central_density(universe, lower, upper):
-    a_energy, b_energy = box_energies(universe)
-    density = a_energy + b_energy
-    return density[lower:upper, lower:upper, lower:upper]
-
-
-def _measure(universe, settings, lower, upper):
-    now = stats(universe, settings)
-    density = _central_density(universe, lower, upper)
-    wavenumbers, power = power_spectrum(density)
-    contrast = float(np.sqrt(np.mean((density / density.mean() - 1.0) ** 2)))
-    return {"occupied_radius": (3.0 * now["occupied"] / (4.0 * math.pi)) ** (1.0 / 3.0),
-            "occupied_growth": now["occupied_growth"], "edge_share": now["edge_share"],
-            "lumps": now["lumps"], "collapses": now["collapses"], "contrast": contrast,
-            "wavenumbers": wavenumbers.tolist(), "power": power.tolist()}
-
-
-def _expansion_score(times, radii, final):
-    _, rates = growth_rates(times, radii)
-    thirds = np.array_split(rates, 3)
-    r1, r2, r3 = (float(np.mean(part)) for part in thirds)
-    scale = (abs(r1) + abs(r2) + abs(r3)) / 3.0 + 1e-9
-    dip = min(r1 - r2, r3 - r2) / scale
-    score = float(np.clip(dip, -1.0, 1.0))
-    if final["occupied_growth"] < 1.02 or min(r1, r2, r3) <= 0.0:
-        score = -1.0
-    if final["edge_share"] > 0.01:
-        score -= 1.0
-    return score, {"r1": r1, "r2": r2, "r3": r3, "dip": dip}
-
-
-def _structure_score(first, last):
-    contrast_part = math.tanh(math.log(last["contrast"] / first["contrast"]))
-    lump_part = math.tanh((last["lumps"] - first["lumps"]) / 5.0)
-    growth = np.log(np.asarray(last["power"]) / np.asarray(first["power"]))
-    wavenumbers = np.asarray(first["wavenumbers"])
-    large = growth[wavenumbers <= 2].mean()
-    small = growth[wavenumbers >= wavenumbers.max() / 2].mean()
-    tilt_part = math.tanh(float(large - small))
-    return (contrast_part + lump_part + tilt_part) / 3.0, {
-        "Sc": contrast_part, "Sl": lump_part, "St": tilt_part, "ln_growth_large": float(large),
-        "ln_growth_small": float(small)}
-
+from physics.engine import Settings, new_universe, step
+from physics.fit.fit_measure import fit_measure
+from physics.fit.fit_score import fit_score
 
 _START_KEYS = ("unevenness", "joint_unevenness")
 
 
-def fit_run(overrides, seed, cells, boxes, steps, every, observers=3):
-    """Run one universe from the overrides' start unevennesses and settings; return its scores and series."""
+def fit_run(overrides: dict, seed: int, cells: int, boxes: int, steps: int, every: int,
+            seconds: float | None = None) -> dict:
+    """Run one wrapping universe from the overrides' start and settings; return its score, parts and series."""
     started = time.time()
     settings = Settings(**{name: value for name, value in overrides.items() if name not in _START_KEYS})
     start = {name: value for name, value in overrides.items() if name in _START_KEYS}
-    universe = new_universe(cells, boxes, seed, margin=open_margin(cells, boxes), **start)
-    occupied = host_boxes(universe)["quanta"] != 0
-    occupied_axis = np.nonzero(occupied.any(axis=(1, 2)))[0]
-    lower, upper = int(occupied_axis.min()), int(occupied_axis.max()) + 1
-    samples, local = clocked_run(universe, settings, steps, every,
-                                 lambda sampled: _measure(sampled, settings, lower, upper))
-    picked = observer_cells(universe, observers, local)
-    times = [when for when, _ in samples]
-    local_time = local[:, picked].mean(axis=1).tolist() if picked.size else []
-    radii = [measured["occupied_radius"] for _, measured in samples]
-    first, last = samples[1][1], samples[-1][1]
-    if picked.size:
-        expansion_score, expansion_parts = _expansion_score(local_time[1:], radii[1:], last)
-    else:
-        expansion_score, expansion_parts = -1.0 - float(last["edge_share"] > 0.01), {}
-    structure_score, structure_parts = _structure_score(first, last)
-    return {"overrides": overrides, "seed": seed, "cells": cells, "boxes": boxes, "steps": steps,
-            "score": 0.5 * expansion_score + 0.5 * structure_score, "E": expansion_score,
-            "S": structure_score, **expansion_parts, **structure_parts,
-            "observer_ids": picked.tolist(), "time": times, "local_time": local_time,
-            "occupied_growth_end": last["occupied_growth"], "edge_share_end": last["edge_share"],
-            "lumps": [measured["lumps"] for _, measured in samples],
-            "contrast": [measured["contrast"] for _, measured in samples],
-            "radius": radii, "collapses_end": last["collapses"], "substeps": universe.step,
-            "seconds": time.time() - started}
+    universe = new_universe(cells, boxes, seed, **start)
+    if not universe.wrap:
+        raise ValueError(f"the fit needs a wrapping universe (even cells and side), got {cells} cells of {boxes}")
+    block = 2 * (boxes + 1)
+    samples = [{"step": 0, "time": 0.0, "tau": 0.0, **fit_measure(universe, settings, block)}]
+    unfinished = False
+    for taken in range(1, steps + 1):
+        step(universe, settings)
+        if taken % every == 0 or taken == steps:
+            measured = fit_measure(universe, settings, block)
+            before = samples[-1]
+            passed = (taken - before["step"]) * settings.step_time
+            samples.append({"step": taken, "time": taken * settings.step_time,
+                            "tau": before["tau"] + passed * 0.5 * (before["observer_rate"] + measured["observer_rate"]),
+                            **measured})
+        if seconds is not None and time.time() - started > seconds and taken < steps:
+            unfinished = True
+            break
+    record = {"overrides": overrides, "seed": seed, "cells": cells, "boxes": boxes, "steps": steps,
+              "steps_done": samples[-1]["step"], "unfinished": unfinished, "seconds": time.time() - started,
+              "series": {name: [sample[name] for sample in samples] for name in samples[0]}}
+    if unfinished or len(samples) < 4:
+        return {**record, "score": 0.0, "E": 0.0, "S": 0.0,
+                "error": f"unfinished: {samples[-1]['step']} of {steps} steps in {seconds} s"}
+    counter = fit_score([{**sample, "tau": sample["time"]} for sample in samples])
+    return {**record, **fit_score(samples), "counter": {name: counter[name] for name in ("score", "E", "dip", "r1", "r2", "r3")}}
