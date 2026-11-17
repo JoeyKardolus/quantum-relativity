@@ -32,8 +32,9 @@ is cut into as many equal substeps as the stiffest joint needs for accuracy
 (omega * substep <= 1/2), at most MOST_SUBSTEPS; when the rounds do not settle on a
 substep's equation (joints flying inward by more than their own size in one substep),
 the whole step is taken again from its start with FINER times as many substeps in that
-universe, up to RETRIES times (numerics: the same equation at a shorter substep; before
-2026-11-17 the step raised, which ended 37 of the fit's 105 universes). A joint whose size falls to the
+universe, up to MOST_FINE substeps (numerics: the same equation at a shorter substep;
+past that it raises RuntimeError, as before 2026-11-17 it did at the first miss, which
+ended 37 of the fit's 105 universes). A joint whose size falls to the
 collapse packing (its minus quanta over its size reach collapse_packing, size <= quanta /
 collapse_packing; owner, 2026-11-16: only too high a concentration collapses a joint,
 never too little energy) stops there, at rest, hands its speed to the joints it shared
@@ -65,7 +66,7 @@ MOST_SUBSTEPS = 64
 ROUNDS = 400
 TOLERANCE = 1e-12
 FINER = 4
-RETRIES = 6
+MOST_FINE = 4096
 _LOST = 1e150  # numerics: a miss this large will not come back; the step is taken again, finer
 _ACTIVE, _PAIRED, _HELD, _BORN = 1, 2, 4, 8
 
@@ -239,7 +240,7 @@ def joint_swing(state: State, settings: Settings, pull: np.ndarray) -> np.ndarra
     host = {"rate": (rate, 0.0), "hardness": (hardness, 0.0), "floor": (floor, 0.0), "size": (size, 1.0),
             "speed": (state.speed[rows, columns], 0.0), "load": (pull[rows, columns], 0.0)}
     limit = np.full(state.universes, TOLERANCE)
-    for attempt in range(RETRIES + 1):
+    while True:
         on = {name: wp.array(_spread(shape, rows, columns, values, fill), dtype=wp.float64, device=device)
               for name, (values, fill) in host.items()}
         on["spans"] = wp.array(settings.step_time / np.maximum(counts, 1), dtype=wp.float64, device=device)
@@ -255,9 +256,9 @@ def joint_swing(state: State, settings: Settings, pull: np.ndarray) -> np.ndarra
                 break
         if not unsolved.any():
             break
+        if int(counts[unsolved].max()) * FINER > MOST_FINE:
+            raise RuntimeError(f"joint swing: not solved in {ROUNDS} rounds with {int(counts[unsolved].max())} substeps")
         counts = np.where(unsolved, counts * FINER, counts)
-    else:
-        raise RuntimeError(f"joint swing: not solved in {ROUNDS} rounds with {int(counts.max()) // FINER} substeps")
     held = (on["flags"].numpy()[rows, columns] & _HELD) != 0
     state.size, state.speed = state.size.copy(), state.speed.copy()
     state.size[rows, columns] = on["size"].numpy()[rows, columns]

@@ -20,7 +20,8 @@
    the speed that carries it inward 20 times its size in one step, the volume's other
    joints the opposite speed shared out (the speeds add up to nothing). One swing: the
    first try does not settle, the swing still returns, and the swing energy and the
-   summed size change by less than 1e-9 of themselves.
+   summed size change by less than 1e-9 of themselves. With the most substeps allowed
+   set to 1 the same swing raises RuntimeError (a universe that cannot be stepped says so).
 4. Each joint's step is solved to a tolerance of its own size, not of the universe's
    largest joint (a joint left with a few quanta by a tear wants, by length = constant /
    energy, more boxes than the universe holds; with the tolerance taken from it every
@@ -34,6 +35,7 @@ from __future__ import annotations
 import sys
 
 import numpy as np
+import pytest
 
 from physics.engine import Settings, cell_count, cell_laws, joint_swing, new_universe, step
 from physics.engine.tests._gpu import needs_gpu
@@ -189,6 +191,11 @@ def test_a_swing_whose_rounds_do_not_settle_is_taken_again_finer_and_keeps_its_e
         unsettled.append(bool(result.any()))
         return result
 
+    most = module.MOST_FINE
+    monkeypatch.setattr(module, "MOST_FINE", 1)
+    with pytest.raises(RuntimeError):
+        joint_swing(state, settings, load)
+    monkeypatch.setattr(module, "MOST_FINE", most)
     monkeypatch.setattr(module, "_substep", counted)
     before = swing_energy(state, settings, load, joints)
     summed = float(state.size[0, joints].sum())
