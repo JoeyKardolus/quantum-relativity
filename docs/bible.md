@@ -967,7 +967,7 @@ grid should be irregular; length must be an internal quantity, not a coordinate;
 repulsion must balance attraction so everything does not clump; bound regions (atoms, galaxies)
 must resist the drift while empty space expands; the real expansion first slowed and then sped
 up, which a constant drift alone does not give; and electromagnetism is about 10³⁶ times
-stronger than gravity, so each force needs its own strength.
+stronger than gravity, so each force needs its own strength. Measured 2026-11-17 (issue #1): the size law acts per cell and does not add up (two cells merged want a sixteenth of the room, a torn cell's halves sixteen times), so collapses chain and torn halves head for the tear size again; energy runs into single volumes, not regions; at the default numbers nothing seals (a joint's squeeze reaches 0.34 against the seal's 1).
 
 ### How results are trusted
 

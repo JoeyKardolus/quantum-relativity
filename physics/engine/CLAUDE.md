@@ -43,8 +43,8 @@ side; the detail ladder (`physics/ladder`) can sit beside the boxes.
 
 ## Measured (2026-11-17, RTX 5080, defaults, seed 1)
 
-24 places wrapping, 16,000 steps: amount exact, 0 collapses, 0 tears, nothing sealed
-(squeeze at most 0.33, seal 1). Open space: tears cascade. Issue #1.
+24 places wrapping, 20,000 steps: amount exact, 1 collapse (step 16,431), 0 tears,
+nothing sealed (squeeze at most 0.34, seal 1). Open, 3,400 steps: 86 tears. Issue #1.
 Strict xfail: axiom 2 swing. Sizes: `bench/CLAUDE.md`.
 
 ## Run
