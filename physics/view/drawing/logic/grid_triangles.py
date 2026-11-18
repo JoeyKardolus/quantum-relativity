@@ -5,13 +5,13 @@ and returns (corners float32 (n, k, 3), colours uint8 (n, 4), pattern int32 (m,)
 drawn): one row per drawn cell, its k corner points and its RGBA (`cell_colours`), and
 the triangles of every cell as corner numbers, the same for all cells. `shown` is one
 of SHOWN (any other value raises ValueError).
-  layer None  the whole grid: every shown cell as its block (k = 8, BLOCK_PATTERN). A
-              drawer shades the faces by FACE_SHADE and raises the opacity to
-              WHOLE_POWER, so thin cells are nearly clear and packed ones stand in
-              them as solid masses.
+  layer None  blocks: every shown cell of the record as its block (k = 8,
+              BLOCK_PATTERN). A drawer shades the faces by FACE_SHADE and raises the
+              opacity to WHOLE_POWER, so packed cells stand as solid masses.
   layer k     the slice: every shown cell whose slot has lattice index k along z, as
               one flat four-cornered face through the middle of its block (k = 4,
-              FACE_PATTERN)
+              FACE_PATTERN). A drawer adds every cell's outline, so the pattern shows
+              where the fills are clear.
 """
 from __future__ import annotations
 

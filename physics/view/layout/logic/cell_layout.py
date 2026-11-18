@@ -1,158 +1,121 @@
-"""Cell layout: the corners of the warped grid, from how wide every slot is.
+"""Cell layout: the corners of the drawn grid: the perfect grid, warped only round cells of another size.
 
-Contract: `cell_layout(widths)` takes (3, side, side, side) float widths, widths[axis]
-[i, j, k] the width along `axis` of the slot at lattice place (i, j, k) (`cell_slots`),
-and returns float64 (side + 1, side + 1, side + 1, 3): the grid's corner points,
-centred on 0. The slot at (i, j, k) is the block between corners [i, j, k] and
-[i + 1, j + 1, k + 1], so slots share their corners: they leave no gap and keep their
-places in the pattern whatever their sizes.
-A cell has a size and no shape, and a row of big cells beside a row of small ones
-cannot both be drawn exactly their size in one grid without gaps. The corners are
-therefore the best fit: every edge of every slot wants to be as long as the slot is
-wide along it and to point straight along its axis, and the corners settle where the
-squared misses, each divided by the length wanted, are least in sum (a miss sideways
-counts SHEAR times a miss in length). Dividing by the length makes a short cell as
-stiff as it is short, so the small cells keep their size and the long ones take up the
-mismatch. Where all sizes agree the fit is exact. Where they do not, a region of small
-cells is drawn small, but one cell smaller than all its neighbours is drawn only part
-of the way smaller. The colour carries each cell's own packing exactly.
-The fit is one sparse linear solve per coordinate: conjugate gradients to RELATIVE of
-the load, started from the slots' mean widths and helped by the exact answer for the
-grid whose every layer has its slots' mean stiffness (`_layer_solver`); the same
-widths always give the same corners. When it has not settled in MOST_TURNS turns the
-coordinate is solved directly instead (slow: seconds at 32 places a side), so a layout
-always comes back. A width of 0 (a slot whose cell is gone) is held to FLOOR of the
-median width. The universe wraps round; the drawing opens it at lattice index 0.
+Contract: `cell_layout(widths, typical, first=(0, 0, 0), places=None, flat=False,
+trim=((0, 0),) * 3)` takes (3, nx, ny, nz) widths of a box of slots whose first slot is
+lattice place `first` in a lattice of `places` places a side (None: the box is the
+lattice), and `typical`, the (volume, joint) lengths of `typical_lengths`. It returns
+`(corners, limited)`: float64 (nx + 1, ny + 1, nz + 1, 3) corner points, less the `trim`
+(low, high) slots cut off each axis's ends, and whether any size was further from the
+typical than is drawn. The slot at (i, j, k) is the block between corners [i, j, k] and
+[i + 1, j + 1, k + 1]: slots share corners, so there is never a gap.
+
+The method, and why. The drawing starts from the perfect grid (`regular_planes`): every
+even place as wide as the typical volume, every odd one as the typical joint. Each
+slot's width is then compared with the typical one, and the difference moves the corner
+planes of its own row by fixed weights (`pull_weights`): its own two planes by half the
+difference each, the planes further along by less and less, none beyond REACH places;
+a line between rows takes the ACROSS-weighted mean of the rows beside it. That is a
+plain weighted sum, with no fit and no memory, so:
+  - where nothing differs within REACH, corners are exactly the perfect grid's, in
+    every frame; a change moves only the corners within REACH of it
+  - the weights of mirrored places cancel, so the outer frame never moves along its
+    own axis; it changes only when the typical lengths do, and then evenly
+  - a slot is drawn at least 1 / LIMIT of its typical width less whatever its
+    neighbours need (at most 1 / (2 LIMIT) of the smaller typical width), so every
+    edge keeps at least 1 / (2 LIMIT) of its regular length: corners keep their order
+    along every line whatever the sizes
+What it costs: a cell is drawn smaller only against its neighbourhood. A lone small cell
+shows part of its size (its lines are shared with the rows beside it); a region wider
+than REACH is drawn regular inside; a cell larger than typical is drawn hardly larger.
+The colour carries each cell's own packing exactly.
+Should the bends between rows still turn a block inside out, the whole warp is drawn at
+the largest share that folds none (found by halving, EASE_TURNS times) and `limited`
+says so. With `flat` the z planes stay regular (a slice is a flat cut) and what must
+not fold is each slot's face through its middle, the thing a slice draws.
 """
 from __future__ import annotations
 
 import numpy as np
-from scipy.sparse import coo_matrix
-from scipy.sparse.linalg import spsolve
 
-from physics.view.layout.definitions.fit_marks import FLOOR, MOST_TURNS, RELATIVE, SHEAR
+from physics.view.layout.definitions.pull_weights import pull_weights
+from physics.view.layout.definitions.regular_planes import regular_planes
+from physics.view.layout.definitions.warp_marks import ACROSS, EASE_TURNS, LIMIT, REACH
 
 
-def cell_layout(widths: np.ndarray) -> np.ndarray:
-    """Corner points of the grid whose slots are as near these widths as one gapless grid allows."""
+def cell_layout(widths: np.ndarray, typical: tuple, first: tuple = (0, 0, 0), places: int | None = None,
+                flat: bool = False, trim: tuple = ((0, 0),) * 3) -> tuple:
+    """Corner points of the perfect grid warped round the slots that differ, and whether sizes were limited."""
     widths = np.asarray(widths, dtype=np.float64)
-    side = widths.shape[1]
-    across = side + 1
-    floor = FLOOR * float(np.median(widths[widths > 0.0])) if (widths > 0.0).any() else 1.0
-    number = np.arange(across ** 3).reshape(across, across, across)
-    rows, cols, stiff, loads, layers = [], [], [], [], []
+    count = widths.shape[1:]
+    places = count[0] if places is None else places
+    volume, joint = typical
+    room = min(volume, joint) / (2.0 * LIMIT)
+    regular = np.zeros((count[0] + 1, count[1] + 1, count[2] + 1, 3))
+    shift = np.zeros_like(regular)
+    limited = False
     for axis in range(3):
-        pad = [(0, 0) if other == axis else (1, 1) for other in range(3)]
-        give = np.pad(1.0 / np.maximum(widths[axis], floor), pad)
-        ones = np.pad(np.ones((side, side, side)), pad)
-        weight, count = np.zeros_like(give), np.zeros_like(ones)
-        first, second = [other for other in range(3) if other != axis]
-        for shift_one in (0, 1):
-            for shift_two in (0, 1):
-                weight += np.roll(give, (shift_one, shift_two), axis=(first, second))
-                count += np.roll(ones, (shift_one, shift_two), axis=(first, second))
-        trim = tuple(slice(None) if other == axis else slice(1, None) for other in range(3))
-        low = np.take(number, range(side), axis=axis).reshape(-1)
-        high = np.take(number, range(1, across), axis=axis).reshape(-1)
-        rows.append(low)
-        cols.append(high)
-        stiff.append(weight[trim].reshape(-1))
-        loads.append(count[trim].reshape(-1))
-        layers.append((weight[trim] / count[trim]).mean(axis=(first, second)))
-    low, high = np.concatenate(rows), np.concatenate(cols)
-    total = across ** 3
-    guess = _mean_grid(widths)
-    corners = np.zeros((across, across, across, 3))
-    for axis in range(3):
-        soft = [1.0 if other == axis else SHEAR for other in range(3)]
-        spring = np.concatenate([soft[other] * stiff[other] for other in range(3)])
-        matrix = coo_matrix((np.concatenate([spring, spring, -spring, -spring]),
-                             (np.concatenate([low, high, low, high]), np.concatenate([low, high, high, low]))),
-                            shape=(total, total)).tocsr()
-        helper = _layer_solver([soft[other] * layers[other] for other in range(3)], across)
-        load = np.zeros(total)
-        np.add.at(load, rows[axis], -loads[axis])
-        np.add.at(load, cols[axis], loads[axis])
-        found = _settle(matrix, load, guess[..., axis].reshape(-1).copy(), helper)
-        if found is None:
-            found = _direct(matrix, load)
-        corners[..., axis] = (found - found.mean()).reshape(across, across, across)
-    return corners
+        along = [-1 if other == axis else 1 for other in range(3)]
+        regular[..., axis] = regular_planes(count[axis], first[axis], volume, joint, places).reshape(along)
+        if flat and axis == 2:
+            continue
+        usual = np.where((first[axis] + np.arange(count[axis])) % 2 == 0, volume, joint).reshape(along)
+        limited = limited or bool(((widths[axis] < usual / LIMIT) | (widths[axis] > usual * LIMIT)).any())
+        shift[..., axis] = _spread(np.clip(widths[axis], usual / LIMIT, usual + room) - usual, axis)
+    kept = tuple(slice(low, regular.shape[axis] - high) for axis, (low, high) in enumerate(trim))
+    regular, shift = regular[kept], shift[kept]
+    share = _share_without_folds(regular, shift, flat)
+    return regular + share * shift, limited or share < 1.0
 
 
-def _layer_solver(layers: list, across: int):
-    """The exact solve of the grid whose springs along each axis depend only on the layer (its slots' mean).
-
-    That grid's matrix is a sum of three products of one-axis matrices, so it is solved by
-    turning each axis to its own modes; the real grid differs from it only by the
-    unevenness, which is why it is the helper (preconditioner) of the real solve.
-    """
-    share = np.full(across, 2.0)
-    share[[0, -1]] = 1.0
-    modes, tones = [], []
-    for springs in layers:
-        chain = np.zeros((across, across))
-        at = np.arange(across - 1)
-        chain[at, at] += springs
-        chain[at + 1, at + 1] += springs
-        chain[at, at + 1] -= springs
-        chain[at + 1, at] -= springs
-        tone, mode = np.linalg.eigh(chain / np.sqrt(np.outer(share, share)))
-        modes.append(mode / np.sqrt(share)[:, None])
-        tones.append(tone)
-    total = tones[0][:, None, None] + tones[1][None, :, None] + tones[2][None, None, :]
-    give = np.where(total > 1e-12 * total.max(), 1.0 / np.maximum(total, 1e-300), 0.0)
-
-    def solve(load: np.ndarray) -> np.ndarray:
-        turned = _turn(load.reshape(across, across, across), [mode.T for mode in modes]) * give
-        return _turn(turned, modes).reshape(-1)
-    return solve
+def _spread(change: np.ndarray, axis: int) -> np.ndarray:
+    """How far every corner moves along `axis` for these changes of the slots' widths along it."""
+    for other in range(3):
+        if other != axis:
+            change = _onto_planes(change, other, np.asarray(ACROSS))
+    return _onto_planes(change, axis, pull_weights(REACH))
 
 
-def _settle(matrix, load: np.ndarray, found: np.ndarray, helper) -> np.ndarray | None:
-    """Conjugate gradients with a helper: the corners' one coordinate that balances the load, or None when not settled.
-
-    Sums are taken with einsum, not the threaded library: on a busy machine its threads
-    wait on each other and a solve of 0.03 s takes 1.5 s (measured, 24 cores under load 64).
-    """
-    left = load - matrix @ found
-    limit = RELATIVE * np.sqrt(np.einsum("i,i->", load, load))
-    eased = helper(left)
-    way = eased.copy()
-    power = np.einsum("i,i->", left, eased)
-    for _ in range(MOST_TURNS):
-        if np.sqrt(np.einsum("i,i->", left, left)) <= limit:
-            return found
-        pushed = matrix @ way
-        stride = power / np.einsum("i,i->", way, pushed)
-        found += stride * way
-        left -= stride * pushed
-        eased = helper(left)
-        power, before = np.einsum("i,i->", left, eased), power
-        way = eased + (power / before) * way
-    return None
+def _onto_planes(field: np.ndarray, axis: int, weights: np.ndarray) -> np.ndarray:
+    """A weighted sum of the slots on either side of every plane across `axis`, the slots mirrored at both ends."""
+    half = len(weights) // 2
+    padded = np.pad(field, [(half, half) if other == axis else (0, 0) for other in range(3)], mode="symmetric")
+    planes = field.shape[axis] + 1
+    summed = np.zeros([planes if other == axis else field.shape[other] for other in range(3)])
+    for tap, weight in enumerate(weights):
+        summed += weight * padded[tuple(slice(tap, tap + planes) if other == axis else slice(None) for other in range(3))]
+    return summed
 
 
-def _direct(matrix, load: np.ndarray) -> np.ndarray:
-    """The same balance by direct elimination, corner 0 held still (the grid may sit anywhere)."""
-    hold = coo_matrix(([matrix.diagonal().max()], ([0], [0])), shape=matrix.shape)
-    return spsolve((matrix + hold).tocsc(), load)
+def _share_without_folds(regular: np.ndarray, shift: np.ndarray, flat: bool) -> float:
+    """The largest share of the warp, 1 when all of it, at which nothing drawn is turned inside out."""
+    folded = _face_folded if flat else _block_folded
+    if not folded(regular + shift):
+        return 1.0
+    low, high = 0.0, 1.0
+    for _ in range(EASE_TURNS):
+        middle = 0.5 * (low + high)
+        low, high = (low, middle) if folded(regular + middle * shift) else (middle, high)
+    return low
 
 
-def _turn(field: np.ndarray, tables: list) -> np.ndarray:
-    """Apply one square table along each of the three axes of a field."""
-    field = np.einsum("ai,ijk->ajk", tables[0], field)
-    field = np.einsum("bj,ajk->abk", tables[1], field)
-    return np.einsum("ck,abk->abc", tables[2], field)
+def _face_folded(corners: np.ndarray) -> bool:
+    """Whether any slot's face through its middle along z has a corner that does not turn the way a face's does."""
+    face = 0.5 * (corners[:, :, 1:, :2] + corners[:, :, :-1, :2])
+    quad = np.stack([face[:-1, :-1], face[1:, :-1], face[1:, 1:], face[:-1, 1:]], axis=0)
+    ahead, back = np.roll(quad, -1, axis=0) - quad, quad - np.roll(quad, 1, axis=0)
+    return bool((back[..., 0] * ahead[..., 1] - back[..., 1] * ahead[..., 0] <= 0.0).any())
 
 
-def _mean_grid(widths: np.ndarray) -> np.ndarray:
-    """The straight grid whose every layer is as wide as its slots' mean: where the fit starts from."""
-    side = widths.shape[1]
-    corners = np.zeros((side + 1, side + 1, side + 1, 3))
-    for axis in range(3):
-        mean = widths[axis].mean(axis=tuple(other for other in range(3) if other != axis))
-        edges = np.concatenate([[0.0], np.cumsum(mean)]) - 0.5 * mean.sum()
-        shape = [side + 1 if other == axis else 1 for other in range(3)]
-        corners[..., axis] = edges.reshape(shape)
-    return corners
+def _block_folded(corners: np.ndarray) -> bool:
+    """Whether any block has a corner whose three edges do not turn the way a block's do."""
+    edges = [np.diff(corners, axis=axis) for axis in range(3)]
+    for corner in range(8):
+        one, two, three = [edges[axis][tuple(slice(None) if other == axis
+                                             else (slice(1, None) if corner >> other & 1 else slice(None, -1))
+                                             for other in range(3))] for axis in range(3)]
+        turn = (one[..., 0] * (two[..., 1] * three[..., 2] - two[..., 2] * three[..., 1])
+                - one[..., 1] * (two[..., 0] * three[..., 2] - two[..., 2] * three[..., 0])
+                + one[..., 2] * (two[..., 0] * three[..., 1] - two[..., 1] * three[..., 0]))
+        if (turn <= 0.0).any():
+            return True
+    return False

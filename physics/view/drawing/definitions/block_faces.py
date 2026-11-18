@@ -5,6 +5,8 @@ c & 1, along y when c & 2, along z when c & 4 (`Pieces`).
   BLOCK_PATTERN  int32 (36,): the block's six faces as twelve triangles, corner numbers
   FACE_PATTERN   int32 (6,): a four-cornered slice face as two triangles
   MAX_PATTERN    the longest pattern the mesh takes (36)
+  FACE_LINES     int32 (8,): the outline of a slice face as four lines, corner numbers
+  BLOCK_LINES    int32 (24,): a block's twelve edges as lines
   FACE_SHADE     how bright a face is drawn by the axis it faces (x, y, z), so the
                  whole grid's blocks read as blocks without any light
 """
@@ -16,4 +18,7 @@ _FACES = ((0, 2, 6, 4), (1, 3, 7, 5), (0, 1, 5, 4), (2, 3, 7, 6), (0, 1, 3, 2), 
 BLOCK_PATTERN = np.array([face[corner] for face in _FACES for corner in (0, 1, 2, 0, 2, 3)], dtype=np.int32)
 FACE_PATTERN = np.array((0, 1, 2, 0, 2, 3), dtype=np.int32)
 MAX_PATTERN = 36
+FACE_LINES = np.array((0, 1, 1, 2, 2, 3, 3, 0), dtype=np.int32)
+BLOCK_LINES = np.array([pair for low in range(8) for bit in (1, 2, 4) if not low & bit for pair in (low, low | bit)],
+                       dtype=np.int32)
 FACE_SHADE = (0.8, 1.0, 0.9)

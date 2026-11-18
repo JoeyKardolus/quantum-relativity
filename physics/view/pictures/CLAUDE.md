@@ -9,16 +9,18 @@ Saved pictures: PNG files of the grid while a source steps, with no window shown
 
 ## Must not get wrong
 
-- **Every picture of a run shows the same box**: the start's grid plus a margin. So a
-  cell drawn elsewhere later has really moved, and a grid that outgrows the box runs
-  off the picture. That is the run, not a bug.
+- **The slice is the default** and needs neither GPU nor display. It lays out one
+  layer, so it costs the same at any lattice size.
+- **Every picture is fitted to the grid's own frame** plus a margin. The frame is the
+  perfect grid's, so the grid sits still from picture to picture and a cell drawn
+  elsewhere has moved within it. The universe's size is in the printed line.
 - **The whole grid needs a display and the GPU** (a hidden window); call
-  `use_gpu_driver()` before importing `logic/whole_picture.py`. `--slice` needs neither.
+  `use_gpu_driver()` before importing `logic/whole_picture.py`.
 - **PNG is written with the standard library only.** No image dependency.
 - A machine keeps no datasets: pictures go to a directory outside the repo.
 
 ## Run
 
 ```
-PYTHONPATH=. .venv/bin/python -m physics.view --pictures DIR --steps 40 --every 4 [--slice]
+PYTHONPATH=. .venv/bin/python -m physics.view --pictures DIR --steps 40 --every 4 [--whole]
 ```

@@ -16,7 +16,8 @@ LOW, HIGH = np.full(3, -1.0, dtype=np.float32), np.full(3, 1.0, dtype=np.float32
 
 def _cubes(centres, half, kinds, packings) -> Pieces:
     unit = np.array([[c & 1, c >> 1 & 1, c >> 2 & 1] for c in range(8)], dtype=np.float32) * 2.0 - 1.0
-    corners = np.stack([np.asarray(centre, dtype=np.float32) + half * unit for centre in centres])
+    corners = np.stack([np.asarray(centre, dtype=np.float32) + half * unit for centre in centres]) if len(centres) \
+        else np.zeros((0, 8, 3), dtype=np.float32)
     count = len(centres)
     return Pieces(corners, np.arange(count), np.array(kinds, dtype=np.int8), np.array(packings, dtype=np.float32),
                   np.zeros((count, 3), dtype=np.int64), 4, LOW, HIGH)
@@ -48,11 +49,21 @@ def test_a_solid_cell_is_its_hue_shaded_by_the_face_it_shows_on_black(draw):
         "nothing but the three shades of red: hard edges, no light of its own"
 
 
-def test_an_emptied_cell_is_not_there_and_the_starts_mean_is_haze(draw):
-    assert draw(_cubes([(0, 0, 0)], 0.5, [1], [0.0]), LOW, HIGH).sum() == 0
-    haze = draw(_cubes([(0, 0, 0)], 0.5, [-1], [1.0]), LOW, HIGH).astype(int)[80, 110]
-    through_two_faces = 1.0 - (1.0 - 0.25 ** WHOLE_POWER) ** 2
+def test_a_cell_at_the_starts_mean_is_not_there_and_a_half_packed_one_is_haze(draw):
+    assert draw(_cubes([(0, 0, 0)], 0.5, [1], [1.0]), LOW, HIGH).sum() == 0
+    haze = draw(_cubes([(0, 0, 0)], 0.5, [-1], [2.5]), LOW, HIGH).astype(int)[80, 110]
+    through_two_faces = 1.0 - (1.0 - 0.5 ** WHOLE_POWER) ** 2
     assert 0 < haze[2] <= np.ceil(JOINT_BLUE[2] * through_two_faces) + 1, f"middle pixel {haze}"
+
+
+def test_the_slice_under_the_blocks_shows_a_clear_cells_outline_in_its_hue(draw):
+    plane = _cubes([(0, 0, 0)], 0.5, [1], [0.0])
+    nothing = _cubes([], 0.5, [], [])
+    picture = draw(nothing, LOW, HIGH, plane).astype(int)
+    lit = picture[picture.sum(axis=2) > 0]
+    assert 20 < len(lit) < 2000, "thin lines, not a filled face"
+    assert (lit[:, 0] > 3 * lit[:, 2]).all() and lit[:, 0].max() > 100, "the outline of a clear energy volume is red"
+    assert draw(nothing, LOW, HIGH).sum() == 0, "without the slice a clear grid is black"
 
 
 def test_the_near_solid_cell_hides_the_far_one_whatever_order_they_come_in(draw):

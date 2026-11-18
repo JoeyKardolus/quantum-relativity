@@ -1,11 +1,13 @@
 """The layout draws a perfect A B A B pattern: no cell overlaps another, no gap, every cell in its place.
 
 Plain arrays, no engine. A lattice whose cells' lengths differ by 30%, an even one
-where every size is exact, and one with the engine's own proportions (a joint thirty
-times as long as an energy volume).
+where every size is exact, one with the engine's own proportions (a joint thirty
+times as long as an energy volume), one whose sizes differ thousands of times, and a
+lump that moves through a larger lattice.
 """
 import numpy as np
 
+from physics.view.layout.definitions.warp_marks import LAID_OUT_MOST, REACH
 from physics.view.layout.logic.cell_pieces import cell_pieces
 from physics.view.tests.grid_cases import inside, slice_faces, uneven_lattice
 
@@ -16,14 +18,45 @@ def test_no_point_lies_in_two_cells_and_none_in_no_cell():
     kind, length, packing = uneven_lattice(SIDE)
     pieces = cell_pieces(SIDE, kind, length, packing)
     assert len(pieces.cell) == SIDE ** 3
-    points = np.random.default_rng(2).uniform(-30.0, 30.0, size=(4000, 2))
+    points = np.random.default_rng(2).uniform(pieces.low[:2], pieces.high[:2], size=(4000, 2))
     for layer in range(SIDE):
         faces, _ = slice_faces(pieces, layer)
         assert len(faces) == SIDE * SIDE
         hits = inside(points, faces)
         assert hits.max() == 1, "a point lies inside two cells: cells overlap"
-        hull = np.abs(points).max(axis=1) < 12.0
-        assert (hits[hull] == 1).mean() > 0.999, "a gap inside the grid (only points exactly on an edge may miss)"
+        assert (hits == 1).mean() > 0.999, "a gap inside the grid (only points exactly on an edge may miss)"
+
+
+def test_a_layer_laid_out_alone_is_the_same_picture_as_that_layer_of_the_whole_grid():
+    kind, length, packing = uneven_lattice(SIDE, spread=0.05)
+    pieces = cell_pieces(SIDE, kind, length, packing)
+    assert not pieces.limited
+    for layer in range(SIDE):
+        faces, cells = slice_faces(pieces, layer)
+        flat, alone = slice_faces(cell_pieces(SIDE, kind, length, packing, layer=layer), layer)
+        assert np.array_equal(cells, alone) and np.allclose(flat, faces, atol=1e-4)
+
+
+def test_sizes_thousands_of_times_apart_gone_cells_and_endless_ones_never_fold_or_overlap_a_cell():
+    kind, length, packing = uneven_lattice(SIDE, seed=5, spread=3.0)
+    length[[7, 100, 301]] = np.inf
+    kind[[9, 210]], length[[9, 210]] = 0, 0.0
+    assert length[np.isfinite(length)].max() / length[length > 0].min() > 1e4
+    pieces = cell_pieces(SIDE, kind, length, packing)
+    assert pieces.limited and np.isfinite(pieces.corners).all() and len(pieces.cell) == SIDE ** 3 - 2
+    corners = pieces.corners.astype(np.float64)
+    edges = corners[:, [1, 2, 4]] - corners[:, [0]]
+    assert (np.einsum("ni,ni->n", edges[:, 0], np.cross(edges[:, 1], edges[:, 2])) > 0).all(), "every block has volume"
+    points = np.random.default_rng(6).uniform(pieces.low[:2], pieces.high[:2], size=(3000, 2))
+    for layer in range(SIDE):
+        faces, _ = slice_faces(pieces, layer)
+        ahead, back = np.roll(faces, -1, axis=1) - faces, faces - np.roll(faces, 1, axis=1)
+        assert (back[..., 0] * ahead[..., 1] - back[..., 1] * ahead[..., 0] > 0).all(), "every face has area and no fold"
+        assert inside(points, faces).max() == 1, "no two cells overlap"
+        flat, _ = slice_faces(cell_pieces(SIDE, kind, length, packing, layer=layer), layer)
+        ahead, back = np.roll(flat, -1, axis=1) - flat, flat - np.roll(flat, 1, axis=1)
+        assert (back[..., 0] * ahead[..., 1] - back[..., 1] * ahead[..., 0] > 0).all() and inside(points, flat).max() == 1, \
+            "the layer laid out alone does not fold or overlap either"
 
 
 def test_every_cell_turns_the_same_way_and_shares_its_corners_with_its_neighbours():
@@ -89,18 +122,48 @@ def test_with_the_engines_own_sizes_the_joints_are_the_fat_cells_and_nothing_is_
     assert volume[pieces.kind == 1].sum() / volume.sum() < 1e-4, "the energy volumes are specks between the joints"
 
 
-def test_a_cell_with_more_energy_is_drawn_smaller_and_the_grid_closes_in_round_it():
-    kind, length, packing = uneven_lattice(SIDE, spread=0.0)
-    even = cell_pieces(SIDE, kind, length, packing)
-    lump = (2 * SIDE + 2) * SIDE + 2
-    length[lump] = 2.5
-    warped = cell_pieces(SIDE, kind, length, packing)
-    middle = [(warped.corners[:, [c for c in range(8) if c >> axis & 1], axis].mean(axis=1)
-               - warped.corners[:, [c for c in range(8) if not c >> axis & 1], axis].mean(axis=1)) for axis in range(3)]
-    middle = np.stack(middle, axis=1)
-    volumes = np.flatnonzero(warped.kind == 1)
-    assert (middle[lump] < middle[volumes[volumes != lump]].min(axis=0)).all(), "the lump is the smallest volume drawn"
-    assert (middle > 0).all()
-    assert ((warped.high - warped.low) < (even.high - even.low)).all(), "the whole grid is smaller by what the lump lost"
-    far = (np.abs(warped.place - 2) > 3).all(axis=1) & (warped.kind == 1)
-    assert np.abs(middle[far] / 10.0 - 1.0).max() < 0.05, "volumes far from the lump keep their size"
+def test_a_lump_is_drawn_smaller_and_solid_and_everything_out_of_its_reach_stays_exactly_where_it_was():
+    side = 28
+    kind, length, packing = uneven_lattice(side, spread=0.0)
+    even = cell_pieces(side, kind, length, packing)
+    place = np.indices((side, side, side)).reshape(3, -1).T
+    lump = ((place >= 4) & (place <= 6)).all(axis=1)
+    length[lump] *= 0.4
+    warped = cell_pieces(side, kind, length, packing)
+    assert np.array_equal(warped.low, even.low) and np.array_equal(warped.high, even.high), "the outer frame stays put"
+    far = (warped.place > 6 + REACH + 1).any(axis=1)
+    assert far.sum() > side ** 3 // 2 and np.array_equal(warped.corners[far], even.corners[far]), \
+        "a cell out of the lump's reach is drawn exactly where it was"
+    spans = lambda pieces: pieces.corners[:, 7] - pieces.corners[:, 0]
+    assert (spans(warped)[lump] < spans(even)[lump]).all(), "every cell of the lump is drawn smaller"
+    assert (spans(warped)[lump] / spans(even)[lump]).mean() < 0.85
+    beside = (warped.place[:, 0] >= 8) & (warped.place[:, 0] <= 12) & (warped.place[:, 1:] == 5).all(axis=1)
+    assert beside.sum() == 5 and (spans(warped)[beside, 0] > spans(even)[beside, 0]).all(), \
+        "the cells beyond it along its row take up the room it gave"
+    moved = cell_pieces(side, kind, np.roll(length.reshape(side, side, side), 2, axis=0).reshape(-1), packing)
+    still = (moved.place > 8 + REACH + 1).any(axis=1)
+    assert np.array_equal(moved.corners[still], warped.corners[still]), "when the lump moves, the far grid does not"
+
+
+def test_only_the_wanted_cells_are_laid_out_and_they_lie_where_the_whole_layout_puts_them():
+    side = 28
+    kind, length, packing = uneven_lattice(side, spread=0.1)
+    place = np.indices((side, side, side)).reshape(3, -1).T
+    only = ((place >= 20) & (place <= 23)).all(axis=1)
+    whole, some = cell_pieces(side, kind, length, packing), cell_pieces(side, kind, length, packing, only=only)
+    assert some.cell.tolist() == np.flatnonzero(only).tolist() and some.left_out == 0
+    assert np.array_equal(some.corners, whole.corners[only]), "the box round them is laid out exactly as the whole is"
+    assert np.array_equal(some.low, whole.low) and np.array_equal(some.high, whole.high)
+    none = cell_pieces(side, kind, length, packing, only=np.zeros(side ** 3, dtype=bool))
+    assert len(none.cell) == 0 and none.left_out == 0 and none.corners.shape == (0, 8, 3)
+
+
+def test_wanted_cells_too_spread_to_lay_out_are_counted_not_drawn():
+    side = 128
+    kind = np.ones(side ** 3, dtype=np.int8)
+    only = np.zeros(side ** 3, dtype=bool)
+    only[[0, side ** 3 - 1]] = True
+    spread = cell_pieces(side, kind, np.full(side ** 3, 5.0, dtype=np.float32), np.ones(side ** 3, dtype=np.float32), only=only)
+    assert len(spread.cell) == 0 and spread.left_out == 2 and side ** 3 > LAID_OUT_MOST
+    one_layer = cell_pieces(side, kind, np.full(side ** 3, 5.0, dtype=np.float32), np.ones(side ** 3, dtype=np.float32), layer=64)
+    assert len(one_layer.cell) == side * side and np.ptp(one_layer.corners[:, :4, 2]) == 0.0, "a layer is always laid out"

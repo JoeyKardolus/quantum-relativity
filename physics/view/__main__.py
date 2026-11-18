@@ -1,4 +1,4 @@
-"""Command line: `python -m physics.view [--scene NAME] [--all-rules] [--cells N] [--seed S] [--set name=value ...] [--steps-per-frame F] [--pictures DIR --steps N --every K [--slice]]`.
+"""Command line: `python -m physics.view [--scene NAME] [--all-rules] [--cells N] [--seed S] [--set name=value ...] [--steps-per-frame F] [--pictures DIR --steps N --every K [--whole]]`.
 
 `--scene two_lumps | coast | orbit | lone` opens a gravity scene (`physics.scenes.gravity`)
 with the fitted phase 1 settings (`physics.fit.fitted`), `--set` on top of them, 24 cells
@@ -11,11 +11,12 @@ side, seed 1; `--set` overrides of `Settings` fields, each a number, the start's
 one the engine refuses exits with a message). Without `--pictures` it sets the Mesa GPU
 variables (`use_gpu_driver`) before pyglet is imported, steps the source on a `Stepper`
 thread, F steps between drawn frames, starting paused (space starts), and opens the
-`CellWindow` on the whole grid until it is closed. With `--pictures DIR` no window
-shows: `saved_frames` runs `--steps` steps and saves a picture every `--every` steps
-into DIR, printing one line per picture. The picture is the whole grid in three
-dimensions, drawn by the GPU off screen (`WholePicture`), or with `--slice` the middle
-slice, drawn without GPU or display.
+`CellWindow` on the slice through the middle until it is closed (key C: the whole
+grid). With `--pictures DIR` no window shows: `saved_frames` runs `--steps` steps and
+saves a picture every `--every` steps into DIR, printing one line per picture. The
+picture is the middle slice, drawn without GPU or display, or with `--whole` the whole
+grid in three dimensions, drawn by the GPU off screen (`WholePicture`). `--slice` is
+the default and still accepted.
 """
 from __future__ import annotations
 
@@ -35,8 +36,9 @@ def main() -> None:
     parser.add_argument("--set", action="append", default=[], metavar="name=value",
                         help="override one rule setting, e.g. --set unevenness=0.3")
     parser.add_argument("--steps-per-frame", type=int, default=1)
-    parser.add_argument("--pictures", metavar="DIR", help="save pictures of the whole grid here instead of opening a window")
-    parser.add_argument("--slice", action="store_true", help="with --pictures: the middle slice instead of the whole grid")
+    parser.add_argument("--pictures", metavar="DIR", help="save pictures of the middle slice here instead of opening a window")
+    parser.add_argument("--whole", action="store_true", help="with --pictures: the whole grid in three dimensions (needs the GPU)")
+    parser.add_argument("--slice", action="store_true", help="with --pictures: the middle slice (the default)")
     parser.add_argument("--steps", type=int, default=5000, help="with --pictures: steps to run")
     parser.add_argument("--every", type=int, default=250, help="with --pictures: steps between pictures")
     arguments = parser.parse_args()
@@ -61,13 +63,14 @@ def main() -> None:
     if arguments.pictures:
         from physics.view.pictures.logic.saved_frames import saved_frames
         from physics.view.pictures.logic.slice_of_the_middle import slice_of_the_middle
-        if arguments.slice:
-            picture = slice_of_the_middle
-        else:
+        if arguments.whole:
             use_gpu_driver()
             from physics.view.pictures.logic.whole_picture import WholePicture
             picture = WholePicture()
-        for frame in saved_frames(source, arguments.steps, arguments.every, arguments.pictures, picture):
+        else:
+            picture = slice_of_the_middle
+        for frame in saved_frames(source, arguments.steps, arguments.every, arguments.pictures, picture,
+                                  arguments.whole):
             print(f"step {frame['step']}: {frame['path']} size {frame['size']:.1f} volumes {frame['volumes']} "
                   f"collapses {frame['collapses']} tears {frame['tears']} quanta {frame['amount']}", flush=True)
         return

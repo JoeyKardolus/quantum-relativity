@@ -10,7 +10,7 @@ TypeError and a value the engine refuses raises ValueError, both at construction
             packing marks and size, which every later frame is read against
   step()    one `physics.engine.step`
   steps     steps since the last reset
-  view()    `grid_pieces`
+  view(layer=None)  `grid_pieces`: one layer, or the packed cells
   stats()   `cell_stats`
 """
 from __future__ import annotations
@@ -49,9 +49,9 @@ class CellsSource:
         step(self.state, self.settings, quantum=self.quantum)
         self.steps += 1
 
-    def view(self) -> Pieces:
-        """Every living cell's block in the warped grid."""
-        return grid_pieces(self.state, self.marks)
+    def view(self, layer: int | None = None) -> Pieces:
+        """One layer's cells, or the packed cells, as blocks of the drawn grid."""
+        return grid_pieces(self.state, self.marks, layer)
 
     def stats(self) -> dict:
         """The engine's counts for the title."""

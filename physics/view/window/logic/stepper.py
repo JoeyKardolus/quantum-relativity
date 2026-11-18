@@ -3,15 +3,17 @@
 Contract: `Stepper(source, steps_per_frame=1, paused=False)` starts a daemon thread that
 publishes the start, then runs `steps_per_frame` source steps, publishes a `Snapshot`,
 and repeats while not paused (`source` fits the `Source` interface). It starts on the
-whole grid; the slice starts at `middle_layer`. Stats are read at most every
-STATS_EVERY seconds, and on every reset, pause or change of view.
+slice through `middle_layer`: only that layer is laid out and drawn, whatever the size
+of the lattice. With the whole grid on, the packed cells are laid out too and handed
+over as blocks beside the slice. Stats are read at most every STATS_EVERY seconds, and
+on every reset, pause or change of view.
   latest()         the newest Snapshot, or None when none is new since the last call
   toggle_pause()   pause or resume
   show(kinds)      draw only energy volumes, only joints, or both (one of SHOWN; any
                    other value raises ValueError)
-  toggle_whole()   the whole grid, or the slice
+  toggle_whole()   the whole grid (the slice plus the packed cells' blocks), or the
+                   slice alone
   move_slice(n)    move the slice by whole lattice layers, round the wrapping grid
-                   (nothing while the whole grid shows)
   reset(), stop()  a fresh start; stop the thread and wait for it
 Each of these is safe from any thread and republishes even while paused. All source
 work (steps, views) runs on the stepping thread. When the source or the layout raises,
@@ -37,7 +39,8 @@ class Stepper:
 
     def __init__(self, source, steps_per_frame: int = 1, paused: bool = False) -> None:
         self.source = source
-        self.whole = True
+        self.whole = False
+        self._side = None
         self.slice_offset = 0
         self.steps_per_frame = max(1, int(steps_per_frame))
         self.paused = paused
@@ -74,15 +77,14 @@ class Stepper:
         self._stats_at = 0.0
 
     def toggle_whole(self) -> None:
-        """Draw the whole grid, or the slice again."""
+        """Draw the whole grid, or the slice alone again."""
         self.whole = not self.whole
         self._stats_at = 0.0
 
     def move_slice(self, layers: int) -> None:
-        """Move the slice by whole lattice layers; nothing while the whole grid shows."""
-        if not self.whole:
-            self.slice_offset += int(layers)
-            self._stats_at = 0.0
+        """Move the slice by whole lattice layers."""
+        self.slice_offset += int(layers)
+        self._stats_at = 0.0
 
     def reset(self) -> None:
         """Ask for a fresh start on the stepping thread."""
@@ -110,6 +112,7 @@ class Stepper:
 
     def _fresh_start(self) -> None:
         self.source.reset()
+        self._side = None
         self._publish()
 
     def _advance(self) -> None:
@@ -134,14 +137,22 @@ class Stepper:
             return False
 
     def _publish(self) -> None:
-        pieces = self.source.view()
-        layer = None if self.whole else (middle_layer(pieces.side) + self.slice_offset) % pieces.side
+        if self._side is None:
+            self._side = self.source.view(0).side
+        layer = (middle_layer(self._side) + self.slice_offset) % self._side
+        pieces = self.source.view(layer)
         corners, colours, pattern, drawn = grid_triangles(pieces, self.shown, layer)
+        blocks, limited, left_out = None, pieces.limited, 0
+        if self.whole:
+            packed = self.source.view()
+            *blocks, more = grid_triangles(packed, self.shown, None)
+            blocks, drawn, limited, left_out = tuple(blocks), drawn + more, limited or packed.limited, packed.left_out
         now = time.perf_counter()
         if now - self._stats_at >= STATS_EVERY:
             self._stats, self._stats_at = self.source.stats(), now
         snapshot = Snapshot(step=int(self.source.steps), corners=corners, colours=colours, pattern=pattern, drawn=drawn,
                             low=pieces.low, high=pieces.high, stats=self._stats, steps_per_second=self._rate,
-                            paused=self.paused, error=self.error, generation=self.generation, layer=layer)
+                            paused=self.paused, error=self.error, generation=self.generation, layer=layer,
+                            blocks=blocks, places=self._side, limited=limited, left_out=left_out)
         with self._lock:
             self._latest = self._last = snapshot

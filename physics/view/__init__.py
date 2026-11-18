@@ -1,17 +1,18 @@
-"""The viewer: the grid of cells in a GPU window, every cell at its own size (the only viewer).
+"""The viewer: the grid of cells in a GPU window, a perfect grid that only lumps warp (the only viewer).
 
 `python -m physics.view [--cells N] [--seed S] [--set name=value ...] [--steps-per-frame F]`
-opens the window; with `--pictures DIR --steps N --every K [--slice]` it saves pictures
+opens the window; with `--pictures DIR --steps N --every K [--whole]` it saves pictures
 instead. The cells are the grid (bible `physics/quantum-relativity`, axiom 3): a perfect
-A B A B pattern, energy volumes red, joints blue, clear where thin and solid where
-packed, so a packed lump stands in the thin rest like a mass in space. Planck boxes are
-not space and are never drawn.
+A B A B pattern, energy volumes red, joints blue, every cell outlined, its fill clear at
+the calm background's packing and solid where packed, so a lump stands like a mass in
+empty-looking space and the smaller cells of a lump bend the lines round it. Planck
+boxes are not space and are never drawn.
 
 One directory per purpose, each with `definitions/` (what things are), `logic/` (what
 happens) and `tests/`:
-  layout/    every cell in its place of the pattern, the grid warped by the cells' sizes
-  colours/   red and blue, opacity following packing on one fixed scale
-  drawing/   the whole grid in three dimensions (the default) and the slice (key C)
+  layout/    every cell in its place of the pattern, the perfect grid warped round lumps
+  colours/   red and blue, fills following packing on one fixed scale, outlines always
+  drawing/   the slice (the default) and the whole grid in three dimensions (key C)
   source/    the engine read as something to draw                  (needs the engine)
   window/    the pyglet window, its keys and the stepping thread
   pictures/  PNG files saved while a source steps

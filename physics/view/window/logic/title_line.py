@@ -2,10 +2,15 @@
 
 Contract: `title_line(snapshot, frames_per_second)` returns one line: the step, every
 count of `STAT_NAMES` (size with its growth since the start in brackets; a missing
-count shows as "?"), cells drawn, the view ("whole" or "slice z <layer>"), steps/s,
-frames/s, plus "paused" when paused and "STOPPED: <error>" when the source raised.
+count shows as "?"), cells drawn, the view ("slice z <layer>", after "whole + " when
+the packed cells' blocks show too), steps/s, frames/s, plus "sizes drawn up to <LIMIT>x"
+when a cell's size is further from the typical than is drawn, "<n> packed cells too
+spread for blocks" when the whole grid left them out, "paused" when paused and
+"STOPPED: <error>" when the source raised.
 """
 from __future__ import annotations
+
+from physics.view.layout.definitions.warp_marks import LIMIT
 
 
 def title_line(snapshot, frames_per_second: float) -> str:
@@ -18,9 +23,13 @@ def title_line(snapshot, frames_per_second: float) -> str:
               "quanta ?" if amount is None else f"quanta {amount:,}",
               "warp ?" if warp is None else f"warp {warp:.3f}",
               f"{snapshot.drawn:,} cells drawn",
-              "whole" if snapshot.layer is None else f"slice z {snapshot.layer}",
+              ("" if snapshot.blocks is None else "whole + ") + f"slice z {snapshot.layer}",
               f"{snapshot.steps_per_second:.1f} steps/s",
               f"{frames_per_second:.0f} fps"]
+    if snapshot.limited:
+        parts.append(f"sizes drawn up to {LIMIT:g}x")
+    if snapshot.left_out:
+        parts.append(f"{snapshot.left_out:,} packed cells too spread for blocks")
     if snapshot.paused:
         parts.append("paused")
     if snapshot.error:

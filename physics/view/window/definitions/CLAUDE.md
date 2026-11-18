@@ -13,4 +13,4 @@ What the window and its thread are made of.
   name is a real key and no two are the same key.
 - A new key is one line in `KEY_ACTIONS`. A new action also needs its branch in
   `CellWindow.on_key_press`.
-- `layer` in a snapshot is `None` for the whole grid; the window picks its shading by it.
+- A snapshot always carries the slice; `blocks` is `None` unless the whole grid shows.

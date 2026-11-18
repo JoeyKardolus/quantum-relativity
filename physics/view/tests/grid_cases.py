@@ -6,6 +6,9 @@ exp(spread * a standard normal). `torn_lattice(side)` is the even one after volu
 tore along y: (kind, length, packing, lines, line_axis). `inside(points, quads)` counts,
 for every 2D point, the four-cornered faces (n, 4, 2) it lies strictly inside.
 `slice_faces(pieces, layer)` returns the slice's faces (n, 4, 2) with their cell ids.
+`turns(faces)` is, per face and corner, how far the outline turns left there (all above
+0: the face has area and no fold). `every_layer(source, side)` is a source's layers,
+each laid out alone, as one list of `Pieces`.
 `FakeSource` fits the source interface: an 8-place lattice whose cells shrink 1% a
 step, and that raises at step `fail_at`.
 """
@@ -42,6 +45,15 @@ def slice_faces(pieces, layer: int) -> tuple:
     return (0.5 * (corners[:, :4] + corners[:, 4:]))[:, (0, 1, 3, 2), :2], pieces.cell[keep]
 
 
+def turns(faces: np.ndarray) -> np.ndarray:
+    ahead, back = np.roll(faces, -1, axis=1) - faces, faces - np.roll(faces, 1, axis=1)
+    return back[..., 0] * ahead[..., 1] - back[..., 1] * ahead[..., 0]
+
+
+def every_layer(source, side: int) -> list:
+    return [source.view(layer) for layer in range(side)]
+
+
 def inside(points: np.ndarray, quads: np.ndarray) -> np.ndarray:
     count = np.zeros(len(points), dtype=np.int64)
     for quad in quads:
@@ -71,8 +83,8 @@ class FakeSource:
         self.length = self.length * 0.99
         self.steps += 1
 
-    def view(self):
-        return cell_pieces(self.SIDE, self.kind, self.length, self.packing)
+    def view(self, layer=None):
+        return cell_pieces(self.SIDE, self.kind, self.length, self.packing, layer=layer)
 
     def stats(self):
         return {"volumes": int((self.kind == 1).sum()), "joints": int((self.kind == -1).sum()), "size": 1.0}

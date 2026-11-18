@@ -4,13 +4,16 @@ What things are when cells are laid out. Records, constants and formulas only.
 
 - `kinds.py`: the engine's three kind numbers, written again so drawing loads without
   the engine. `source/logic/tests/` checks them against the engine's.
-- `pieces.py`: `Pieces`, one row per living cell: its block's 8 corners, id, kind,
-  packing, lattice place.
-- `fit_marks.py`: the fit's fixed numbers. None is a physics setting.
+- `pieces.py`: `Pieces`, one row per laid-out cell: its block's 8 corners, id, kind,
+  packing, lattice place; the frame; whether sizes were limited.
+- `warp_marks.py`: the warp's fixed numbers. None is a physics setting.
+- `regular_planes.py`: the corner planes of the perfect grid along one axis.
+- `pull_weights.py`: how far a slot's size moves each plane of its row.
 - `lattice_place.py`: slot number to (i, j, k). All even: an energy volume. One odd
   index: a face joint; two: an edge joint; three: a corner joint.
 - `drawn_length.py`: a cell's length as drawn (gone: 0; endless: the longest finite).
-- `slot_widths.py`: how wide each slot is along x, y and z.
+- `slot_widths.py`: how wide each slot of a box is along x, y and z. It takes the box
+  with one more place all round; the caller wraps the lattice.
 
 ## Must not get wrong
 

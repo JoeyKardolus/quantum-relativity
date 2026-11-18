@@ -2,8 +2,8 @@
 
 What a source is.
 
-- `source_interface.py`: `Source`, a Protocol: `reset()`, `step()`, `steps`, `view()`,
-  `stats()`. The stepper and the saved pictures ask for nothing else.
+- `source_interface.py`: `Source`, a Protocol: `reset()`, `step()`, `steps`,
+  `view(layer=None)`, `stats()`. The stepper and the saved pictures ask for nothing else.
 - `stat_names.py`: `STAT_NAMES`, the nine counts the title reads.
 
 ## Must not get wrong

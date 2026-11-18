@@ -6,11 +6,14 @@ pattern)` takes what `grid_triangles` returns: float32 (n, k, 3) corner points o
 cells, uint8 (n, 4) RGBA per cell and the triangles of every cell as corner numbers
 (at most MAX_PATTERN); n may change. It raises ValueError when the shapes disagree or
 the cells do not fit a buffer texture. `draw(view_projection, width, height,
-face_shade=(1, 1, 1), opacity_power=1)` draws them on the bound framebuffer, blended
-over what is there: each cell in its colour, its opacity (alpha) raised to
+face_shade=(1, 1, 1), opacity_power=1, outline=0)` draws them on the bound framebuffer,
+blended over what is there: each cell in its colour, its opacity (alpha) raised to
 `opacity_power`, each face darkened by `face_shade` for the axis it faces, hard edges,
-no light of its own, no lines, both sides of every triangle. view_projection is a
-(4, 4) row-major world-to-clip matrix (`orbit_camera`).
+no light of its own, both sides of every triangle. With `outline` above 0 every cell's
+outline is then drawn over them in its plain hue at that opacity, whatever its fill
+(FACE_LINES for four-cornered cells, BLOCK_LINES for blocks), set in by OUTLINE_INSET so
+neighbours' outlines lie side by side. view_projection is a (4, 4) row-major
+world-to-clip matrix (`orbit_camera`).
 
 Depth is read by order, not by a depth buffer: the cells are sorted far to near by
 their centres (`far_to_near`) whenever the cells or the view changed, and drawn in
@@ -26,7 +29,8 @@ import ctypes
 import numpy as np
 from pyglet import gl
 
-from physics.view.drawing.definitions.block_faces import MAX_PATTERN
+from physics.view.colours.definitions.palette import OUTLINE_INSET
+from physics.view.drawing.definitions.block_faces import BLOCK_LINES, FACE_LINES, MAX_PATTERN
 from physics.view.drawing.definitions.shader_text import FRAGMENT, VERTEX
 from physics.view.drawing.logic.far_to_near import far_to_near
 from physics.view.drawing.logic.link_program import link_program
@@ -38,6 +42,7 @@ class CellMesh:
     def __init__(self) -> None:
         self.program = link_program(VERTEX, FRAGMENT)
         self.count, self.corners_per_cell, self.pattern_length = 0, 0, 0
+        self._pattern = np.zeros(0, dtype=np.int32)
         self._centres = np.zeros((0, 3), dtype=np.float32)
         self._sorted_for = None
         limit = gl.GLint()
@@ -77,18 +82,16 @@ class CellMesh:
             gl.glBindBuffer(gl.GL_ARRAY_BUFFER, buffer)
             gl.glBufferData(gl.GL_ARRAY_BUFFER, values.nbytes, values.ctypes.data, gl.GL_STREAM_DRAW)
         gl.glUseProgram(self.program)
-        padded = np.zeros(MAX_PATTERN, dtype=np.int32)
-        padded[:len(pattern)] = pattern
-        gl.glUniform1iv(self._where("pattern"), MAX_PATTERN, padded.ctypes.data_as(ctypes.POINTER(gl.GLint)))
         gl.glUniform1i(self._where("corners_per_cell"), corners.shape[1])
         gl.glUseProgram(0)
+        self._pattern = pattern
         self.count, self.corners_per_cell, self.pattern_length = corners.shape[0], corners.shape[1], len(pattern)
         self._centres = corners.mean(axis=1) if self.count else np.zeros((0, 3), dtype=np.float32)
         self._sorted_for = None
 
     def draw(self, view_projection: np.ndarray, width: int, height: int,
-             face_shade: tuple = (1.0, 1.0, 1.0), opacity_power: float = 1.0) -> None:
-        """Draw the cells far to near, each blended over what lies behind it."""
+             face_shade: tuple = (1.0, 1.0, 1.0), opacity_power: float = 1.0, outline: float = 0.0) -> None:
+        """Draw the cells far to near, each blended over what lies behind it, then their outlines."""
         matrix = np.asarray(view_projection, dtype=np.float32)
         if self._sorted_for is None or not np.array_equal(self._sorted_for, matrix):
             order = far_to_near(self._centres, matrix)
@@ -110,12 +113,25 @@ class CellMesh:
             gl.glBindTexture(gl.GL_TEXTURE_BUFFER, texture)
             gl.glUniform1i(self._where(name), unit)
         gl.glBindVertexArray(self._array)
+        self._pass(self._pattern, 0.0, 0.0)
         gl.glDrawArraysInstanced(gl.GL_TRIANGLES, 0, self.pattern_length, self.count)
+        if outline > 0.0 and self.corners_per_cell in (4, 8):
+            lines = FACE_LINES if self.corners_per_cell == 4 else BLOCK_LINES
+            self._pass(lines, OUTLINE_INSET, outline)
+            gl.glDrawArraysInstanced(gl.GL_LINES, 0, len(lines), self.count)
         gl.glBindVertexArray(0)
         gl.glActiveTexture(gl.GL_TEXTURE0)
         gl.glBindTexture(gl.GL_TEXTURE_BUFFER, 0)
         gl.glUseProgram(0)
         gl.glDisable(gl.GL_BLEND)
+
+    def _pass(self, pattern: np.ndarray, inset: float, outline: float) -> None:
+        """Set what one pass draws: the corner numbers of its vertices, the inset and the outline opacity."""
+        padded = np.zeros(MAX_PATTERN, dtype=np.int32)
+        padded[:len(pattern)] = pattern
+        gl.glUniform1iv(self._where("pattern"), MAX_PATTERN, padded.ctypes.data_as(ctypes.POINTER(gl.GLint)))
+        gl.glUniform1f(self._where("inset"), float(inset))
+        gl.glUniform1f(self._where("outline"), float(outline))
 
     def _where(self, name: str) -> int:
         return gl.glGetUniformLocation(self.program, name.encode())

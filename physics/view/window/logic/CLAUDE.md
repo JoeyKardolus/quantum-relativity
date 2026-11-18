@@ -15,8 +15,10 @@ What happens while the window is open.
   source.
 - Stats are read at most every `STATS_EVERY` seconds, and at once after a reset, a
   pause or a change of view.
-- The view is fitted on the first snapshot, after a reset, on F, and when the grid
-  outgrows the last fit. Turning is kept.
+- The view is fitted to every snapshot's frame, times the wheel's zoom; F undoes the
+  zoom. Turning is kept.
+- The stepper lays out one layer per snapshot, and the packed cells too only while
+  the whole grid shows.
 - Closing the window stops the stepper.
 - `tests/` checks the title against one exact line, and the stepper on a plain-array
   source, including a source that raises.

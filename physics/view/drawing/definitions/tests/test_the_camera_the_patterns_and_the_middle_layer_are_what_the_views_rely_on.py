@@ -1,8 +1,10 @@
 """The drawing's definitions, on numbers worked out by hand."""
 import numpy as np
 
-from physics.view.drawing.definitions.block_faces import BLOCK_PATTERN, FACE_PATTERN, FACE_SHADE, MAX_PATTERN
-from physics.view.drawing.definitions.camera_marks import CORNER, FACING, FOV_DEGREES, LEVELS
+from physics.view.drawing.definitions.block_faces import (BLOCK_LINES, BLOCK_PATTERN, FACE_LINES, FACE_PATTERN,
+                                                          FACE_SHADE, MAX_PATTERN)
+from physics.view.drawing.definitions.camera_marks import CORNER, FACE_FILL, FACING, FILL, FOV_DEGREES, LEVELS
+from physics.view.drawing.definitions.place_pixels import place_pixels
 from physics.view.drawing.definitions.middle_layer import middle_layer
 from physics.view.drawing.definitions.orbit_camera import orbit_camera
 from physics.view.drawing.definitions.shader_text import FRAGMENT, VERTEX
@@ -26,6 +28,20 @@ def test_a_blocks_twelve_triangles_are_two_on_each_of_its_six_faces():
     assert len(BLOCK_PATTERN) == MAX_PATTERN == 36 and FACE_PATTERN.tolist() == [0, 1, 2, 0, 2, 3]
     assert "pattern[36]" in VERTEX and "opacity_power" in FRAGMENT and "face_shade" in FRAGMENT
     assert len(FACE_SHADE) == 3 and len(set(FACE_SHADE)) == 3 and max(FACE_SHADE) == 1.0, "each axis its own shade"
+
+
+def test_an_outline_is_the_four_sides_of_a_face_and_the_twelve_edges_of_a_block():
+    assert FACE_LINES.reshape(4, 2).tolist() == [[0, 1], [1, 2], [2, 3], [3, 0]]
+    edges = BLOCK_LINES.reshape(12, 2)
+    assert len({tuple(edge) for edge in edges.tolist()}) == 12 and len(BLOCK_LINES) <= MAX_PATTERN
+    assert all(bin(low ^ high).count("1") == 1 for low, high in edges.tolist()), "an edge joins corners one axis apart"
+    assert "inset" in VERTEX and "outline" in FRAGMENT
+
+
+def test_a_place_is_as_many_pixels_wide_as_the_view_shows_it_and_the_slice_is_fitted_closer():
+    assert np.isclose(place_pixels([-50, -50, -50], [50, 50, 50], 10, 100.0, 800, 90.0), 10.0 * 800 / 200.0)
+    assert place_pixels([0, 0, 0], [1, 1, 1], 10, 2.0, 800) == 2 * place_pixels([0, 0, 0], [1, 1, 1], 10, 4.0, 800)
+    assert 0 < FACE_FILL < FILL
 
 
 def test_the_camera_puts_its_centre_in_the_middle_and_right_is_right_and_up_is_up():

@@ -3,7 +3,8 @@
 What happens when the engine is read. Everything here imports the engine (Warp).
 
 - `grid_pieces.py`: the engine's `Grid` to `Pieces`: host copies of six per-cell
-  arrays, then `torn_lines`, `relative_packing`, `cell_pieces`.
+  arrays, then `torn_lines`, `cell_pieces` for one layer or for the `packed_cells`,
+  and `relative_packing` of the pieces only.
 - `cell_stats.py`: counts for the title from the engine's `measure_grid`, `read_books`
   and its `collapses` and `tears`.
 - `cells_source.py`: `CellsSource`, the engine behind the `Source` interface.

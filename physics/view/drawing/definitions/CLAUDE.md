@@ -3,8 +3,10 @@
 What the two views are made of. Constants and formulas.
 
 - `shown_kinds.py`: energy volumes, joints, or both.
-- `block_faces.py`: a block's 12 triangles, a slice face's 2, the face shades.
-- `camera_marks.py`: field of view, the corner and facing angles, fit and refit numbers.
+- `block_faces.py`: a block's 12 triangles, a slice face's 2, the face shades, and
+  the outlines: a face's 4 lines, a block's 12.
+- `camera_marks.py`: field of view, the corner and facing angles, the two fits.
+- `place_pixels.py`: how many pixels wide a lattice place is on screen.
 - `middle_layer.py`: the even lattice layer nearest the middle.
 - `orbit_camera.py`: the world-to-clip matrix of a camera circling a centre.
 - `shader_text.py`: the GLSL text. It is only text here; nothing compiles it.

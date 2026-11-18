@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from physics.view.colours.definitions.palette import JOINT_BLUE, VOLUME_RED
-from physics.view.drawing.definitions.camera_marks import FILL, REFIT_GROWTH
+from physics.view.drawing.definitions.camera_marks import FACE_FILL, FILL
 from physics.view.drawing.definitions.orbit_camera import orbit_camera
 from physics.view.drawing.definitions.shown_kinds import SHOW_BOTH, SHOW_ENERGY_VOLUMES, SHOW_JOINTS
 from physics.view.drawing.logic.far_to_near import far_to_near
@@ -59,10 +59,10 @@ def test_three_cells_in_a_row_along_z_come_back_farthest_first():
     assert far_to_near(centres, orbit_camera(np.zeros(3), 10.0, np.pi, 0.0, 1.0)).tolist() == [0, 2, 1]
 
 
-def test_the_view_is_fitted_to_the_widest_side_and_again_only_when_the_grid_outgrows_it():
+def test_the_view_is_fitted_to_the_frames_widest_side_and_closer_for_the_slice():
     centre, distance, extent = view_fit([-1.0, 0.0, 2.0], [3.0, 2.0, 12.0], 60.0)
     assert centre.tolist() == [1.0, 1.0, 7.0] and extent == 10.0 and np.isclose(distance, FILL * 10.0 / 0.5)
-    assert view_fit([0, 0, 0], [REFIT_GROWTH * 10.0, 1, 1], 60.0, fitted_extent=10.0) is None
-    assert view_fit([0, 0, 0], [REFIT_GROWTH * 10.0 + 0.1, 1, 1], 60.0, fitted_extent=10.0) is not None
-    assert view_fit([0, 0, 0], [1, 1, 1], 60.0, fitted_extent=10.0) is None, "shrinking never refits"
+    assert np.isclose(view_fit([-1.0, 0.0, 2.0], [3.0, 2.0, 12.0], 60.0, FACE_FILL)[1], FACE_FILL * 10.0 / 0.5)
     assert view_fit([0, 0, 0], [0.1, 0.1, 0.1], 60.0)[2] == 1.0
+    assert np.isclose(view_fit([0, 0, 0], [20, 20, 20], 60.0)[1], 2 * view_fit([0, 0, 0], [10, 10, 10], 60.0)[1]), \
+        "a frame twice as wide is seen from twice as far: the grid stays still on screen"

@@ -6,7 +6,9 @@ that has the same five names fit it
   reset()   back to a fresh start, step 0
   step()    one step
   steps     steps since the last reset
-  view()    the grid now as a `Pieces` record
+  view(layer=None)  the grid now as a `Pieces` record: the cells of lattice layer
+            `layer` along z, laid out flat; with None the cells the whole grid shows
+            as blocks (a source decides which: the engine's hands the packed ones)
   stats()   a dict of counts for the title; its names are in stat_names.py, and a
             missing one shows as "?"
 """
@@ -29,8 +31,8 @@ class Source(Protocol):
     def step(self) -> None:
         """One step."""
 
-    def view(self) -> Pieces:
-        """The grid now."""
+    def view(self, layer: int | None = None) -> Pieces:
+        """One layer of the grid now, or the cells the whole grid shows."""
 
     def stats(self) -> dict:
         """Counts for the title."""

@@ -2,9 +2,10 @@
 
 Contract: `cell_colours(kind, relative)` returns uint8 (n, 4) RGBA. The hue is the
 kind: an energy volume VOLUME_RED, anything else JOINT_BLUE. The opacity (alpha / 255)
-is `opacity_law` of the packing over the start's mean, so a lump turns solid as it
-gathers energy and a thinned cell fades to nothing. This is the opacity of one layer of
-cells over black (the slice); the whole grid raises it to WHOLE_POWER when it draws.
+is `opacity_law` of the packing over the start's mean, so the calm background is clear
+and a lump turns solid as it gathers energy. This is the fill of one layer of cells over
+black (the slice); the whole grid raises it to WHOLE_POWER when it draws. The outline,
+which shows a clear cell too, is the drawer's (`outline_opacity`).
 """
 from __future__ import annotations
 

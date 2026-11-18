@@ -5,8 +5,9 @@ The engine read as something to draw. The only directory in the viewer that impo
 
 - `definitions/`: the source interface and the names of the counts the title shows.
 - `logic/`: the engine's grid as pieces, its counts, and `CellsSource`.
-- `tests/`: real engine runs with collapses and with tears; every living cell is drawn
-  once and never changes slot.
+- `tests/`: real engine runs with collapses and with tears: every living cell is drawn
+  once and never changes slot; and the two lumps scene and the default universe: no
+  drawn cell folds or overlaps another, nothing jumps between steps.
 
 ## Must not get wrong
 
