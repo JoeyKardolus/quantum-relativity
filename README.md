@@ -19,7 +19,7 @@ Everything in the simulation has to follow from these seven sentences, and from 
    warp the grid by making their cells small. Planck boxes are not space: they sit inside each cell only
    to compute its fluid.
 4. **Crossing**: energy diffuses between plus swirls only through minus; that is the only friction, and
-   it becomes heat.
+   what friction holds back stays as energy in the volume it came from.
 5. **Packing**: more packed is smaller, slower and pulls harder; pull spreads at a finite speed, weaker
    with distance; squeezed minus pushes back steeply.
 6. **Limits**: a joint's energy rises only while it is squeezed, so a fresh joint is the fattest it will
