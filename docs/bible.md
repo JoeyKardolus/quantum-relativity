@@ -970,6 +970,8 @@ stronger than gravity, so each force needs its own strength. Measured 2026-11-17
 
 ### How results are trusted
 
+**Light on compute** (owner, 2026-11-18, hard rule): a fit is earned, not routine: at most one a night, started only on the owner's say or once a phase's scenes already work by hand. Never more than one run of this project on the graphics card at a time. Every test and probe is the smallest grid and fewest steps that can show the thing, seconds not minutes; think from the code and one measurement before running another; no sweeps to see what happens. The test suite stays quick.
+
 **The fit goes in phases** (owner, 2026-11-18; this replaces fitting on expansion and structure first). Phase 1 fits only for gravity to work somewhat normally: two lumps fall toward each other as bodies, sideways motion keeps going, the pull fades as one over distance squared, one lump can go round another. Only when that holds is the next layer added (expansion, structure, black holes, quantum), one at a time, each fitted on top of the last without breaking the layers below. No scorecard and no result pages until phase 1 holds; results are shown in the viewer.
 
 Validation comes first: a measurement is trusted only after it gives the known answer on a
