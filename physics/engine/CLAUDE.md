@@ -1,9 +1,10 @@
 # physics/engine
 
-Layer 2: `three_cells()` lays a volume, a fresh joint and a volume in a line; `four_volumes()` (`axiom_3_structure/logic/lay_square.py`) four volumes in a square with their four joints. `step(store)` moves the fluid, lets it cross, reads the squeeze, lets the squeezed joint make quanta and presses its fluid. `one_cell()` is layer 1's; `calm_cells()` lays rules.
+`calm_grid()` (`axiom_3_structure/logic/lay_grid.py`) lays a grid that wraps round, every cell own. `three_cells()`: a volume, a fresh joint, a volume (a ring whose second joint is empty). `one_cell()` is layer 1's; `calm_cells()` lays rules. `step(store)` moves the fluid, lets it cross, reads the squeeze, lets squeezed joints make quanta and presses their fluid.
 
-One directory per axiom. Axioms 1 to 6 hold code; 7 waits for its layer.
+One directory per axiom. Axioms 1 to 6 hold code; 7 waits.
 
-- A step runs only over cells that hold their own boxes. Nothing is copied to the host inside a step.
-- All of it runs the same on the CPU and on the card. Tests use the CPU.
-- The same scene runs the same course at 6, 12 and 24 boxes across, counted in turns of a calm swirl (tested).
+- A step runs only over own cells. Nothing is copied to the host inside a step.
+- CPU and card run alike. Tests use the CPU.
+- The same scene runs the same course at 6, 12 and 24 boxes across, in turns of a calm swirl (tested).
+- Measured on the card, 6 boxes: 64 volumes 1,735 steps a second, 512 volumes 1,141.

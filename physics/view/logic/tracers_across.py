@@ -30,7 +30,8 @@ def _carry_across(quanta: wp.array2d(dtype=wp.int32), phase: wp.array2d(dtype=wp
     if line < 0.0:  # not in its cell's last box: in its first, the pair's volume after?
         line, way = line + float(across), -1
     joint = cell_beside(grid, own_cell[slot], axis, way)
-    if line < 0.0 or line >= 2.0 or joint < 0 or cell_quanta[own_cell[slot]] <= 0:
+    between = slot_at(tile_home, tile_slots, joint)
+    if line < 0.0 or line >= 2.0 or between < 0 or cell_quanta[own_cell[slot]] <= 0:
         return
     other = volume_beside(cell_quanta, grid, joint, axis, way)
     if other < 0 or slot_at(tile_home, tile_slots, other) < 0:
@@ -39,10 +40,10 @@ def _carry_across(quanta: wp.array2d(dtype=wp.int32), phase: wp.array2d(dtype=wp
     if way < 0:
         low, high = high, slot
     stride = stride_of(across, axis)
-    first = row_of(wp.clamp(int(place[1 - axis]), 0, across - 1),
-                   wp.clamp(int(place[2]), 0, across - 1), across, axis)
+    first = row_of(wp.clamp(int(place[(axis + 1) % 3]), 0, across - 1),
+                   wp.clamp(int(place[(axis + 2) % 3]), 0, across - 1), across, axis)
     last = first + (across - 1) * stride
-    minus = row_minus(quanta, slot_at(tile_home, tile_slots, joint), first, stride, across)
+    minus = row_minus(quanta, between, first, stride, across)
     if minus <= wp.float64(0.0):
         return
     low_has, high_has = quanta[low, last], quanta[high, first]

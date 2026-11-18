@@ -54,10 +54,11 @@ def _carry(quanta: wp.array2d(dtype=wp.int32), phase: wp.array2d(dtype=wp.float3
     tail[write_row, tracer] = place
 
 
-def lay_tracers(store, cell: int, count: int = COUNT, seed: int = 1, cells: int = 1) -> Tracers:
-    """`count` tracers at rest, laid over the boxes of `cells` cells from `cell` on by quanta."""
+def lay_tracers(store, cell: int, count: int = COUNT, seed: int = 1, cells: int = 1,
+                shown=1) -> Tracers:
+    """`count` tracers at rest in `cells` cells from `cell` on, by the quanta of boxes `shown`."""
     box_quanta, _phase, slot = boxes_of(store, cell)
-    quanta = np.abs(box_quanta[slot:slot + cells].numpy().ravel())
+    quanta = (np.abs(box_quanta[slot:slot + cells].numpy()) * shown).ravel()
     chance = np.random.default_rng(seed)
     boxes = chance.choice(quanta.size, size=count, p=quanta / quanta.sum())
     corner = np.stack(np.unravel_index(boxes % store.across ** 3, (store.across,) * 3), axis=1)
@@ -69,12 +70,11 @@ def lay_tracers(store, cell: int, count: int = COUNT, seed: int = 1, cells: int 
 def step_carrying(store, tracers: Tracers, cell: int, mark: bool, boxes: tuple = None,
                   cells: int = 1) -> None:
     """One step of the engine with the tracers carried along; `mark` lengthens their tails."""
-    new = (tracers.head + 1) % MARKS if mark else tracers.head
     # `boxes` saves asking again: a calm cell's stay good, its flow is the same every step
+    new = (tracers.head + 1) % MARKS if mark else tracers.head
     line = (*(boxes or boxes_of(store, cell)), cells, store.across)
     def carry(axis: int, parity: int) -> None:
         wp.launch(_carry, dim=tracers.tail.shape[1], device=tracers.tail.device,
                   inputs=[*line, axis, parity, tracers.head, new, tracers.tail])
         tracers.head = new
-
     step(store, carry, lambda axis: carry_across(store, axis, cells, tracers.tail, tracers.head))

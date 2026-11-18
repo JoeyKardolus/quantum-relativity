@@ -10,13 +10,14 @@ drawn anywhere. `FULL` and `THICK` only draw; they were set by eye once (2026-11
 from physics.view.definitions.camera import FOCAL, NEAREST
 
 FULL = 0.6     # fluid that goes this many boxes in one mark is drawn fully solid
-THICK = 0.002  # a streak's thickness in cell edges; thinner than a picture dot, it is clearer
+THICK = 0.002  # a streak's thickness in cell edges; thinner than a picture dot, it is clearer.
+# A grid's eye stands further off by its volumes along, and its streaks are that much thicker.
 
 VERTEX = f"""#version 330 core
 in vec4 place;  // a mark's place in boxes, and how far the tracer went to reach it
 in float fade;  // 0 at the oldest mark of a tail, 1 at the newest
 uniform vec3 eye, right, up, forward;
-uniform float across, tall, aspect;
+uniform float across, tall, aspect, thick;
 out float solid;
 out float minus;
 void main() {{
@@ -26,7 +27,7 @@ void main() {{
                        depth - {NEAREST}, depth);
     minus = float(place.w < 0.0);  // a joint's fluid: its way gone is given below 0
     float energy = min(place.w * place.w / {FULL * FULL}, 1.0);
-    float dots_thick = {THICK * FOCAL * 0.5} * tall / max(depth, {0.5 * NEAREST});
+    float dots_thick = thick * {THICK * FOCAL * 0.5} * tall / max(depth, {0.5 * NEAREST});
     solid = fade * energy * min(dots_thick, 1.0);
 }}"""
 

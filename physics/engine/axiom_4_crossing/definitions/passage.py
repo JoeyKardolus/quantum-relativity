@@ -1,6 +1,6 @@
 """Passage: how freely plus energy passes a joint, read off the joint's own fluid.
 
-A joint stands between two volumes along the boxes' first or second direction, its axis.
+A joint stands between two volumes along one of the boxes' three directions, its axis.
 A box of the one volume that faces the joint and the box of the other facing it are
 joined by the row of the joint's boxes between them (`row_of`, `stride_of`). `row_minus`
 is the minus quanta of that row, a box. Crossing energy rubs against them: `rub_share` is
@@ -21,16 +21,19 @@ from physics.engine.axiom_3_structure.definitions.kinds import ACROSS
 
 @wp.func
 def stride_of(across: wp.int32, axis: wp.int32) -> wp.int32:
-    """How far apart in a block two boxes lie that follow each other along `axis` (0 or 1)."""
+    """How far apart in a block two boxes lie that follow each other along `axis` (0, 1 or 2)."""
     if axis == 0:
         return across * across
-    return across
+    if axis == 1:
+        return across
+    return 1
 
 
 @wp.func
 def row_of(first: wp.int32, third: wp.int32, across: wp.int32, axis: wp.int32) -> wp.int32:
-    """The first box of the row along `axis` that lies `first` across it and `third` deep."""
-    return first * (across * across + across - stride_of(across, axis)) + third
+    """The first box of the row along `axis`: `first`, `third` along the two directions after it."""
+    return (first * stride_of(across, (axis + 1) % 3)
+            + third * stride_of(across, (axis + 2) % 3))
 
 
 @wp.func

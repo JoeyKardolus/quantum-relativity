@@ -1,7 +1,5 @@
-"""The engine, layer 2: volumes whose fluid turns as whole swirls, and the joints they squeeze.
-`calm_cells` lays cells as rules, `one_cell` is one cell with its own boxes, `three_cells` a
-volume, a joint and a volume; `step` moves the fluid, lets it cross and squeezes the joints.
-"""
+"""The engine: `calm_cells` lays cells as rules, `one_cell` one cell with its own boxes,
+`three_cells` a volume, a joint and a volume; `step` steps them. The full grid: `lay_grid.py`."""
 import warp as wp
 
 from physics.engine.axiom_1_energy.logic.flow_inside import flow_inside
@@ -58,10 +56,11 @@ LINE_PARTS = (3, -2, 1)  # halves of a calm volume's quanta: volume A, the joint
 def three_cells(across: int = ACROSS, seed: int = 1, device: str = "cpu",
                 parts: tuple = LINE_PARTS) -> Store:
     """A volume, a joint and a volume in a line, each with its own boxes and one whole swirl."""
-    store = calm_cells(3, 3, across, seed=seed, device=device)
-    for cell, halves in enumerate(parts):
+    store = calm_cells(4, 3, across, seed=seed, device=device)  # a ring; its 4th place is empty
+    for cell, halves in enumerate((*parts, 0)):
         put(store.cell_quanta, cell, halves * QUANTA_A_BOX * across ** 3 // 2)
         put(store.cell_laid, cell, 4 + cell // 2 % 2)  # each volume the mirror of the one before
+    for cell in range(3):
         take_own(store, cell)
     return store
 
@@ -70,7 +69,7 @@ def step(store: Store, before_pass=None, before_cross=None) -> None:
     """One step: the fluid moves inside every own cell and crosses; squeezed joints make quanta.
 
     `before_pass(axis, parity)` lets a watcher look before each of the six passes inside,
-    `before_cross()` before the crossing. A calm cell's step is the count.
+    `before_cross(axis)` before each direction's crossing. A calm cell's step is the count.
     """
     flow_inside(store, before_pass)
     cross(store, before_cross)

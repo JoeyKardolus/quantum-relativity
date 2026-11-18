@@ -8,7 +8,7 @@ import numpy as np
 import warp as wp
 
 from physics.engine.axiom_3_structure.definitions.kinds import QUANTA_A_BOX
-from physics.engine.axiom_3_structure.definitions.grid import volume_beside
+from physics.engine.axiom_3_structure.definitions.grid import axis_of, volume_beside
 from physics.engine.axiom_3_structure.definitions.store import Store, slot_at, slot_of
 from physics.engine.axiom_5_packing.definitions.pull_push import (
     apart_of, pull_across, push_back)
@@ -23,18 +23,18 @@ def _squeeze(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.in
     joint = own_cell[wp.tid()]
     slot, none = wp.tid(), wp.float64(0.0)
     own_squeeze[slot] = wp.vec4d(none, none, none, none)
-    for axis in range(2):
-        before = volume_beside(cell_quanta, grid, joint, axis, -1)
-        after = volume_beside(cell_quanta, grid, joint, axis, 1)
-        if before < 0 or after < 0:
-            continue  # only a joint with a volume on both sides along an axis is pulled across
-        if slot_at(tile_home, tile_slots, before) < 0 or slot_at(tile_home, tile_slots, after) < 0:
-            continue  # a calm volume does not press yet (layer 3)
-        held = wp.float64(-cell_quanta[joint]) / calm
-        left, right = wp.float64(cell_quanta[before]) / calm, wp.float64(cell_quanta[after]) / calm
-        if held > none:
-            own_squeeze[slot] = wp.vec4d(pull_across(left, right, held), push_back(held),
-                                         apart_of(left, right, held), wp.float64(axis))
+    axis = axis_of(grid, joint)
+    before = volume_beside(cell_quanta, grid, joint, wp.max(axis, 0), -1)
+    after = volume_beside(cell_quanta, grid, joint, wp.max(axis, 0), 1)
+    if axis < 0 or before < 0 or after < 0:
+        return  # only a joint between two volumes is pulled across
+    if slot_at(tile_home, tile_slots, before) < 0 or slot_at(tile_home, tile_slots, after) < 0:
+        return  # a calm volume does not press yet
+    held = wp.float64(-cell_quanta[joint]) / calm
+    left, right = wp.float64(cell_quanta[before]) / calm, wp.float64(cell_quanta[after]) / calm
+    if held > none:
+        own_squeeze[slot] = wp.vec4d(pull_across(left, right, held), push_back(held),
+                                     apart_of(left, right, held), wp.float64(axis))
 
 
 def squeeze(store: Store) -> None:

@@ -17,7 +17,7 @@ def _run(parts: tuple, steps: int):
         gained = before - int(held[1])
         assert gained >= 0 and (gained == 0 or pull > push)  # never falls; rises only squeezed
         assert held[1] == parts[1] * 324_000 - store.cell_made.numpy()[1]  # booked to the quantum
-        assert held[0] + held[2] == plus and (held == store.cell_quanta.numpy()).all()
+        assert held[0] + held[2] == plus and (held == store.cell_quanta.numpy()[:3]).all()
     return store
 
 

@@ -1,12 +1,11 @@
 # View, logic
 
-`tracers.py` (the dots the flow carries), `tracers_across.py` (over a joint), `streaks.py` and `line_streaks.py` (their tails as what the card draws), `placed.py` (where each cell is drawn, from the engine's squeeze), `scene.py` (one cell, the line or the square), `swirl_painter.py` (OpenGL: the buffer, `load`, `draw`), `picture.py` (one drawing read back, for files and tests), `cell_window.py` (window and keys), `window.py` (the door and `--pictures`), `save_png.py`, `title_line.py`.
+`tracers.py`, `tracers_across.py` (dots the flow carries), `streaks.py`, `line_streaks.py` (their tails), `placed.py` (where each cell is drawn), `scene.py` (scenes, the cut), `swirl_painter.py`, `picture.py`, `cell_window.py` (keys), `window.py` (the door), `save_png.py`, `title_line.py`.
 
-- A tracer moves before each of a step's six passes (the engine's `before_pass`), by that pass's own pair rotation. Moved once a step instead, they drift into the core (measured).
+- A tracer moves before each of a step's six passes; moved once a step, tracers drift into the core.
 - A tracer's second number names its cell's slot, `across` a slot.
-- `COUNT`, `MARKS`, `MARK_EVERY`, `BOXES`, `LINE_BOXES`, `AT_MEAN`, `SPEED`, `FRAMES` and `TICKS` only draw. Set by eye once; do not move them.
-- No kernel argument may be a C++ word (`new`): the CPU build fails.
-- pyglet is imported only when a window opens. Under WSL2 the two Mesa settings in `window.py` come before it; Warp and OpenGL then share no memory, so `load` copies by the host (4 MB a tick, straight into pyglet's own copy of the buffer).
-- Never call `.numpy()`, `peek` or `boxes_of` in a frame, and in a tick only what must be: each waits for the card. `boxes_of` on a calm cell deals all its boxes on one thread (8 ms); the window asks once and keeps the answer.
-- The title is worked out twice a second and costs 12 ms (`swirl_of`), one late frame each time.
-- The picture tests skip where no window can open.
+- The cut's tracers are laid in the two middle layers of boxes of one layer's cells. Joints from layer to layer are in no cut.
+- A streak the other way round the wrap is not drawn.
+- Drawing numbers (`COUNT`, `MARKS`, `AT_MEAN`, `SPEED`, `TICKS`) were set by eye once; do not move them.
+- No kernel argument may be a C++ word.
+- Never call `.numpy()` in a frame. Under WSL2 `load` copies by the host.

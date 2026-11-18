@@ -19,13 +19,13 @@ def _still(parts: tuple, a_phase=0.0):
 
 
 def test_the_books_are_exact_over_2000_steps():
-    store, heat = three_cells(), np.zeros(3)
+    store, heat = three_cells(), np.zeros(4)  # the ring's fourth place is empty
     for _ in range(2000):
         step(store)
         held = store.box_quanta.numpy().astype(np.int64).sum(axis=1)
         assert held[0] + held[2] == 1_296_000
         assert held[1] == -648_000 - store.cell_made.numpy()[1]  # the joint only makes
-        assert (held == store.cell_quanta.numpy()).all() and store.box_quanta.numpy()[[0, 2]].min() >= 0
+        assert (held == store.cell_quanta.numpy()[:3]).all() and store.box_quanta.numpy()[[0, 2]].min() >= 0
         assert (store.cell_heat.numpy() >= heat).all() and store.cell_heat.numpy()[1] == 0
         heat = store.cell_heat.numpy()
     assert abs(held[0] - held[2]) < 0.01 * 1_296_000 and heat[2] > 0  # A 3 to B 1 has evened out
@@ -35,7 +35,7 @@ def test_nothing_crosses_where_no_joint_lies_between():
     store = three_cells(parts=(3, 0, 1))
     for _ in range(200):
         step(store)
-    assert store.cell_quanta.numpy().tolist() == [972_000, 0, 324_000]
+    assert store.cell_quanta.numpy().tolist() == [972_000, 0, 324_000, 0]
     assert store.cell_heat.numpy().max() == 0
 
 

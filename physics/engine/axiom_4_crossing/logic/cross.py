@@ -1,8 +1,8 @@
 """Cross: one step of plus energy crossing every joint that lies between two volumes.
 
-A joint's two volumes follow from its place (`volume_beside`). A volume is laid as the
-mirror of the volume before it (the other sense, like meshing gears), so two calm volumes'
-facing fluid agrees. Each box of the one volume that faces the joint moves with the box of
+A joint's axis and its two volumes follow from its place (`axis_of`, `volume_beside`). A
+volume is laid as the mirror of the volume before it (the other sense, like meshing gears),
+so two calm volumes' facing fluid agrees. Each box of the one volume that faces the joint moves with the box of
 the other facing it, by the pair rotation at the joint's `passing_turn`: energy goes the
 way its phase carries it and arrives with its phase, so it is still moving. Friction then
 takes its share of the motion across, and that share of the whole quanta that crossed is
@@ -14,7 +14,7 @@ import warp as wp
 from physics.engine.axiom_1_energy.definitions.draw_uniform import draw_uniform
 from physics.engine.axiom_1_energy.definitions.pair_rotation import pair_rotation, phase_of, wave_of
 from physics.engine.axiom_1_energy.definitions.whole_move import whole_move
-from physics.engine.axiom_3_structure.definitions.grid import volume_beside
+from physics.engine.axiom_3_structure.definitions.grid import axis_of, volume_beside
 from physics.engine.axiom_3_structure.definitions.store import slot_at
 from physics.engine.axiom_4_crossing.definitions.passage import (
     layer_part, less_step, passing_turn, row_minus, row_of, rub_share, stride_of)
@@ -33,8 +33,8 @@ def _cross(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int3
     row = row_of(first, third, across, axis)  # the row's first box, facing the volume before
     before = volume_beside(cell_quanta, grid, joint, axis, -1)
     after = volume_beside(cell_quanta, grid, joint, axis, 1)
-    if before < 0 or after < 0:
-        return  # only a joint with a volume on both sides along this axis lets energy cross
+    if axis_of(grid, joint) != axis or before < 0 or after < 0:
+        return  # only a joint that lies along this axis between two volumes lets energy cross
     left, right = slot_at(tile_home, tile_slots, before), slot_at(tile_home, tile_slots, after)
     minus = row_minus(box_quanta, slot, row, stride, across)
     if left < 0 or right < 0 or minus <= wp.float64(0.0):
@@ -67,7 +67,7 @@ def _cross(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int3
 
 def cross(store, before=None) -> None:
     """One step of crossing at every own joint; `before(axis)` lets a watcher look first."""
-    for axis in (0, 1):
+    for axis in range(3):
         if before:
             before(axis)
         wp.launch(_cross, dim=(store.count, store.across, store.across),

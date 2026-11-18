@@ -27,9 +27,10 @@ The full rules, open problems and milestones are in the bible chapter
 
 Early, and started afresh on 2026-11-18: the engine before had grown too big and basic gravity still did
 not work. The new one is small, built for a billion cells from the start, and grows in layers, each one
-something to look at. Layer 1 is built: one energy volume whose fluid turns as one whole swirl with an
-open core, every quantum counted exactly. Next: layer 2, many cells and the first gravity test; then
-layer 3, a billion cells on one graphics card. Progress is tracked on
+something to look at. Built so far: one energy volume whose fluid turns as one whole swirl with an
+open core, every quantum counted exactly; energy crossing from volume to volume through a joint, and
+the squeeze; a small three-dimensional grid that wraps round and stands calm. Next: the pull spreading
+through the grid and the first gravity test; then a billion cells on one graphics card. Progress is tracked on
 [issue #1](https://github.com/JoeyKardolus/quantum-relativity/issues/1).
 Misses are reported as misses; nothing is tuned to look good.
 
@@ -39,7 +40,8 @@ Misses are reported as misses; nothing is tuned to look good.
 uv sync --all-packages --all-extras --all-groups
 PYTHONPATH=. .venv/bin/python -m physics.view   # a window; Space starts, R resets, G calm/own, Esc quits
 PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing   # energy crossing from a volume through a joint into the next
-PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, 5 seconds
+PYTHONPATH=. .venv/bin/python -m physics.view --scene calm       # 4 x 4 x 4 volumes that wrap round and stand calm; L next layer, C all layers
+PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, 20 seconds
 ```
 
 Needs Linux or WSL2, Python 3.12+, [`uv`](https://docs.astral.sh/uv/) . The engine runs on
@@ -49,7 +51,7 @@ to the GPU by itself.
 | Path | What it is |
 |---|---|
 | `physics/engine/` | the engine, one directory per axiom (`axiom_1_energy` to `axiom_7_quantum`), each with its definitions, its logic and its tests; layers 1 and 2 fill the first five |
-| `physics/view/` | the window on one red energy volume with its swirl, or on a volume, a blue joint and a volume with energy crossing; it can also save pictures |
+| `physics/view/` | the window on one red energy volume with its swirl, on a volume, a blue joint and a volume with energy crossing, or on a small grid that wraps round, as a flat cut through one layer; it can also save pictures |
 | `docs/bible.md` | how everything works; the theory is the chapter `physics/quantum-relativity` |
 
 ## Built with

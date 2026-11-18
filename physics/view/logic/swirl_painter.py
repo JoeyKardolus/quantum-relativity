@@ -18,6 +18,7 @@ class SwirlPainter:
     def __init__(self, marks: int, count: int):
         """Room on the card for `count` tails of `marks` marks; needs an open window."""
         shader = pyglet.graphics.shader
+        self.thick = 1.0  # times `THICK`: a grid's volumes along, so it is as solid as one cell
         self.program = shader.ShaderProgram(shader.Shader(VERTEX, "vertex"),
                                             shader.Shader(FRAGMENT, "fragment"))
         older = np.arange((marks - 1) * count)  # each line: a mark and the next newer one
@@ -46,5 +47,5 @@ class SwirlPainter:
         for name, value in zip(("eye", "right", "up", "forward"), camera(yaw, pitch, distance)):
             self.program[name] = tuple(float(part) for part in value)
         self.program["across"], self.program["tall"] = float(across), float(height)
-        self.program["aspect"] = width / max(height, 1)
+        self.program["aspect"], self.program["thick"] = width / max(height, 1), self.thick
         self.lines.draw(gl.GL_LINES)

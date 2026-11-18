@@ -53,6 +53,13 @@ def _beside_mean(tail: wp.array2d(dtype=wp.vec3), head: wp.int32, across: wp.int
     mean = wp.sqrt(speed[cell][0] / wp.max(speed[cell][1], 1.0))
     spot = drawn[age, tracer]
     solid = wp.sign(placed[cell][2][2]) * AT_MEAN * spot[3] / wp.max(mean, 1.0e-6)
+    # a mark a cell's edge or more from the next is the same place the other way round the
+    # grid, where it wraps: that way is not drawn
+    after = drawn[wp.min(age + 1, tail.shape[0] - 1), tracer] - spot
+    before = drawn[wp.max(age - 1, 0), tracer] - spot
+    if wp.max(wp.length(wp.vec3(after[0], after[1], after[2])),
+              wp.length(wp.vec3(before[0], before[1], before[2]))) > float(across):
+        solid = 0.0
     drawn[age, tracer] = wp.vec4(spot[0], spot[1], spot[2], solid)
 
 
