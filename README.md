@@ -5,21 +5,36 @@ kind of stuff: energy. The goal is not to replace quantum physics or relativity,
 these rules, run on a computer, produce things we know from nature: gravity, expansion, black holes,
 orbits.
 
-## The idea in short
+## The seven axioms
 
-- **Space is a foam of two kinds of cell**: energy volumes that **pull** (A) and **joints** that **push**
-  (B). Every A is wrapped in joints on all sides, edges and corners included; joints touch each other
-  and form one web, like mortar between bricks.
-- **Energy sets size**: the more energy packed into a region, the smaller and denser it is.
-- **A pulls** on other A's through the joints between them, fading with distance, like gravity.
-  **A joint pushes back**, harder the more it is squeezed, until it gives way past a limit and the
-  region collapses, like a star becoming a black hole.
-- **Energy is a quantum fluid**, whole quanta and a phase per Planck box: frictionless inside a volume, whirls
-  turning only in whole steps, friction only in passing a joint.
-  Squeezed joints let less through and past a seal point nothing, so packed lumps seal themselves.
-- **Time is local**: where energy is more packed, everything happens more slowly.
+Everything in the simulation has to follow from these seven sentences, and from nothing else.
 
-The full rules, open problems and milestones are in the bible chapter
+1. **Energy**: an always-moving quantum fluid, one whole signed number of quanta per Planck box at each
+   moment of local time. The total is not fixed: a squeezed joint makes more minus energy out of itself,
+   and a collapse takes the joint's energy off the rest. Zero is empty space, which does nothing.
+2. **Cells are swirls**: plus only pulls, minus only pushes, both oscillate in whole steps.
+3. **Structure**: plus never touches plus; minus wraps every plus and forms one web. The cells are the
+   grid, a perfect A B A B pattern. A cell has no geometry of its own, only relations to its neighbours
+   and a size set by its energy alone: more energy, smaller, for energy volumes and joints alike. Lumps
+   warp the grid by making their cells small. Planck boxes are not space: they sit inside each cell only
+   to compute its fluid.
+4. **Crossing**: energy diffuses between plus swirls only through minus; that is the only friction, and
+   it becomes heat.
+5. **Packing**: more packed is smaller, slower and pulls harder; pull spreads at a finite speed, weaker
+   with distance; squeezed minus pushes back steeply.
+6. **Limits**: a joint's energy rises only while it is squeezed, so a fresh joint is the fattest it will
+   ever be and shrinks as it is squeezed; squeezed too far it collapses, its energy is taken off the
+   rest, and its two volumes merge; an overstretched plus tears, and only that cell splits.
+7. **Quantum**: each box's fluid also carries a phase, so waves add and cancel. Moving energy can split
+   over several routes at once. Every split gets a direct pull between its halves, private to them, and
+   its own oscillation. When something reacts with a half, or the energy loses its momentum, it settles
+   whole in one cell.
+
+In pictures: an **energy volume** (plus, drawn red) is a round swirl of energy, like the inside of a living
+cell; the **joints** (minus, drawn blue) are volumes squeezed between the energy volumes that pull across
+them, thin between two and fat where several meet.
+
+The full wording, the open problems and the plan are in the bible chapter
 [`physics/quantum-relativity`](docs/bible.md#physicsquantum-relativity); the words used are defined in
 [`CONTEXT.md`](CONTEXT.md).
 
