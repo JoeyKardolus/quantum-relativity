@@ -4,5 +4,5 @@
 
 - A joint writes only its two volumes' facing boxes, so no box is in two pairs of the launch.
 - The cell totals and the heat are added with `atomic_add`: whole numbers, so the order does not matter.
-- Measured: how fast the two volumes even out depends on the boxes across (750 steps at 6, still sloshing after 9,600 at 24). That is wrong: boxes are not space.
+- Measured (seed 1): the two volumes are even after about 4 turns of a calm swirl, the same at 6, 12 and 24 boxes across (369, 1,446 and 5,754 steps).
 - A calm volume beside an own joint is not crossed into yet (layer 3).

@@ -2,11 +2,12 @@
 
 > More packed is smaller, slower and pulls harder; pull spreads at a finite speed, weaker with distance; squeezed minus pushes back steeply.
 
-Built: only the press of two volumes on the joint between them (`logic/press.py`). The pull, its spreading and the push back wait for layer 3.
+Built: the pull of two volumes across their joint, its push back, and the press on its fluid.
 
 Assumed (the owner has not ruled):
-- The press turns the phase of the joint's facing boxes on, so its fluid is pushed inward.
-- It follows the plus quanta facing each other across that row.
-- `PRESS` is a tenth of `TURN`, chosen before the first run.
+- Pull: `PULL` times both volumes' quanta over the distance squared. `PULL` is 36: two calm volumes hold their joint at half their size.
+- Push: the joint's quanta over its room, so quanta to the power `STEEP`, 4.
+- `GIVE`: a wholly unanswered pull makes the joint give a quarter in one swirl turn.
+- The pull acts at once, across one joint only.
 
-Measured (6 across): the pressed joint's swirl turns over, one whole turn to the other, about every 350 steps.
+Not built: spreading, slower clocks.

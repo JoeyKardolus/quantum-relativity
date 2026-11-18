@@ -17,6 +17,7 @@ from physics.view.logic.scene import SCENES, drawn, eye_distance, lay_scene, tit
 from physics.view.logic.tracers import COUNT, MARK_EVERY, MARKS, lay_tracers, step_carrying
 
 BOXES, SPEED = 24, 8
+LINE_BOXES = 12  # the line's course is the same at any boxes, and a swirl's turn is quicker here
 FRAMES = 120  # the window is drawn at most this often a second
 
 
@@ -45,12 +46,13 @@ def save_pictures(folder: Path, across: int, steps: int, every: int, device: str
 def main() -> None:
     parser = argparse.ArgumentParser(description="Energy volumes as red swirls, joints blue.")
     parser.add_argument("--scene", choices=list(SCENES), default="one", help="what to show")
-    parser.add_argument("--boxes", type=int, default=BOXES, help="boxes along an edge (even)")
+    parser.add_argument("--boxes", type=int, help="boxes along an edge (even)")
     parser.add_argument("--speed", type=int, default=SPEED, help="steps a tick, a drawing speed")
     parser.add_argument("--pictures", type=Path, metavar="DIR", help="save pictures, no window")
     parser.add_argument("--steps", type=int, default=80, help="steps to run for the pictures")
     parser.add_argument("--every", type=int, default=20, help="steps between two pictures")
     chosen = parser.parse_args()
+    chosen.boxes = chosen.boxes or (BOXES if chosen.scene == "one" else LINE_BOXES)
     wp.config.quiet = True
     device = "cuda:0" if wp.is_cuda_available() else "cpu"
     os.environ.setdefault("GALLIUM_DRIVER", "d3d12")  # under WSL2 Mesa draws on the CPU without

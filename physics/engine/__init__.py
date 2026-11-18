@@ -1,7 +1,7 @@
-"""The engine, layer 2: energy volumes whose fluid turns as whole swirls, and joints it crosses.
+"""The engine, layer 2: volumes whose fluid turns as whole swirls, and the joints they squeeze.
 
 `calm_cells` lays cells as rules, `one_cell` is one cell with its own boxes, `three_cells` a
-volume, a joint and a volume in a line; `step` moves the fluid and lets it cross.
+volume, a joint and a volume; `step` moves the fluid, lets it cross and squeezes the joints.
 """
 import warp as wp
 
@@ -13,6 +13,8 @@ from physics.engine.axiom_3_structure.definitions.store import TILE, Store, put
 from physics.engine.axiom_3_structure.logic.take_own import take_own
 from physics.engine.axiom_4_crossing.logic.cross import cross
 from physics.engine.axiom_5_packing.logic.press import press
+from physics.engine.axiom_5_packing.logic.squeeze import squeeze
+from physics.engine.axiom_6_limits.logic.make import make
 
 
 def calm_cells(cells: int, own_cap: int, across: int = ACROSS, laid: int = 4, seed: int = 1,
@@ -30,9 +32,11 @@ def calm_cells(cells: int, own_cap: int, across: int = ACROSS, laid: int = 4, se
             cell_quanta=wp.full(cells, QUANTA_A_BOX * boxes, dtype=wp.int32),
             cell_laid=wp.full(cells, laid, dtype=wp.uint8),
             cell_heat=wp.zeros(cells, dtype=wp.int32),
+            cell_made=wp.zeros(cells, dtype=wp.int32),
             tile_home=wp.full(tiles, -1, dtype=wp.int32),
             tile_slots=wp.full(rows * TILE, -1, dtype=wp.int32),
             own_cell=wp.full(own_cap, -1, dtype=wp.int32),
+            own_squeeze=wp.zeros(own_cap, dtype=wp.vec2d),
             box_quanta=wp.zeros((own_cap, boxes), dtype=wp.int32),
             box_phase=wp.zeros((own_cap, boxes), dtype=wp.float32),
             pattern=wp.array(swirl_patterns(across), dtype=wp.vec2d))
@@ -45,9 +49,9 @@ def one_cell(across: int = ACROSS, seed: int = 1, device: str = "cpu") -> Store:
     return store
 
 
-# The crossing scene's start, chosen before it was ever run and not moved: the joint holds a
-# calm volume's quanta in minus (no new number), and the two volumes share two calm volumes'
-# quanta 3 to 1, so A clearly holds more and they are calm volumes once they are even.
+# The crossing scene's start, chosen before it was ever run and not moved: the fresh joint
+# holds a calm volume's quanta in minus (no new number), and the two volumes share two calm
+# volumes' quanta 3 to 1, so A clearly holds more and they are calm volumes once even.
 LINE_PARTS = (3, -2, 1)  # halves of a calm volume's quanta: volume A, the joint, volume B
 
 
@@ -63,12 +67,14 @@ def three_cells(across: int = ACROSS, seed: int = 1, device: str = "cpu",
 
 
 def step(store: Store, before_pass=None, before_cross=None) -> None:
-    """One step: the fluid moves inside every own cell, crosses the joints, and presses on them.
+    """One step: the fluid moves inside every own cell and crosses; squeezed joints make quanta.
 
     `before_pass(axis, parity)` lets a watcher look before each of the six passes inside,
     `before_cross()` before the crossing. A calm cell's step is the count.
     """
     flow_inside(store, before_pass)
     cross(store, before_cross)
+    squeeze(store)
+    make(store)
     press(store)
     store.step += 1

@@ -15,9 +15,10 @@ def title_line(store: Store) -> str:
 
 
 def line_title(store: Store) -> str:
-    """Volume A, the joint and volume B: quanta, heat booked, the plus total, sizes, the step."""
+    """Each cell's quanta and size, what the joint has made, the heat, all the energy, the step."""
     left, joint, right = (int(held) for held in store.cell_quanta.numpy()[:3])
-    heat = store.cell_heat.numpy()
-    sizes = "  ".join(f"{size_of(held, store.across):.2f}" for held in (left, joint, right))
-    return (f"A {left:,}  joint {joint:,}  B {right:,}  A + B {left + right:,}  "
-            f"heat A {heat[0]:,}  B {heat[2]:,}  sizes {sizes}  step {store.step}")
+    heat, made = store.cell_heat.numpy(), int(store.cell_made.numpy()[1])
+    cells = "  ".join(f"{name} {held:,} size {size_of(held, store.across):.2f}"
+                      for name, held in (("A", left), ("joint", joint), ("B", right)))
+    return (f"{cells}  joint made {made:,}  heat A {heat[0]:,} B {heat[2]:,}  "
+            f"plus and minus {left + right - joint:,}  step {store.step}")

@@ -1,7 +1,8 @@
 # Axiom 5, logic
 
-`press.py`: one launch over the own slots, after the crossing.
+`squeeze.py`: one launch over the own slots writes each own joint's pull and push into `own_squeeze`, before anything acts on it. `press.py`: the squeeze turns the phase of the joint's facing boxes on, so its fluid is pushed inward.
 
-- Only phases change: the joint's quanta stay, and the volumes are not touched.
-- `PRESS` is not to be moved to make a picture look right.
-- The joint's energy does not rise while it is pressed (axiom 6): not built.
+- `squeeze` runs before `make` and `press`: both read `own_squeeze`, so a run repeats.
+- The press and the making are one squeeze: both use `given` times `pressed`.
+- Only the joint's phases change here. No press once the push answers the pull.
+- Measured (6 across, 300 steps): the squeezed joint is 2,653 off its rule and still winds one whole turn; one not squeezed stays under 1.

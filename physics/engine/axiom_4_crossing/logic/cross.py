@@ -17,7 +17,7 @@ from physics.engine.axiom_1_energy.definitions.pair_rotation import pair_rotatio
 from physics.engine.axiom_1_energy.definitions.whole_move import whole_move
 from physics.engine.axiom_3_structure.definitions.store import slot_at
 from physics.engine.axiom_4_crossing.definitions.passage import (
-    less_step, passing_turn, row_minus, rub_share)
+    layer_part, less_step, passing_turn, row_minus, rub_share)
 
 wp.set_module_options({"fuse_fp": False})
 
@@ -44,14 +44,14 @@ def _cross(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int3
     rub = rub_share(minus, low_has, high_has)
     low_wave, high_wave = pair_rotation(wave_of(low_has, box_phase[left, low]),
                                         wave_of(high_has, box_phase[right, row]),
-                                        passing_turn(rub))
+                                        passing_turn(rub, across))
     box = wp.uint64(joint) * wp.uint64(box_quanta.shape[1]) + wp.uint64(row)
     flow = wp.dot(high_wave, high_wave) - wp.float64(high_has)  # what the right volume gains
     moved = whole_move(flow, draw_uniform(seed, step, wp.uint32(6), box), low_has, high_has)
     rubbed = wp.int32(wp.floor(rub * wp.float64(wp.abs(moved))
                                + draw_uniform(seed, step, wp.uint32(7), box)))
     step_across = less_step(phase_of(low_wave, box_phase[left, low]),
-                            phase_of(high_wave, box_phase[right, row]), rub)
+                            phase_of(high_wave, box_phase[right, row]), rub * layer_part(across))
     box_quanta[left, low] = low_has - moved
     box_quanta[right, row] = high_has + moved
     box_phase[left, low] = step_across[0]

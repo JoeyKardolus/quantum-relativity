@@ -1,29 +1,38 @@
-"""The volumes' press turns the phase of the joint's facing boxes, and so disturbs its swirl."""
+"""The squeeze is read off the cells' quanta, and it presses the joint's facing fluid, unevenly."""
 import numpy as np
 
 from physics.engine import step, three_cells
 from physics.engine.axiom_3_structure.logic.boxes_of import swirl_of
-from physics.engine.axiom_5_packing.logic.press import PRESS, press
+from physics.engine.axiom_5_packing.definitions.pull_push import GIVE
+from physics.engine.axiom_5_packing.logic.press import press
+from physics.engine.axiom_5_packing.logic.squeeze import pull_push
 
 
-def test_one_press_turns_only_the_joint_s_facing_phases_by_the_pull_across():
+def test_the_squeeze_is_the_pull_across_and_the_push_back_of_the_cells_as_they_are():
+    assert np.allclose(pull_push(three_cells(), 1), [36 * 0.75 / (1 / 3 + 1 + 1) ** 2, 1])
+    assert np.allclose(pull_push(three_cells(parts=(2, -2, 2)), 1), [9, 1])
+    assert np.allclose(pull_push(three_cells(parts=(3, 0, 1)), 1), [0, 0])  # no joint between
+
+
+def test_one_press_turns_only_the_joint_s_facing_phases_by_what_it_gives():
     store = three_cells(parts=(2, -2, 2))
     quanta, before = store.box_quanta.numpy().reshape(3, 6, 6, 6), store.box_phase.numpy().copy()
+    pull_push(store, 1)
     press(store)
     turned = (store.box_phase.numpy() - before + np.pi) % (2 * np.pi) - np.pi
-    pull = (quanta[0][:, 5, :] + quanta[2][:, 0, :]) / 6000
+    pressed = (quanta[0][:, 5, :] + quanta[2][:, 0, :]) / 6000  # each over its volume's mean box
+    gives = GIVE * store.turn_per_step * (9 - 1) / 9  # of a whole turn: the 2 pi falls out
     joint = turned[1].reshape(6, 6, 6)
-    assert np.allclose(joint[:, 0, :], PRESS * pull, atol=1e-5)
-    assert np.allclose(joint[:, 5, :], PRESS * pull, atol=1e-5)
+    assert np.allclose(joint[:, 0, :], gives * pressed, atol=1e-5) and pressed.std() > 0.1
+    assert np.allclose(joint[:, 5, :], gives * pressed, atol=1e-5)
     assert np.abs(joint[:, 1:5, :]).max() == 0 and np.abs(turned[[0, 2]]).max() == 0
     assert (store.box_quanta.numpy().reshape(3, 6, 6, 6) == quanta).all()
 
 
-def test_the_pressed_joint_keeps_its_quanta_and_its_swirl_goes_irregular():
-    store = three_cells()
+def test_a_squeezed_joint_s_swirl_goes_irregular_and_one_not_squeezed_stays_as_laid():
+    squeezed, held = three_cells(), three_cells(parts=(2, -6, 2))  # 3 calm: push 81, pull 21
     for _ in range(300):
-        step(store)
-    joint = swirl_of(store, 1)
-    assert store.box_quanta.numpy()[1].sum() == -648_000 and store.box_quanta.numpy()[1].max() <= 0
-    assert joint["off_rule"] > 100  # far from the plain swirl it was laid as (measured: 741)
-    assert joint["round_flow"] < 0 and joint["turns"] == 1  # measured: by now it turns the other way
+        step(squeezed)
+        step(held)
+    assert swirl_of(squeezed, 1)["off_rule"] > 500  # measured: 2,653
+    assert swirl_of(held, 1)["off_rule"] < 1 and swirl_of(held, 1)["turns"] == -1

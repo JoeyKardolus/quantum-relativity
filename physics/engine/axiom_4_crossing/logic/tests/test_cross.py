@@ -23,7 +23,8 @@ def test_the_books_are_exact_over_2000_steps():
     for _ in range(2000):
         step(store)
         held = store.box_quanta.numpy().astype(np.int64).sum(axis=1)
-        assert held[0] + held[2] == 1_296_000 and held[1] == -648_000
+        assert held[0] + held[2] == 1_296_000
+        assert held[1] == -648_000 - store.cell_made.numpy()[1]  # the joint only makes
         assert (held == store.cell_quanta.numpy()).all() and store.box_quanta.numpy()[[0, 2]].min() >= 0
         assert (store.cell_heat.numpy() >= heat).all() and store.cell_heat.numpy()[1] == 0
         heat = store.cell_heat.numpy()

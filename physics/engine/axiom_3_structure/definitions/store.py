@@ -1,7 +1,7 @@
 """Store: where every cell is kept, built so a billion cells fit one graphics card.
 
 A calm cell is a rule, not boxes: its whole signed total, how its swirl is laid
-(`axis * 2`, plus 1 for the other sense) and its heat count, 9 bytes. Only a cell in the
+(`axis * 2`, plus 1 for the other sense) its heat count and what it has made, 13 bytes. Only a cell in the
 own set holds boxes, in a slot; slots in use are always `0 .. count - 1`. Two plain
 arrays find the slot.
 """
@@ -20,9 +20,11 @@ class Store:
     cell_quanta: wp.array   # int32 (cells)
     cell_laid: wp.array     # uint8 (cells)
     cell_heat: wp.array     # int32 (cells): quanta that came in with their direction taken
+    cell_made: wp.array     # int32 (cells): quanta a joint has made out of itself
     tile_home: wp.array     # int32 (cells / 512): the tile's row in tile_slots, -1: all calm
     tile_slots: wp.array    # int32 (tile rows * 512): the cell's slot, -1: calm
     own_cell: wp.array      # int32 (cap): which cell holds this slot
+    own_squeeze: wp.array   # vec2d (cap): the pull across an own joint and its push back
     box_quanta: wp.array    # int32 (cap, boxes)
     box_phase: wp.array     # float32 (cap, boxes)
     pattern: wp.array       # vec2d (6, boxes): each box's share and phase in the six swirls

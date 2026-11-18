@@ -2,7 +2,7 @@
 import numpy as np
 
 from physics.engine import three_cells
-from physics.view.logic.line_streaks import line_streaks, placed_line
+from physics.view.logic.line_streaks import AT_MEAN, line_streaks, placed_line
 from physics.view.logic.tracers import lay_tracers, step_carrying
 
 
@@ -38,4 +38,6 @@ def test_each_cell_is_drawn_at_its_size_the_joint_s_way_below_0():
     assert across_picture[cell == 0].max() < across_picture[cell == 1].min() + 0.02
     assert across_picture[cell == 1].max() < across_picture[cell == 2].min() + 0.02
     assert drawn[cell == 1, 3].max() <= 0 < drawn[cell == 1, 3].min() + 1 and drawn[cell != 1, 3].min() >= 0
-    assert np.abs(drawn[cell == 1, 3]).max() > 0
+    for one in range(3):  # one rule for both colours: fluid at its cell's mean speed is AT_MEAN
+        ways = line_streaks(tracers, 6, placed_line(store, 3)).numpy()[1:, cell == one, 3]
+        assert abs(np.sqrt((ways ** 2).mean()) - AT_MEAN) < 0.1 * AT_MEAN

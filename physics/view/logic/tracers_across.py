@@ -34,7 +34,7 @@ def _carry_across(quanta: wp.array2d(dtype=wp.int32), phase: wp.array2d(dtype=wp
     low_has, high_has = quanta[low, first + (across - 1) * across], quanta[high, first]
     _low_wave, high_wave = pair_rotation(
         wave_of(low_has, phase[low, first + (across - 1) * across]),
-        wave_of(high_has, phase[high, first]), passing_turn(rub_share(minus, low_has, high_has)))
+        wave_of(high_has, phase[high, first]), passing_turn(rub_share(minus, low_has, high_has), across))
     stays = float(low_has + high_has) - float(wp.dot(high_wave, high_wave))
     line = carried(line, float(low_has), float(high_has), stays)
     if line < 1.0:
