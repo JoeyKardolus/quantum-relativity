@@ -14,8 +14,9 @@ from physics.engine import step
 from physics.engine.axiom_1_energy.definitions.pair_rotation import TURN, pair_rotation, wave_of
 from physics.engine.axiom_3_structure.logic.boxes_of import boxes_of
 
-COUNT = 900  # tracers, a drawing number
-MARKS = 16  # places a tracer remembers: where it is now and the 15 marks behind it
+COUNT = 8000  # tracers, a drawing number
+MARKS = 32  # places a tracer remembers: where it is now and the 31 marks behind it
+MARK_EVERY = 4  # steps from one mark to the next
 
 
 @dataclass
@@ -63,10 +64,11 @@ def lay_tracers(store, cell: int, count: int = COUNT, seed: int = 1) -> Tracers:
     return Tracers(wp.array(np.tile(place, (MARKS, 1, 1)), dtype=wp.vec3, device=box_quanta.device))
 
 
-def step_carrying(store, tracers: Tracers, cell: int, mark: bool) -> None:
+def step_carrying(store, tracers: Tracers, cell: int, mark: bool, boxes: tuple = None) -> None:
     """One step of the engine with the tracers carried along; `mark` lengthens their tails."""
     new = (tracers.head + 1) % MARKS if mark else tracers.head
-    box_quanta, box_phase, slot = boxes_of(store, cell)  # a calm cell's: the rule's, this step
+    # `boxes` saves asking again: a calm cell's stay good, its flow is the same every step
+    box_quanta, box_phase, slot = boxes or boxes_of(store, cell)
 
     def carry(axis: int, parity: int) -> None:
         wp.launch(_carry, dim=tracers.tail.shape[1], device=box_quanta.device,
