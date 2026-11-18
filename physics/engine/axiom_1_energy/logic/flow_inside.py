@@ -34,8 +34,11 @@ def _flow(own_cell: wp.array(dtype=wp.int32), apart: wp.vec3i, parity: wp.int32,
     box_phase[slot, high] = phase_of(high_wave, box_phase[slot, high])
 
 
-def flow_inside(store) -> None:
-    """One step of the fluid inside each own cell: the pair rotation, then the whole move."""
+def flow_inside(store, before_pass=None) -> None:
+    """One step of the fluid inside each own cell: the pair rotation, then the whole move.
+
+    `before_pass(axis, parity)`, when given, is called before each launch, for a watcher.
+    """
     across = store.across
     strides = (across * across, across, 1)  # how far apart neighbours along each axis lie
     for axis in range(3):
@@ -43,6 +46,8 @@ def flow_inside(store) -> None:
         apart = wp.vec3i(strides[axis], strides[(axis + 1) % 3], strides[(axis + 2) % 3])
         for parity in (0, 1):
             pairs = (across - parity) // 2
+            if before_pass:
+                before_pass(axis, parity)
             wp.launch(_flow, dim=(store.count, pairs, across, across),
                       inputs=[store.own_cell, apart, parity, axis * 2 + parity, store.seed,
                               store.step, store.box_quanta, store.box_phase],

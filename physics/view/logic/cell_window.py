@@ -6,34 +6,41 @@ calm if it may go or takes it own again, drag turns the view, the wheel zooms, E
 import pyglet
 from pyglet.window import key
 
-from physics.engine import one_cell, step
+from physics.engine import one_cell
 from physics.engine.axiom_3_structure.definitions.store import slot_of
 from physics.engine.axiom_3_structure.logic.give_back import give_back
 from physics.engine.axiom_3_structure.logic.take_own import take_own
 from physics.view.definitions.camera import DISTANCE, PITCH, YAW
 from physics.view.logic.paint import paint
 from physics.view.logic.title_line import title_line
+from physics.view.logic.tracers import lay_tracers, step_carrying
 
 
 class CellWindow(pyglet.window.Window):
     def __init__(self, across: int, speed: int, device: str):
         super().__init__(1000, 800, resizable=True, vsync=False, caption="one energy volume")
         self.fresh = lambda: one_cell(across, device=device)
-        self.store, self.speed, self.running = self.fresh(), speed, False
+        self.speed, self.running = speed, False
+        self.lay()
         self.yaw, self.pitch, self.distance = YAW, PITCH, DISTANCE
         pyglet.clock.schedule_interval(self.tick, 1 / 30)
         pyglet.clock.schedule_interval(self.retitle, 0.25)
 
+    def lay(self) -> None:
+        self.store = self.fresh()
+        self.tracers = lay_tracers(self.store, 0)
+
     def tick(self, _elapsed: float) -> None:
-        for _ in range(self.speed if self.running else 0):
-            step(self.store)
+        for done in range(self.speed if self.running else 0):
+            step_carrying(self.store, self.tracers, 0, mark=done == 0)
 
     def retitle(self, _elapsed: float) -> None:
         self.set_caption(title_line(self.store) + ("" if self.running else "  (stopped: Space)"))
 
     def on_draw(self) -> None:
         width, height = self.width, self.height
-        pixels = paint(self.store, 0, self.yaw, self.pitch, self.distance, width, height)
+        pixels = paint(self.store, 0, self.tracers, self.yaw, self.pitch, self.distance,
+                       width, height)
         picture = pyglet.image.ImageData(width, height, "RGB", pixels.tobytes(), pitch=-3 * width)
         picture.blit(0, 0)
 
@@ -41,7 +48,7 @@ class CellWindow(pyglet.window.Window):
         if symbol == key.SPACE:
             self.running = not self.running
         elif symbol == key.R:
-            self.store = self.fresh()
+            self.lay()
         elif symbol == key.G and slot_of(self.store, 0) < 0:
             take_own(self.store, 0)
         elif symbol == key.G:

@@ -37,7 +37,7 @@ Misses are reported as misses; nothing is tuned to look good.
 
 ```bash
 uv sync --all-packages --all-extras --all-groups
-PYTHONPATH=. .venv/bin/python -m physics.view.logic.window   # a window; Space starts, R resets, G calm/own, Esc quits
+PYTHONPATH=. .venv/bin/python -m physics.view   # a window; Space starts, R resets, G calm/own, Esc quits
 PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, 5 seconds
 ```
 

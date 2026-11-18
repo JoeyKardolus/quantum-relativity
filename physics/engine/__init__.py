@@ -41,7 +41,10 @@ def one_cell(across: int = ACROSS, seed: int = 1, device: str = "cpu") -> Store:
     return store
 
 
-def step(store: Store) -> None:
-    """One step: the fluid moves inside every own cell; a calm cell's step is the count."""
-    flow_inside(store)
+def step(store: Store, before_pass=None) -> None:
+    """One step: the fluid moves inside every own cell; a calm cell's step is the count.
+
+    `before_pass(axis, parity)` lets a watcher look before each of the step's six passes.
+    """
+    flow_inside(store, before_pass)
     store.step += 1

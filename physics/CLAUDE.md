@@ -3,7 +3,7 @@
 A fresh start (2026-11-18), built in layers, each one something to look at. Rules and layers: the seven axioms in `docs/bible.md#physicsquantum-relativity`. Layer 1 is built: one energy volume with a swirl. `engine/` holds one directory per axiom, `view/` the window.
 
 ```
-PYTHONPATH=. .venv/bin/python -m physics.view.logic.window   # Space, R, G, Esc
+PYTHONPATH=. .venv/bin/python -m physics.view   # Space starts, R, G, Esc; --boxes 24
 PYTHONPATH=. .venv/bin/pytest -q physics                     # seconds, on the CPU
 ```
 

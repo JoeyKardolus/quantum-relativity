@@ -1,17 +1,18 @@
-"""The picture shows one red volume with a hole down its axis, and a bright side that goes round."""
+"""The picture shows one red glow with a dark hole down its axis, and the tracers as light dots."""
 import struct
 import zlib
 
 import numpy as np
 
-from physics.engine import one_cell, step
+from physics.engine import one_cell
 from physics.engine.axiom_3_structure.logic.give_back import give_back
 from physics.view.logic.paint import paint
 from physics.view.logic.save_png import save_png
+from physics.view.logic.tracers import lay_tracers
 
 
 def _down_the_axis(store) -> np.ndarray:
-    return paint(store, 0, 0.0, 0.0, 2.6, 120, 120).astype(int)
+    return paint(store, 0, None, 0.0, 0.0, 2.6, 120, 120).astype(int)
 
 
 def test_the_picture_has_the_red_volume_and_the_hole():
@@ -23,18 +24,15 @@ def test_the_picture_has_the_red_volume_and_the_hole():
     assert red[58:62, 58:62].mean() < 0.4 * ring.mean()                # the open core
 
 
-def test_the_bright_side_goes_round_as_the_fluid_steps():
+def test_the_tracers_are_drawn_as_light_dots_on_the_red():
     store = one_cell()
-    before = _down_the_axis(store)[..., 0]
-    for _ in range(46):                                                # half a round at 6 across
-        step(store)
-    after = _down_the_axis(store)[..., 0]
-    assert (before[40:80, 75:95].mean() - before[40:80, 25:45].mean()) * \
-        (after[40:80, 75:95].mean() - after[40:80, 25:45].mean()) < 0  # bright left and right swap
+    with_dots = paint(store, 0, lay_tracers(store, 0, 50), 0.0, 0.0, 2.6, 120, 120).astype(int)
+    assert (_down_the_axis(store)[..., 1] < 60).all()                  # the glow alone is red
+    assert 20 < (with_dots[..., 1] > 200).sum() <= 50 * 9              # 50 dots, 3 by 3 each
 
 
 def test_a_saved_picture_reads_back_the_same(tmp_path):
-    picture = paint(one_cell(), 0, 0.2, 0.15, 2.6, 40, 30)
+    picture = paint(one_cell(), 0, None, 0.2, 0.15, 2.6, 40, 30)
     save_png(tmp_path / "cell.png", picture)
     data = (tmp_path / "cell.png").read_bytes()
     assert data[:8] == b"\x89PNG\r\n\x1a\n" and struct.unpack(">II", data[16:24]) == (40, 30)
