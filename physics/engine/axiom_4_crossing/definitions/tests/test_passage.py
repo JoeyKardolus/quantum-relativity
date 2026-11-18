@@ -10,7 +10,7 @@ from physics.engine.axiom_4_crossing.definitions.passage import (
 @wp.kernel
 def _read(box_quanta: wp.array2d(dtype=wp.int32), low_phase: wp.float32, high_phase: wp.float32,
           found: wp.array(dtype=wp.float64)):
-    minus = row_minus(box_quanta, 0, 1, 2)  # the row of boxes 1 and 3 in a block 2 across
+    minus = row_minus(box_quanta, 0, 1, 2, 2)  # the row of boxes 1 and 3 in a block 2 across
     rub = rub_share(minus, 1000, 3000)
     step = less_step(low_phase, high_phase, rub)
     found[0] = minus

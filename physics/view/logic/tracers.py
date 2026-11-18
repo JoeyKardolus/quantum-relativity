@@ -4,7 +4,7 @@ A tracer starts in a box drawn by its quanta, so the dots lie as the fluid lies.
 each of a step's six passes it moves with the fluid of its box and that box's partner:
 the engine's own pair rotation says how much crosses between the two, and the tracer
 keeps as much of their fluid behind it as it had. Fluid that stands still moves no dot.
-In a line of cells a place's second number runs on from cell to cell: `across` a cell.
+With several cells a place's second number says which slot's cell: `across` a slot.
 """
 from dataclasses import dataclass
 
@@ -77,4 +77,4 @@ def step_carrying(store, tracers: Tracers, cell: int, mark: bool, boxes: tuple =
                   inputs=[*line, axis, parity, tracers.head, new, tracers.tail])
         tracers.head = new
 
-    step(store, carry, lambda: carry_across(*line, tracers.tail, tracers.head))
+    step(store, carry, lambda axis: carry_across(store, axis, cells, tracers.tail, tracers.head))

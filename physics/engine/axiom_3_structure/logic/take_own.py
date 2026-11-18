@@ -14,7 +14,7 @@ wp.set_module_options({"fuse_fp": False})
 
 
 @wp.kernel
-def _lay(own_cell: wp.array(dtype=wp.int32), first: wp.int32, turned: wp.float64,
+def _lay(own_cell: wp.array(dtype=wp.int32), first: wp.int32, turned: wp.float64, row: wp.int32,
          cell_quanta: wp.array(dtype=wp.int32), cell_laid: wp.array(dtype=wp.uint8),
          pattern: wp.array2d(dtype=wp.vec2d),
          box_quanta: wp.array2d(dtype=wp.int32), box_phase: wp.array2d(dtype=wp.float32)):
@@ -23,11 +23,13 @@ def _lay(own_cell: wp.array(dtype=wp.int32), first: wp.int32, turned: wp.float64
     total = wp.abs(cell_quanta[own_cell[slot]])
     laid = wp.int32(cell_laid[own_cell[slot]])
     boxes = pattern.shape[1]
+    # every second row of volumes is laid half a turn on, so facing fluid agrees that way too
+    half_on = turned + wp.float64(wp.pi) * wp.float64(own_cell[slot] // row // 2 % 2)
     left_over = total
     for box in range(boxes):
         left_over -= dealt(total, pattern[laid, box][0], boxes)
     for box in range(boxes):
-        angle = pattern[laid, box][1] + turned
+        angle = pattern[laid, box][1] + half_on
         angle -= wp.float64(wp.tau) * wp.floor((angle + wp.float64(wp.pi)) / wp.float64(wp.tau))
         box_phase[slot, box] = wp.float32(angle)
         share = dealt(total, pattern[laid, box][0], boxes)
@@ -41,6 +43,7 @@ def lay(store: Store, own_cell: wp.array, first: int, number: int,
     """Deal the rule's boxes of `number` cells, named by `own_cell` from `first` on."""
     wp.launch(_lay, dim=number, device=box_quanta.device,
               inputs=[own_cell, first, wp.float64(store.turn_per_step * store.step),
+                      store.grid[1] * store.grid[2],
                       store.cell_quanta, store.cell_laid, store.pattern, box_quanta, box_phase])
 
 

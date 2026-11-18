@@ -12,9 +12,9 @@ from physics.engine.axiom_3_structure.logic.boxes_of import boxes_of
 from physics.engine.axiom_3_structure.logic.give_back import give_back
 from physics.engine.axiom_3_structure.logic.take_own import take_own
 from physics.view.definitions.camera import PITCH, YAW, zoomed
-from physics.view.logic.scene import drawn, eye_distance, lay_scene, title
+from physics.view.logic.scene import drawn, eye_distance, lay_scene, title, tracer_count
 from physics.view.logic.swirl_painter import SwirlPainter
-from physics.view.logic.tracers import COUNT, MARK_EVERY, MARKS, lay_tracers, step_carrying
+from physics.view.logic.tracers import MARK_EVERY, MARKS, lay_tracers, step_carrying
 
 TICKS = 30
 
@@ -24,7 +24,7 @@ class CellWindow(pyglet.window.Window):
         super().__init__(1000, 800, resizable=True, vsync=False, caption="energy")
         self.fresh = lambda: lay_scene(cells, across, device)
         self.speed, self.running, self.cells = speed, True, cells
-        self.painter = SwirlPainter(MARKS, COUNT * cells)
+        self.painter = SwirlPainter(MARKS, tracer_count(cells))
         self.lay()
         self.yaw, self.pitch, self.distance = YAW, PITCH, eye_distance(cells)
         pyglet.clock.schedule_interval(self.tick, 1 / TICKS)
@@ -32,7 +32,7 @@ class CellWindow(pyglet.window.Window):
 
     def lay(self) -> None:
         self.store = self.fresh()
-        self.tracers = lay_tracers(self.store, 0, COUNT * self.cells, cells=self.cells)
+        self.tracers = lay_tracers(self.store, 0, tracer_count(self.cells), cells=self.cells)
         self.boxes = boxes_of(self.store, 0)  # asked once: dealing a calm cell's costs a frame
         self.painter.load(drawn(self.store, self.tracers, self.cells))
 

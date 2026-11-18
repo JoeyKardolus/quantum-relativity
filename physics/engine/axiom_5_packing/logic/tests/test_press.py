@@ -3,14 +3,17 @@ import numpy as np
 
 from physics.engine import step, three_cells
 from physics.engine.axiom_3_structure.logic.boxes_of import swirl_of
-from physics.engine.axiom_5_packing.definitions.pull_push import GIVE
+from physics.engine.axiom_5_packing.definitions.pull_push import GIVE, PULL
 from physics.engine.axiom_5_packing.logic.press import press
 from physics.engine.axiom_5_packing.logic.squeeze import pull_push
 
+EVEN = (3 + np.pi / 6) ** (2 / 3)  # two calm volumes' distance squared across a fresh joint
+
 
 def test_the_squeeze_is_the_pull_across_and_the_push_back_of_the_cells_as_they_are():
-    assert np.allclose(pull_push(three_cells(), 1), [36 * 0.75 / (1 / 3 + 1 + 1) ** 2, 1])
-    assert np.allclose(pull_push(three_cells(parts=(2, -2, 2)), 1), [9, 1])
+    uneven = (3 + np.pi / 12 * (1.5 ** -3 + 0.5 ** -3)) ** (2 / 3)  # the distance squared
+    assert np.allclose(pull_push(three_cells(), 1), [PULL * 0.75 / uneven, 1])
+    assert np.allclose(pull_push(three_cells(parts=(2, -2, 2)), 1), [PULL / EVEN, 1])
     assert np.allclose(pull_push(three_cells(parts=(3, 0, 1)), 1), [0, 0])  # no joint between
 
 
@@ -21,7 +24,7 @@ def test_one_press_turns_only_the_joint_s_facing_phases_by_what_it_gives():
     press(store)
     turned = (store.box_phase.numpy() - before + np.pi) % (2 * np.pi) - np.pi
     pressed = (quanta[0][:, 5, :] + quanta[2][:, 0, :]) / 6000  # each over its volume's mean box
-    gives = GIVE * store.turn_per_step * (9 - 1) / 9  # of a whole turn: the 2 pi falls out
+    gives = GIVE * store.turn_per_step * (PULL / EVEN - 1) / (PULL / EVEN)  # of a whole turn
     joint = turned[1].reshape(6, 6, 6)
     assert np.allclose(joint[:, 0, :], gives * pressed, atol=1e-5) and pressed.std() > 0.1
     assert np.allclose(joint[:, 5, :], gives * pressed, atol=1e-5)
@@ -30,9 +33,9 @@ def test_one_press_turns_only_the_joint_s_facing_phases_by_what_it_gives():
 
 
 def test_a_squeezed_joint_s_swirl_goes_irregular_and_one_not_squeezed_stays_as_laid():
-    squeezed, held = three_cells(), three_cells(parts=(2, -6, 2))  # 3 calm: push 81, pull 21
+    squeezed, held = three_cells(), three_cells(parts=(2, -6, 2))  # 3 calm: push 81, pull 6
     for _ in range(300):
         step(squeezed)
         step(held)
-    assert swirl_of(squeezed, 1)["off_rule"] > 500  # measured: 2,653
+    assert swirl_of(squeezed, 1)["off_rule"] > 100  # measured: 259
     assert swirl_of(held, 1)["off_rule"] < 1 and swirl_of(held, 1)["turns"] == -1

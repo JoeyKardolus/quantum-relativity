@@ -1,5 +1,4 @@
 """The engine, layer 2: volumes whose fluid turns as whole swirls, and the joints they squeeze.
-
 `calm_cells` lays cells as rules, `one_cell` is one cell with its own boxes, `three_cells` a
 volume, a joint and a volume; `step` moves the fluid, lets it cross and squeezes the joints.
 """
@@ -18,10 +17,10 @@ from physics.engine.axiom_6_limits.logic.make import make
 
 
 def calm_cells(cells: int, own_cap: int, across: int = ACROSS, laid: int = 4, seed: int = 1,
-               device: str = "cpu", tile_cap: int | None = None) -> Store:
+               device: str = "cpu", tile_cap: int | None = None, grid: tuple = None) -> Store:
     """A store of calm cells, each 3,000 quanta a box with the swirl `laid`.
 
-    It has room for `own_cap` own cells in `tile_cap` tile rows (left out: a row for each).
+    Room for `own_cap` own cells in `tile_cap` tile rows (left out: a row each); no `grid`: a line.
     """
     tiles = (cells + TILE - 1) // TILE
     rows = min(tiles, own_cap) if tile_cap is None else tile_cap
@@ -29,6 +28,7 @@ def calm_cells(cells: int, own_cap: int, across: int = ACROSS, laid: int = 4, se
     with wp.ScopedDevice(device):
         return Store(
             across=across, seed=seed, turn_per_step=standing_mode(across)[1],
+            grid=grid or (1, cells, 1),
             cell_quanta=wp.full(cells, QUANTA_A_BOX * boxes, dtype=wp.int32),
             cell_laid=wp.full(cells, laid, dtype=wp.uint8),
             cell_heat=wp.zeros(cells, dtype=wp.int32),
@@ -36,7 +36,7 @@ def calm_cells(cells: int, own_cap: int, across: int = ACROSS, laid: int = 4, se
             tile_home=wp.full(tiles, -1, dtype=wp.int32),
             tile_slots=wp.full(rows * TILE, -1, dtype=wp.int32),
             own_cell=wp.full(own_cap, -1, dtype=wp.int32),
-            own_squeeze=wp.zeros(own_cap, dtype=wp.vec2d),
+            own_squeeze=wp.zeros(own_cap, dtype=wp.vec4d),
             box_quanta=wp.zeros((own_cap, boxes), dtype=wp.int32),
             box_phase=wp.zeros((own_cap, boxes), dtype=wp.float32),
             pattern=wp.array(swirl_patterns(across), dtype=wp.vec2d))

@@ -1,7 +1,10 @@
 """Title line: a scene's numbers in words, for the window's title and the pictures' log."""
-from physics.engine.axiom_3_structure.definitions.size_law import size_of
+import numpy as np
+
+from physics.engine.axiom_3_structure.definitions.kinds import QUANTA_A_BOX
 from physics.engine.axiom_3_structure.definitions.store import Store, peek, slot_of
 from physics.engine.axiom_3_structure.logic.boxes_of import swirl_of
+from physics.engine.axiom_5_packing.logic.squeeze import squeeze
 
 
 def title_line(store: Store) -> str:
@@ -14,11 +17,16 @@ def title_line(store: Store) -> str:
             f"ledger {store.ledger:,}  {kept}")
 
 
-def line_title(store: Store) -> str:
-    """Each cell's quanta and size, what the joint has made, the heat, all the energy, the step."""
-    left, joint, right = (int(held) for held in store.cell_quanta.numpy()[:3])
-    heat, made = store.cell_heat.numpy(), int(store.cell_made.numpy()[1])
-    cells = "  ".join(f"{name} {held:,} size {size_of(held, store.across):.2f}"
-                      for name, held in (("A", left), ("joint", joint), ("B", right)))
-    return (f"{cells}  joint made {made:,}  heat A {heat[0]:,} B {heat[2]:,}  "
-            f"plus and minus {left + right - joint:,}  step {store.step}")
+def cells_title(store: Store) -> str:
+    """The volumes' and joints' quanta, the joints' thinnest place, what they made, heat, step."""
+    held = store.cell_quanta.numpy()
+    calm = QUANTA_A_BOX * store.across ** 3
+    squeeze(store)
+    apart = store.own_squeeze.numpy()[:store.count, 2].max()  # the scenes' joints all agree
+    volumes, joints = held[held > 0], -held[held < 0]
+    thin = apart - calm * (1 / volumes).mean()  # less two radii: every joint has one of each
+    return (f"volumes {' '.join(f'{one / calm:.2f}' for one in volumes)}  "
+            f"joints {' '.join(f'{one / calm:.2f}' for one in joints)}  "
+            f"{apart:.2f} apart, joint {thin:.2f} thin  made {store.cell_made.numpy().sum():,}  "
+            f"heat {store.cell_heat.numpy().sum():,}  all {volumes.sum() + joints.sum():,}  "
+            f"step {store.step}")

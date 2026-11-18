@@ -1,14 +1,13 @@
 """Passage: how freely plus energy passes a joint, read off the joint's own fluid.
 
-The line of cells runs along the boxes' second direction (`LINE_AXIS`), the one a swirl
-laid 4 or 5 is mirrored in by taking its other sense. A box of volume A that faces the
-joint and the box of volume B facing it are joined by the row of the joint's boxes
-between them. `row_minus` is the minus quanta of that row,
-a box. Crossing energy rubs against them: `rub_share` is the minus share of all the
-energy met in the passage. The two facing boxes move by the fluid's own law, the pair
-rotation, with the turn cut to the share that does not rub (`passing_turn`); friction
-then takes the rubbing share of the motion across, which is the step in phase between
-the two boxes (`less_step`). No number is set here: the joint's quanta decide.
+A joint stands between two volumes along the boxes' first or second direction, its axis.
+A box of the one volume that faces the joint and the box of the other facing it are
+joined by the row of the joint's boxes between them (`row_of`, `stride_of`). `row_minus`
+is the minus quanta of that row, a box. Crossing energy rubs against them: `rub_share` is
+the minus share of all the energy met in the passage. The two facing boxes move by the
+fluid's own law, the pair rotation, with the turn cut to the share that does not rub
+(`passing_turn`); friction then takes the rubbing share of the motion across, the step in
+phase between the two boxes (`less_step`). No number is set here: the joint's quanta decide.
 
 Stated a cell, not a box: the facing boxes are 1 in `across` of their cell and a step is 1
 in `across` squared of a swirl's turn, so the turn and the friction of one step are cut by
@@ -19,16 +18,28 @@ import warp as wp
 from physics.engine.axiom_1_energy.definitions.pair_rotation import TURN
 from physics.engine.axiom_3_structure.definitions.kinds import ACROSS
 
-LINE_AXIS = 1
+
+@wp.func
+def stride_of(across: wp.int32, axis: wp.int32) -> wp.int32:
+    """How far apart in a block two boxes lie that follow each other along `axis` (0 or 1)."""
+    if axis == 0:
+        return across * across
+    return across
+
+
+@wp.func
+def row_of(first: wp.int32, third: wp.int32, across: wp.int32, axis: wp.int32) -> wp.int32:
+    """The first box of the row along `axis` that lies `first` across it and `third` deep."""
+    return first * (across * across + across - stride_of(across, axis)) + third
 
 
 @wp.func
 def row_minus(box_quanta: wp.array2d(dtype=wp.int32), slot: wp.int32, row: wp.int32,
-              across: wp.int32) -> wp.float64:
+              stride: wp.int32, across: wp.int32) -> wp.float64:
     """The minus quanta a box in the joint's row from box `row` on (0 or less: no joint)."""
     held = wp.int32(0)
     for along in range(across):
-        held -= box_quanta[slot, row + along * across]
+        held -= box_quanta[slot, row + along * stride]
     return wp.float64(held) / wp.float64(across)
 
 

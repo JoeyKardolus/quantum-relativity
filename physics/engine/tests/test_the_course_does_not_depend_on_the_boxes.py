@@ -20,6 +20,6 @@ def _course(across: int) -> np.ndarray:
 
 def test_the_course_is_the_same_at_6_12_and_24_boxes_across():
     least, more, most = _course(6), _course(12), _course(24)
-    assert least[1, 0] < 1.15 and least[1, 1] < -1.3  # things happened: A from 1.5, joint from -1
+    assert least[1, 0] < 1.15 and least[1, 1] < -1.1  # things happened: A from 1.5, joint from -1
     # within 0.03 of a calm volume's quanta (measured: 0.017 at most); before, 24 barely crossed
     assert np.abs(more - least).max() < 0.03 and np.abs(most - least).max() < 0.03

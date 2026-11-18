@@ -1,33 +1,42 @@
-"""The pull grows with both volumes and falls with distance; the push rises steeply; they balance."""
+"""Round volumes stand apart by their joint's room; the pull falls with it, the push rises steeply."""
 import numpy as np
 import warp as wp
 
-from physics.engine.axiom_5_packing.definitions.pull_push import GIVE, given, pull_across, push_back
+from physics.engine.axiom_5_packing.definitions.pull_push import (
+    GIVE, PULL, apart_of, given, pull_across, push_back)
 
 
 @wp.kernel
-def _read(held: wp.array(dtype=wp.vec3d), found: wp.array(dtype=wp.vec3d)):
+def _read(held: wp.array(dtype=wp.vec3d), found: wp.array(dtype=wp.vec4d)):
     left, right, joint = held[wp.tid()][0], held[wp.tid()][1], held[wp.tid()][2]
     pull, push = pull_across(left, right, joint), push_back(joint)
-    found[wp.tid()] = wp.vec3d(pull, push, given(wp.vec2d(pull, push), wp.float64(0.01)))
+    gives = given(wp.vec4d(pull, push, pull, pull), wp.float64(0.01))
+    found[wp.tid()] = wp.vec4d(pull, push, gives, apart_of(left, right, joint))
 
 
 def _forces(*held: tuple) -> np.ndarray:
-    """Pull, push and what is given in a hundredth of a turn, for each (left, right, joint)."""
-    found = wp.zeros(len(held), dtype=wp.vec3d, device="cpu")
+    """Pull, push, what is given in a hundredth of a turn and the distance, for each (left, right, joint)."""
+    found = wp.zeros(len(held), dtype=wp.vec4d, device="cpu")
     wp.launch(_read, dim=len(held), device="cpu",
               inputs=[wp.array(held, dtype=wp.vec3d, device="cpu"), found])
     return found.numpy()
 
 
-def test_two_calm_volumes_hold_their_joint_at_half_their_size():
-    pull, push, gives = _forces((1, 1, 2))[0]
-    assert np.isclose(pull, 16) and np.isclose(push, 16) and gives == 0  # 36 / 1.5 ** 2 and 2 ** 4
+def test_the_cube_on_the_distance_holds_one_round_volume_and_three_joints_room():
+    fresh, squeezed, uneven = _forces((1, 1, 1), (1, 1, 2), (2, 0.5, 1))[:, 3]
+    assert np.isclose(fresh ** 3, 3 + np.pi / 6)                # a ball 1 wide and three rooms of 1
+    assert np.isclose(squeezed ** 3, 3 / 8 + np.pi / 6)         # twice the quanta: an eighth the room
+    assert np.isclose(uneven ** 3, 3 + np.pi / 12 * (1 / 8 + 8))  # half of each of the two balls
+
+
+def test_two_calm_volumes_hold_their_joint_a_quarter_thin():
+    pull, push, gives, apart = _forces((1, 1, 1.2803))[0]
+    assert abs(apart - 1.25) < 0.001 and abs(pull - push) < 0.01 * push  # 1.25 less two radii
 
 
 def test_the_pull_grows_with_both_volumes_and_falls_with_the_distance():
     base, more_left, more_right, fatter_joint = _forces((1, 1, 1), (2, 1, 1), (1, 2, 1), (1, 1, 0.5))
-    assert np.isclose(base[0], 36 / 2 ** 2)  # the distance is a half, 1 and a half
+    assert np.isclose(base[0], PULL / base[3] ** 2)
     assert more_left[0] > base[0] and np.isclose(more_left[0], more_right[0])
     assert fatter_joint[0] < base[0]  # a fatter joint holds its volumes further apart
     assert (_forces((0, 1, 1), (1, 0, 1), (1, 1, 0))[:, [0, 2]] == 0).all()  # nothing to pull
@@ -36,5 +45,5 @@ def test_the_pull_grows_with_both_volumes_and_falls_with_the_distance():
 def test_the_push_rises_steeply_and_what_is_given_is_the_unanswered_share():
     calm, twice = _forces((1, 1, 1), (1, 1, 2))
     assert calm[1] == 1 and twice[1] == 16  # twice the quanta: 16 times the push
-    assert np.isclose(calm[2], GIVE * 0.01 * (9 - 1) / 9)
-    assert _forces((1, 1, 3))[0, 2] == 0  # the push is the bigger: nothing gives
+    assert np.isclose(calm[2], GIVE * 0.01 * (calm[0] - 1) / calm[0])
+    assert twice[2] == 0  # the push is the bigger: nothing gives
