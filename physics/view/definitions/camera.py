@@ -9,6 +9,7 @@ import numpy as np
 
 FOCAL = 2.75
 DISTANCE = 2.6   # the eye's first distance, in cell edges
+LINE_DISTANCE = 4.6  # and for three cells in a row: the whole line fits a window 1000 by 800
 YAW, PITCH = 0.2, 0.15
 NEAREST, FARTHEST = 0.05, 200.0
 

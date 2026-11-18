@@ -38,6 +38,7 @@ Misses are reported as misses; nothing is tuned to look good.
 ```bash
 uv sync --all-packages --all-extras --all-groups
 PYTHONPATH=. .venv/bin/python -m physics.view   # a window; Space starts, R resets, G calm/own, Esc quits
+PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing   # energy crossing from a volume through a joint into the next
 PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, 5 seconds
 ```
 
@@ -47,8 +48,8 @@ to the GPU by itself.
 
 | Path | What it is |
 |---|---|
-| `physics/engine/` | the engine, one directory per axiom (`axiom_1_energy` to `axiom_7_quantum`), each with its definitions, its logic and its tests; layer 1 fills the first three |
-| `physics/view/` | the window on one red energy volume with its swirl; it can also save pictures |
+| `physics/engine/` | the engine, one directory per axiom (`axiom_1_energy` to `axiom_7_quantum`), each with its definitions, its logic and its tests; layers 1 and 2 fill the first five |
+| `physics/view/` | the window on one red energy volume with its swirl, or on a volume, a blue joint and a volume with energy crossing; it can also save pictures |
 | `docs/bible.md` | how everything works; the theory is the chapter `physics/quantum-relativity` |
 
 ## Built with

@@ -1,7 +1,8 @@
 """Flow inside: one step of the fluid inside every cell that holds its own boxes.
 
 Six launches (three axes, two parities) take every face between two boxes of a block
-once; no box is in two pairs of one launch. Only the own set is visited.
+once; no box is in two pairs of one launch. Only the own set is visited. A joint's minus
+quanta move by the same law: the wave is the root of how many, the sign is kept.
 """
 import warp as wp
 
@@ -21,15 +22,16 @@ def _flow(own_cell: wp.array(dtype=wp.int32), apart: wp.vec3i, parity: wp.int32,
     # along the axis, parity 0 pairs boxes 0-1, 2-3, 4-5 and parity 1 pairs 1-2, 3-4
     low = (pair * 2 + parity) * apart[0] + first * apart[1] + second * apart[2]
     high = low + apart[0]
-    low_has = box_quanta[slot, low]
-    high_has = box_quanta[slot, high]
+    sign = wp.sign(box_quanta[slot, low] + box_quanta[slot, high])  # a joint's boxes are minus
+    low_has = wp.abs(box_quanta[slot, low])
+    high_has = wp.abs(box_quanta[slot, high])
     low_wave, high_wave = pair_rotation(wave_of(low_has, box_phase[slot, low]),
                                         wave_of(high_has, box_phase[slot, high]), wp.float64(TURN))
     box = wp.uint64(own_cell[slot]) * wp.uint64(box_quanta.shape[1]) + wp.uint64(low)
     flow = wp.dot(high_wave, high_wave) - wp.float64(high_has)  # what the high box gains
     moved = whole_move(flow, draw_uniform(seed, step, pass_id, box), low_has, high_has)
-    box_quanta[slot, low] = low_has - moved
-    box_quanta[slot, high] = high_has + moved
+    box_quanta[slot, low] = sign * (low_has - moved)
+    box_quanta[slot, high] = sign * (high_has + moved)
     box_phase[slot, low] = phase_of(low_wave, box_phase[slot, low])
     box_phase[slot, high] = phase_of(high_wave, box_phase[slot, high])
 

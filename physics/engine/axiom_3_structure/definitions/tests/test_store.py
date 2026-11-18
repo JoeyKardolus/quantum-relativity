@@ -31,9 +31,12 @@ def test_a_full_own_set_stops_with_a_plain_message():
     assert rows.count == 2 and rows.open_tiles == 1
 
 
-def test_a_joint_is_refused_until_its_fluid_is_built():
-    store = calm_cells(1, own_cap=1)
-    store.cell_quanta.fill_(-648_000)
-    with pytest.raises(NotImplementedError, match="joint"):
-        take_own(store, 0)
-    assert store.count == 0
+def test_a_joint_is_dealt_like_a_volume_in_minus_to_the_quantum():
+    store, volume = calm_cells(1, own_cap=1), calm_cells(1, own_cap=1)
+    store.cell_quanta.fill_(-648_001)
+    volume.cell_quanta.fill_(648_001)
+    take_own(store, 0)
+    take_own(volume, 0)
+    boxes = store.box_quanta.numpy()
+    assert int(boxes.sum()) == -648_001 and boxes.max() < 0
+    assert (boxes == -volume.box_quanta.numpy()).all()

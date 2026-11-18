@@ -56,4 +56,12 @@ def core_share(quanta: np.ndarray, laid: int) -> float:
 
 def off_rule(quanta: np.ndarray, rule: np.ndarray) -> float:
     """How far the boxes are from the calm rule's; 1 is the counting noise of whole quanta."""
-    return float(((quanta - rule) ** 2 / np.maximum(rule, 1)).mean())
+    return float(((quanta - rule) ** 2 / np.maximum(np.abs(rule), 1)).mean())
+
+
+def flow_along(quanta: np.ndarray, phase: np.ndarray, axis: int) -> float:
+    """The fluid going up a block's direction `axis`, summed over the faces between its boxes."""
+    across = round(quanta.size ** (1 / 3))
+    has = np.moveaxis(np.abs(quanta).reshape((across,) * 3).astype(float), axis, 0)
+    angle = np.moveaxis(phase.reshape((across,) * 3).astype(float), axis, 0)
+    return float((np.sqrt(has[:-1] * has[1:]) * np.sin(angle[:-1] - angle[1:])).sum())

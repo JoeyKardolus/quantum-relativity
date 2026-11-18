@@ -1,4 +1,5 @@
-"""Title line: the one cell's numbers in words, for the window's title and the pictures' log."""
+"""Title line: a scene's numbers in words, for the window's title and the pictures' log."""
+from physics.engine.axiom_3_structure.definitions.size_law import size_of
 from physics.engine.axiom_3_structure.definitions.store import Store, peek, slot_of
 from physics.engine.axiom_3_structure.logic.boxes_of import swirl_of
 
@@ -11,3 +12,12 @@ def title_line(store: Store) -> str:
     return (f"whole turns {turns}  quanta {peek(store.cell_quanta, 0):,}  step {store.step}  "
             f"core {seen['core']:.3f} of the mean  off the rule {seen['off_rule']:.2f}  "
             f"ledger {store.ledger:,}  {kept}")
+
+
+def line_title(store: Store) -> str:
+    """Volume A, the joint and volume B: quanta, heat booked, the plus total, sizes, the step."""
+    left, joint, right = (int(held) for held in store.cell_quanta.numpy()[:3])
+    heat = store.cell_heat.numpy()
+    sizes = "  ".join(f"{size_of(held, store.across):.2f}" for held in (left, joint, right))
+    return (f"A {left:,}  joint {joint:,}  B {right:,}  A + B {left + right:,}  "
+            f"heat A {heat[0]:,}  B {heat[2]:,}  sizes {sizes}  step {store.step}")

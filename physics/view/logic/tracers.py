@@ -1,9 +1,10 @@
-"""Tracers: dots of fluid that the cell's own flow carries, each with the way it came.
+"""Tracers: dots of fluid that the cells' own flow carries, each with the way it came.
 
 A tracer starts in a box drawn by its quanta, so the dots lie as the fluid lies. Before
 each of a step's six passes it moves with the fluid of its box and that box's partner:
 the engine's own pair rotation says how much crosses between the two, and the tracer
 keeps as much of their fluid behind it as it had. Fluid that stands still moves no dot.
+In a line of cells a place's second number runs on from cell to cell: `across` a cell.
 """
 from dataclasses import dataclass
 
@@ -13,10 +14,11 @@ import warp as wp
 from physics.engine import step
 from physics.engine.axiom_1_energy.definitions.pair_rotation import TURN, pair_rotation, wave_of
 from physics.engine.axiom_3_structure.logic.boxes_of import boxes_of
+from physics.view.definitions.carried import carried
+from physics.view.logic.tracers_across import carry_across
 
-COUNT = 8000  # tracers, a drawing number
-MARKS = 32  # places a tracer remembers: where it is now and the 31 marks behind it
-MARK_EVERY = 4  # steps from one mark to the next
+COUNT = 8000  # tracers a cell, a drawing number
+MARKS, MARK_EVERY = 32, 4  # places a tracer remembers (now and 31 behind); steps a mark
 
 
 @dataclass
@@ -27,10 +29,12 @@ class Tracers:
 
 @wp.kernel
 def _carry(quanta: wp.array2d(dtype=wp.int32), phase: wp.array2d(dtype=wp.float32),
-           slot: wp.int32, across: wp.int32, axis: wp.int32, parity: wp.int32,
+           slot: wp.int32, cells: wp.int32, across: wp.int32, axis: wp.int32, parity: wp.int32,
            read_row: wp.int32, write_row: wp.int32, tail: wp.array2d(dtype=wp.vec3)):
     tracer = wp.tid()
     place = tail[read_row, tracer]
+    cell = wp.clamp(int(place[1]) / across, 0, cells - 1)
+    place[1] -= float(cell * across)
     strides = wp.vec3i(across * across, across, 1)
     inside = wp.vec3i(wp.clamp(int(place[0]), 0, across - 1),
                       wp.clamp(int(place[1]), 0, across - 1),
@@ -39,41 +43,38 @@ def _carry(quanta: wp.array2d(dtype=wp.int32), phase: wp.array2d(dtype=wp.float3
     if first >= 0 and first + 1 < across:
         low = wp.dot(inside, strides) + (first - inside[axis]) * strides[axis]
         high = low + strides[axis]
-        low_has, high_has = float(quanta[slot, low]), float(quanta[slot, high])
-        low_wave, high_wave = pair_rotation(wave_of(quanta[slot, low], phase[slot, low]),
-                                            wave_of(quanta[slot, high], phase[slot, high]),
-                                            wp.float64(TURN))
-        stays = low_has + high_has - float(wp.dot(high_wave, high_wave))  # the low box, after
-        line = place[axis] - float(first)  # 0 to 2 along the two boxes; `before` is the fluid
-        before = wp.min(line, 1.0) * low_has + wp.max(line - 1.0, 0.0) * high_has  # behind it
-        if before < stays:
-            line = before / stays
-        else:
-            line = 1.0 + (before - stays) / wp.max(low_has + high_has - stays, 1.0e-6)
-        place[axis] = float(first) + wp.clamp(line, 0.0, 2.0)
+        own = slot + cell  # the cells' slots follow each other
+        low_has, high_has = wp.abs(quanta[own, low]), wp.abs(quanta[own, high])  # minus too
+        low_wave, high_wave = pair_rotation(wave_of(low_has, phase[own, low]),
+                                            wave_of(high_has, phase[own, high]), wp.float64(TURN))
+        stays = float(low_has + high_has) - float(wp.dot(high_wave, high_wave))  # low, after
+        place[axis] = float(first) + carried(place[axis] - float(first), float(low_has),
+                                             float(high_has), stays)
+    place[1] += float(cell * across)
     tail[write_row, tracer] = place
 
 
-def lay_tracers(store, cell: int, count: int = COUNT, seed: int = 1) -> Tracers:
-    """`count` tracers at rest, laid over the cell's boxes by their quanta."""
+def lay_tracers(store, cell: int, count: int = COUNT, seed: int = 1, cells: int = 1) -> Tracers:
+    """`count` tracers at rest, laid over the boxes of `cells` cells from `cell` on by quanta."""
     box_quanta, _phase, slot = boxes_of(store, cell)
-    quanta, chance = box_quanta[slot].numpy().astype(float), np.random.default_rng(seed)
+    quanta = np.abs(box_quanta[slot:slot + cells].numpy().ravel())
+    chance = np.random.default_rng(seed)
     boxes = chance.choice(quanta.size, size=count, p=quanta / quanta.sum())
-    corner = np.stack(np.unravel_index(boxes, (store.across,) * 3), axis=1)
+    corner = np.stack(np.unravel_index(boxes % store.across ** 3, (store.across,) * 3), axis=1)
     place = (corner + chance.random((count, 3))).astype(np.float32)
+    place[:, 1] += (boxes // store.across ** 3) * store.across  # the cell's place in the line
     return Tracers(wp.array(np.tile(place, (MARKS, 1, 1)), dtype=wp.vec3, device=box_quanta.device))
 
 
-def step_carrying(store, tracers: Tracers, cell: int, mark: bool, boxes: tuple = None) -> None:
+def step_carrying(store, tracers: Tracers, cell: int, mark: bool, boxes: tuple = None,
+                  cells: int = 1) -> None:
     """One step of the engine with the tracers carried along; `mark` lengthens their tails."""
     new = (tracers.head + 1) % MARKS if mark else tracers.head
     # `boxes` saves asking again: a calm cell's stay good, its flow is the same every step
-    box_quanta, box_phase, slot = boxes or boxes_of(store, cell)
-
+    line = (*(boxes or boxes_of(store, cell)), cells, store.across)
     def carry(axis: int, parity: int) -> None:
-        wp.launch(_carry, dim=tracers.tail.shape[1], device=box_quanta.device,
-                  inputs=[box_quanta, box_phase, slot, store.across, axis, parity,
-                          tracers.head, new, tracers.tail])
+        wp.launch(_carry, dim=tracers.tail.shape[1], device=tracers.tail.device,
+                  inputs=[*line, axis, parity, tracers.head, new, tracers.tail])
         tracers.head = new
 
-    step(store, carry)
+    step(store, carry, lambda: carry_across(*line, tracers.tail, tracers.head))

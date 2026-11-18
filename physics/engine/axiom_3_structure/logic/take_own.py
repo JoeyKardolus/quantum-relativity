@@ -19,7 +19,8 @@ def _lay(own_cell: wp.array(dtype=wp.int32), first: wp.int32, turned: wp.float64
          pattern: wp.array2d(dtype=wp.vec2d),
          box_quanta: wp.array2d(dtype=wp.int32), box_phase: wp.array2d(dtype=wp.float32)):
     slot = first + wp.tid()
-    total = cell_quanta[own_cell[slot]]
+    sign = wp.sign(cell_quanta[own_cell[slot]])  # a joint is dealt like a volume, in minus
+    total = wp.abs(cell_quanta[own_cell[slot]])
     laid = wp.int32(cell_laid[own_cell[slot]])
     boxes = pattern.shape[1]
     left_over = total
@@ -29,9 +30,10 @@ def _lay(own_cell: wp.array(dtype=wp.int32), first: wp.int32, turned: wp.float64
         angle = pattern[laid, box][1] + turned
         angle -= wp.float64(wp.tau) * wp.floor((angle + wp.float64(wp.pi)) / wp.float64(wp.tau))
         box_phase[slot, box] = wp.float32(angle)
-        box_quanta[slot, box] = dealt(total, pattern[laid, box][0], boxes)
+        share = dealt(total, pattern[laid, box][0], boxes)
         if box < left_over:
-            box_quanta[slot, box] += 1
+            share += 1
+        box_quanta[slot, box] = sign * share
 
 
 def lay(store: Store, own_cell: wp.array, first: int, number: int,
@@ -47,8 +49,6 @@ def take_own(store: Store, cell: int) -> None:
     entry = entry_of(store, cell)
     if entry >= 0 and peek(store.tile_slots, entry) >= 0:
         return
-    if peek(store.cell_quanta, cell) < 0:
-        raise NotImplementedError("a joint's fluid is not built yet: layer 1 holds plus only")
     if store.count == store.own_cell.shape[0]:
         raise RuntimeError(f"the own set is full: {store.count} cells hold their own boxes")
     if entry < 0 and store.open_tiles * TILE == store.tile_slots.shape[0]:

@@ -8,4 +8,6 @@ Built: the fluid inside one cell. Two boxes trade what their waves differ by (`p
 - The draw's noise is not damped. Measured (seed 1, 6 across): after about 3,000 steps a cell is too far from the rule to go back to calm.
 - A swirl needs enough quanta a box: at 3,000 it holds, at 20 it is gone in 100 steps.
 
-Not built: local time, the total changing, minus quanta (a joint's fluid).
+A joint's minus quanta move by the same law, the sign kept.
+
+Not built: local time, the total changing.

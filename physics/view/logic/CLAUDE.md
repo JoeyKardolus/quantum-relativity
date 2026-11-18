@@ -1,6 +1,6 @@
 # View, logic
 
-`tracers.py` (the dots the flow carries), `streaks.py` (their tails as what the card draws), `swirl_painter.py` (OpenGL: the buffer, `load`, `draw`), `picture.py` (one drawing read back, for files and tests), `cell_window.py` (window and keys), `window.py` (the door and `--pictures`), `save_png.py`, `title_line.py`.
+`tracers.py` (the dots the flow carries), `tracers_across.py` (over a joint), `streaks.py` and `line_streaks.py` (their tails as what the card draws), `scene.py` (one cell or the line), `swirl_painter.py` (OpenGL: the buffer, `load`, `draw`), `picture.py` (one drawing read back, for files and tests), `cell_window.py` (window and keys), `window.py` (the door and `--pictures`), `save_png.py`, `title_line.py`.
 
 - A tracer moves before each of a step's six passes (the engine's `before_pass`), by that pass's own pair rotation. Moved once a step instead, they drift into the core (measured).
 - `COUNT`, `MARKS`, `MARK_EVERY`, `BOXES`, `SPEED`, `FRAMES` and `TICKS` only draw. Set by eye once; do not move them.

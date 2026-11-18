@@ -1,8 +1,9 @@
 """Store: where every cell is kept, built so a billion cells fit one graphics card.
 
-A calm cell is a rule, not boxes: 5 bytes, its whole signed total and how its swirl is
-laid (`axis * 2`, plus 1 for the other sense). Only a cell in the own set holds boxes,
-in a slot; slots in use are always `0 .. count - 1`. Two plain arrays find the slot.
+A calm cell is a rule, not boxes: its whole signed total, how its swirl is laid
+(`axis * 2`, plus 1 for the other sense) and its heat count, 9 bytes. Only a cell in the
+own set holds boxes, in a slot; slots in use are always `0 .. count - 1`. Two plain
+arrays find the slot.
 """
 from dataclasses import dataclass
 
@@ -18,6 +19,7 @@ class Store:
     turn_per_step: float    # how far a calm swirl's phase turns in one step
     cell_quanta: wp.array   # int32 (cells)
     cell_laid: wp.array     # uint8 (cells)
+    cell_heat: wp.array     # int32 (cells): quanta that came in with their direction taken
     tile_home: wp.array     # int32 (cells / 512): the tile's row in tile_slots, -1: all calm
     tile_slots: wp.array    # int32 (tile rows * 512): the cell's slot, -1: calm
     own_cell: wp.array      # int32 (cap): which cell holds this slot
@@ -28,6 +30,16 @@ class Store:
     count: int = 0          # slots in use
     open_tiles: int = 0     # tile rows in use
     ledger: int = 0         # quanta that changed box when cells went back to calm
+
+
+@wp.func
+def slot_at(tile_home: wp.array(dtype=wp.int32), tile_slots: wp.array(dtype=wp.int32),
+            cell: wp.int32) -> wp.int32:
+    """On the card: the slot that holds the cell's boxes, or -1 when the cell is calm."""
+    row = tile_home[cell / TILE]
+    if row < 0:
+        return -1
+    return tile_slots[row * TILE + cell % TILE]
 
 
 def put(array: wp.array, index: int, value: int) -> None:

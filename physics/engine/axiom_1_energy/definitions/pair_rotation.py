@@ -3,7 +3,7 @@
 A box's fluid is a wave, `sqrt(quanta) * e^(i phase)`, kept as (real, imaginary). What
 two waves have in common stands as it is; what they differ by turns by twice `TURN`.
 So two equal waves stand still, and fluid flows from the wave whose phase is ahead.
-Layer 1 holds plus quanta only: how a joint's minus fluid moves is not decided yet.
+A joint's minus fluid moves by the same law: its wave is the root of how many quanta.
 """
 import warp as wp
 

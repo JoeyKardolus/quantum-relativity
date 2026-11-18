@@ -1,6 +1,6 @@
 # Axiom 3, definitions
 
-`store.py`: the plain arrays every cell lives in, and `slot_of`. `kinds.py`: boxes across a cell, quanta a box (a chosen scene number, not moved).
+`store.py`: the plain arrays every cell lives in, `slot_of`, and `slot_at` (the same on the card). `size_law.py`: a cell's length from its quanta. `kinds.py`: boxes across a cell, quanta a box (a chosen scene number, not moved).
 
 - A box belongs to its cell and has no place in space.
 - Warp arrays cannot grow: they are made once at their full size. A full own set or full tile rows (`tile_cap`) stop with a plain message.
