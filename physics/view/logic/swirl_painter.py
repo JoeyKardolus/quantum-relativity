@@ -1,4 +1,4 @@
-"""Swirl painter: draws the streaks as red lines on the card, straight to the screen.
+"""Swirl painter: draws the streaks as lines and, for a grid, every mark as a dot, on the card.
 
 The lines' ends live in one buffer that OpenGL draws from. `load` copies new streaks
 into it, the one small copy a tick costs (Warp and OpenGL share no memory under WSL2,
@@ -19,6 +19,7 @@ class SwirlPainter:
         """Room on the card for `count` tails of `marks` marks; needs an open window."""
         shader = pyglet.graphics.shader
         self.thick = 1.0  # times `THICK`: a grid's volumes along, so it is as solid as one cell
+        self.dots = False  # a grid's marks are dots too: fluid that stands still is seen
         self.program = shader.ShaderProgram(shader.Shader(VERTEX, "vertex"),
                                             shader.Shader(FRAGMENT, "fragment"))
         older = np.arange((marks - 1) * count)  # each line: a mark and the next newer one
@@ -48,4 +49,9 @@ class SwirlPainter:
             self.program[name] = tuple(float(part) for part in value)
         self.program["across"], self.program["tall"] = float(across), float(height)
         self.program["aspect"], self.program["thick"] = width / max(height, 1), self.thick
+        self.program["dots"] = 0.0
         self.lines.draw(gl.GL_LINES)
+        if self.dots:
+            gl.glEnable(gl.GL_PROGRAM_POINT_SIZE)
+            self.program["dots"] = 1.0
+            gl.glDrawArrays(gl.GL_POINTS, self.lines.start, self.lines.count)

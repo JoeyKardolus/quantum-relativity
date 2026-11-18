@@ -1,9 +1,10 @@
 """Cell window: the window on a scene and its keys.
 
 Space stops and starts, R lays a fresh start, drag turns the view, the wheel zooms, Esc
-quits. A grid: L steps the flat cut to the next layer, C shows all layers at once and the
-cut again. One cell: G sends the cell to calm if it may go or takes it own again. The fluid
-steps `TICKS` times a second; the window is drawn at most as often as the door's `FRAMES`.
+quits. A grid: L steps to the next layer; C goes from the flat cut to a slab two layers
+thick in three dimensions, to the whole grid, to the cut again. One cell: G sends it to
+calm if it may go or takes it own again. The fluid steps `TICKS` times a second; the
+window is drawn at most as often as the door's `FRAMES`.
 """
 import pyglet
 from pyglet.window import key
@@ -25,10 +26,10 @@ class CellWindow(pyglet.window.Window):
         super().__init__(1000, 800, resizable=True, vsync=False, caption="energy")
         self.fresh = lambda: SCENES[scene](across, device=device)
         self.speed, self.running, self.store = speed, True, self.fresh()
-        self.layer = 0 if layers(self.store) else None  # a grid opens on a flat cut
+        self.layer, self.slab = (0 if layers(self.store) else None), 0  # a grid: a flat cut
         self.tracers, self.boxes = trace(self.store, self.layer), boxes_of(self.store, 0)
         self.painter = SwirlPainter(MARKS, self.tracers.tail.shape[1])
-        self.painter.thick = max(layers(self.store), 1.0)
+        self.painter.thick, self.painter.dots = max(layers(self.store), 1.0), scene != "one"
         self.yaw, self.pitch = (0.0, 0.0) if layers(self.store) else (YAW, PITCH)
         self.distance = eye_distance(self.store)
         pyglet.clock.schedule_interval(self.tick, 1 / TICKS)
@@ -38,7 +39,7 @@ class CellWindow(pyglet.window.Window):
         for _ in range(self.speed if self.running else 0):
             step_carrying(self.store, self.tracers, 0, self.store.step % MARK_EVERY == 0,
                           self.boxes, max(self.store.count, 1))
-        self.painter.load(drawn(self.store, self.tracers, self.layer))
+        self.painter.load(drawn(self.store, self.tracers, self.layer, self.slab))
 
     def retitle(self, _elapsed: float) -> None:
         stopped = "" if self.running else "  (stopped: Space)"
@@ -59,14 +60,16 @@ class CellWindow(pyglet.window.Window):
         elif symbol == key.G and alone:
             give_back(self.store, 0)
         elif symbol == key.L and cut:
-            self.layer = ((self.layer or 0) + 1) % cut
+            self.layer += 1
         elif symbol == key.C and cut:
-            self.layer = 0 if self.layer is None else None
-            self.yaw, self.pitch = (YAW, PITCH) if self.layer is None else (0.0, 0.0)
+            self.slab = 0 if self.slab == cut else cut if self.slab else min(2, cut)
+            self.yaw, self.pitch = (YAW, PITCH) if self.slab else (0.0, 0.0)
+        if cut:
+            self.layer %= cut - max(self.slab, 1) + 1  # a slab stays inside the grid
         if symbol == key.R:
             self.store = self.fresh()
         if symbol in (key.R, key.L, key.C):
-            self.tracers = trace(self.store, self.layer)
+            self.tracers = trace(self.store, self.layer, self.slab)
         self.boxes = boxes_of(self.store, 0)  # asked once a key: a calm cell's cost a frame
 
     def on_mouse_drag(self, _x, _y, moved_x: int, moved_y: int, _buttons, _modifiers) -> None:

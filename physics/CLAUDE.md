@@ -5,7 +5,7 @@ A fresh start (2026-11-18), built in layers, each something to look at. Rules: t
 ```
 PYTHONPATH=. .venv/bin/python -m physics.view                   # one volume: Space, R, G, Esc
 PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing  # volume, joint, volume
-PYTHONPATH=. .venv/bin/python -m physics.view --scene calm      # 4 x 4 x 4: L next layer, C all
+PYTHONPATH=. .venv/bin/python -m physics.view --scene calm      # 4 x 4 x 4: L next layer, C in 3D
 PYTHONPATH=. .venv/bin/pytest -q physics                        # 20 seconds, on the CPU
 ```
 

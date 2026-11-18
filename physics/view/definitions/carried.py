@@ -14,4 +14,4 @@ def carried(line: float, low_has: float, high_has: float, stays: float) -> float
         line = before / stays
     else:
         line = 1.0 + (before - stays) / wp.max(low_has + high_has - stays, 1.0e-6)
-    return wp.clamp(line, 0.0, 1.9999)  # never onto the far edge: that is the next cell's
+    return wp.clamp(line, 0.0, 1.999)  # never onto the far edge, however far along the slots

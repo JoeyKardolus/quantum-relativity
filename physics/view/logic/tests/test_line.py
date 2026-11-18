@@ -3,7 +3,7 @@ import numpy as np
 
 from physics.engine import three_cells
 from physics.engine.axiom_3_structure.logic.lay_grid import calm_grid
-from physics.view.logic.line_streaks import AT_MEAN, line_streaks
+from physics.view.logic.line_streaks import AMOUNT, line_streaks
 from physics.view.logic.placed import placed
 from physics.view.logic.scene import trace
 from physics.view.logic.tracers import lay_tracers, step_carrying
@@ -75,6 +75,7 @@ def test_each_cell_is_drawn_at_its_place_the_joint_s_way_below_0():
     across_picture = drawn[:, 0] / 6 - 0.5
     assert across_picture[cell == 0].max() < across_picture[cell == 2].min()  # the joint lies between
     assert drawn[cell == 1, 3].max() <= 0 < drawn[cell == 1, 3].min() + 1 and drawn[cell != 1, 3].min() >= 0
-    for one in range(3):  # one rule for both colours: fluid at its cell's mean speed is AT_MEAN
-        ways = line_streaks(tracers, 6, placed(store)).numpy()[1:, cell == one, 3]
-        assert abs(np.sqrt((ways ** 2).mean()) - AT_MEAN) < 0.1 * AT_MEAN
+    assert np.allclose(drawn[cell == 1, 3], -AMOUNT)  # one rule: every mark of a joint counts alike,
+    inside = tracers.tail.numpy()[tracers.head][cell == 0] / 6 - 0.5  # and a ball's by its even share
+    even = (np.abs(inside).max(axis=1) / np.linalg.norm(inside, axis=1)) ** 3 / (np.pi / 6)
+    assert np.allclose(drawn[cell == 0, 3], AMOUNT * even, rtol=1e-3) and np.ptp(even) > 1

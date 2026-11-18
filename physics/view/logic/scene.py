@@ -3,8 +3,9 @@ volume, a blue joint and a red volume in a line; `calm` a small full grid that w
 
 A grid is shown as a flat cut through one layer of its volumes: the tracers are laid in
 the boxes the cut passes, the two middle layers of boxes of that layer's volumes and of
-the joints between them. With no layer named the cuts through all layers are shown at
-once; the joints that lie from layer to layer are in none of them.
+the joints between them. Or in three dimensions, a slab `slab` layers thick from `layer`
+on: every layer's cut, and the joints from layer to layer each cut both ways along its
+length. A slab of all the layers is the whole grid, every volume and every joint.
 """
 import numpy as np
 import warp as wp
@@ -27,26 +28,33 @@ def layers(store: Store) -> int:
     return store.grid[2] // 2
 
 
-def in_cut(store: Store, layer: int | None) -> np.ndarray | int:
-    """1 for each box of each own cell that the flat cut through `layer` passes; None: every cut."""
+def in_cut(store: Store, layer: int | None, slab: int = 0) -> np.ndarray | int:
+    """1 for each box of each own cell that is shown: the flat cut through `layer`, or the slab."""
     if not layers(store):
         return 1
     deep = np.unravel_index(store.own_cell.numpy()[:store.count], store.grid)[2]
-    middle = np.abs(np.arange(store.across ** 3) % store.across - (store.across - 1) / 2) < 1
-    return np.outer(deep % 2 == 0 if layer is None else deep == 2 * layer, middle)
+    box = np.indices((store.across,) * 3).reshape(3, -1)
+    middle = np.abs(box - (store.across - 1) / 2) < 1  # the two middle layers, each direction
+    if not slab:
+        return np.outer(deep == 2 * layer, middle[2])
+    last = store.grid[2] if slab == layers(store) else 2 * (layer + slab - 1)  # all: the wrap's too
+    cuts = np.outer(deep % 2 == 0, middle[2]) | np.outer(deep % 2 == 1, middle[0] | middle[1])
+    return cuts & ((deep >= 2 * layer) & (deep <= last))[:, None]
 
 
-def trace(store: Store, layer: int | None) -> Tracers:
+def trace(store: Store, layer: int | None, slab: int = 0) -> Tracers:
     """Fresh tracers in what is shown: `COUNT` a cell, shared out past four cells."""
     cells = max(store.count, 1)  # a calm cell alone is drawn too
-    return lay_tracers(store, 0, COUNT * min(cells, 4), cells=cells, shown=in_cut(store, layer))
+    return lay_tracers(store, 0, COUNT * min(cells, 4), cells=cells,
+                       shown=in_cut(store, layer, slab))
 
 
-def drawn(store: Store, tracers: Tracers, layer: int | None = None) -> wp.array:
-    """The tracers' tails as the card draws them now, the cut's layer at the picture's middle."""
+def drawn(store: Store, tracers: Tracers, layer: int | None = None, slab: int = 0) -> wp.array:
+    """The tracers' tails as the card draws them now, what is shown at the picture's middle."""
     if store.grid == (1, 1, 1):
         return streaks(tracers)
-    return line_streaks(tracers, store.across, placed(store, layer))
+    middle = layer if layer is None else layer + max(slab - 1, 0) / 2
+    return line_streaks(tracers, store.across, placed(store, middle))
 
 
 def title(store: Store) -> str:

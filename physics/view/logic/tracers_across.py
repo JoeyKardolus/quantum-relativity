@@ -54,7 +54,7 @@ def _carry_across(quanta: wp.array2d(dtype=wp.int32), phase: wp.array2d(dtype=wp
     line = carried(line, float(low_has), float(high_has), stays)
     slot = high  # over, in the volume after; or still in the one before
     if line < 1.0:
-        slot, line = low, line + float(across)
+        slot, line = low, wp.min(line, 0.999) + float(across)  # never onto the next slot
     place[axis] = line - 1.0
     place[1] += float(slot * across)
     tail[row, tracer] = place

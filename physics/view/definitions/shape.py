@@ -14,6 +14,8 @@ Picture: the grid's second direction runs right, its first down, its third towar
 """
 import warp as wp
 
+BALL = 0.5235987755982988  # the room of a ball 1 wide: pi over 6
+
 
 @wp.func
 def drawn_place(inside: wp.vec3, shape: wp.mat33) -> wp.vec3:
@@ -36,3 +38,16 @@ def drawn_place(inside: wp.vec3, shape: wp.mat33) -> wp.vec3:
         out = wp.cbrt(rim * rim * rim * (1.0 - part) + reach * reach * reach * part)
         spot = middle + ray * (out / reach) + along * (wp.max(side, 0.0) * shape[2][0])
     return shape[0] + wp.vec3(spot[1], -spot[0], spot[2])
+
+
+@wp.func
+def even_share(inside: wp.vec3, shape: wp.mat33) -> float:
+    """How much a mark counts so that every box of a block gets an even share of its room.
+
+    A ball presses its block's corners together; a mark there counts that much less. A
+    joint's fans already give equal parts of the block equal room of the pyramid: 1.
+    """
+    if shape[2][2] <= 0.0:
+        return 1.0
+    widest = wp.max(wp.abs(inside[0]), wp.max(wp.abs(inside[1]), wp.abs(inside[2])))
+    return wp.pow(widest / wp.max(wp.length(inside), 1.0e-6), 3.0) / BALL
