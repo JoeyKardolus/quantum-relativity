@@ -970,6 +970,8 @@ stronger than gravity, so each force needs its own strength. Measured 2026-11-17
 
 ### How results are trusted
 
+**The fit goes in phases** (owner, 2026-11-18; this replaces fitting on expansion and structure first). Phase 1 fits only for gravity to work somewhat normally: two lumps fall toward each other as bodies, sideways motion keeps going, the pull fades as one over distance squared, one lump can go round another. Only when that holds is the next layer added (expansion, structure, black holes, quantum), one at a time, each fitted on top of the last without breaking the layers below. No scorecard and no result pages until phase 1 holds; results are shown in the viewer.
+
 Validation comes first: a measurement is trusted only after it gives the known answer on a
 known start (today: the 1/r pull test and the power-spectrum slope test); the point-scattered
 reference spacetimes went with the milestone code and must be rebuilt on the grid of cells before
