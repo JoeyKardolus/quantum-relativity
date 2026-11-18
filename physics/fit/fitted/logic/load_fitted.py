@@ -5,7 +5,7 @@ Contract: `load_fitted(path=None)` returns a dict with
   fitted_on  what the search that chose them found
 With no `path` it reads the shipped `FITTED`; with one it reads a JSON file of the same
 shape, `{"settings": {...}, "fitted_on": {...}}`, such as a search wrote outside the repo.
-While nothing is fitted the settings are the defaults. The defaults themselves never
+A name the fit did not choose keeps its default. The defaults themselves never
 change (`Settings()` stays the default run): a scene that wants the fitted universe asks
 for it by name,
   fitted = load_fitted(); universe = new_universe(fitted["settings"]); step(universe, fitted["settings"])

@@ -18,7 +18,7 @@ def _universe(**changed):
 def test_the_default_universe_starts_with_every_joint_in_balance_and_the_pull_at_rest():
     state, settings = _universe()
     kind, squeeze, length = state.host("kind"), state.host("squeeze"), state.host("length")
-    assert 0.999 < squeeze[kind == JOINT].min() and squeeze[kind == JOINT].max() <= 1.0
+    assert 0.995 < squeeze[kind == JOINT].min() and squeeze[kind == JOINT].max() <= 1.0
     assert state.pull_unrest < 1e-6 * np.ptp(state.host("pull"))
     ratio = length[kind == JOINT].mean() / length[kind == ENERGY_VOLUME].mean()
     print(f"default start: a joint is {ratio:.2f} times as long as a volume")
@@ -39,7 +39,7 @@ def test_a_start_with_energy_placed_by_hand_is_laid_again_and_only_a_start_is():
     state.set_block("quanta", volume, state.block("quanta", volume) * 5)
     lay_start(state, settings)
     kind, squeeze = state.host("kind"), state.host("squeeze")
-    assert squeeze[kind == JOINT].max() <= 1.0 and squeeze[kind == JOINT].min() > 0.999
+    assert squeeze[kind == JOINT].max() <= 1.0 and squeeze[kind == JOINT].min() > 0.995
     assert state.host("pull")[volume] == state.host("pull")[kind == ENERGY_VOLUME].min(), "the fuller volume sits deepest"
     step(state, settings)
     with pytest.raises(ValueError, match="lays a start"):

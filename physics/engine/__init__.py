@@ -93,7 +93,8 @@ def _merged(table: str) -> dict:
     return merged
 
 
-_BALANCE_ROUNDS = 60
+_BALANCE_ROUNDS = 24
+_RAISE_ROUNDS = 6
 _BALANCED = 1e-4
 
 ARRAYS = _merged("ARRAYS")
@@ -125,10 +126,10 @@ def _balance(state, settings) -> None:
     """The start at rest in balance: every joint gets the energy at which its push equals the pull across it.
 
     A joint's energy sets its length, and the lengths set the pull, so the level is asked
-    again (`balance_level`) until no
-    joint moves by more than `_BALANCED` of what it holds, at most `_BALANCE_ROUNDS` times.
-    Then every joint still squeezed is raised to its own level, again and again, until
-    none is: the start is not squeezed anywhere and slack by less than `_BALANCED`.
+    again (`balance_level`) until no joint moves by more than `_BALANCED` of what it holds, at most `_BALANCE_ROUNDS` times.
+    Then, while any joint is still squeezed (at most `_RAISE_ROUNDS` times), every joint is raised by twice `_BALANCED`
+    (a squeezed one from its level): the start is not squeezed anywhere and slack by a
+    few times `_BALANCED` at most.
     `state.balance_off` keeps the last round's largest move.
     """
     for _ in range(_BALANCE_ROUNDS):
@@ -141,13 +142,13 @@ def _balance(state, settings) -> None:
         rest_pull(state, settings)
         if state.balance_off <= _BALANCED:
             break
-    for _ in range(_BALANCE_ROUNDS):
+    for _ in range(_RAISE_ROUNDS):
         press_joints(state, settings)
         held = state.host("cell_quanta").astype("float64")
         level = balance_level(state, settings)
         if not (level > held).any():
             break
-        fill_joints(state, settings, (level > held) * (level * (1.0 + _BALANCED) + 1.0) + (level <= held) * held)
+        fill_joints(state, settings, (level > 0.0) * (level * (level > held) + held * (level <= held)) * (1.0 + 2.0 * _BALANCED))
         size_cells(state, settings)
         pack_cells(state, settings)
         rest_pull(state, settings)

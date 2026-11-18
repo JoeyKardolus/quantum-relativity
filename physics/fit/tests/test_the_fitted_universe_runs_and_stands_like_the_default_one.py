@@ -1,4 +1,4 @@
-"""While nothing is fitted, a universe run from the fitted settings is the default universe, number for number, and the same run twice gives the same record."""
+"""A universe run from the fitted settings stands like the default one, and the same run twice gives the same record."""
 import dataclasses
 
 import physics.fit
@@ -15,13 +15,13 @@ def test_every_public_name_is_there():
 
 
 @needs_gpu
-def test_the_fitted_settings_change_nothing_while_nothing_is_fitted():
+def test_the_fitted_settings_are_the_defaults_but_for_what_phase_1_names_and_their_universe_runs():
     fitted = load_fitted()["settings"]
-    assert fitted == Settings()
     changed = {name: value for name, value in dataclasses.asdict(fitted).items() if value != getattr(Settings(), name)}
+    assert set(changed) <= set(load_fitted()["fitted_on"]["names"])
     default_run, fitted_run = run_universe({}, 1, 8, 24, 4), run_universe(changed, 1, 8, 24, 4)
-    assert default_run["series"] == fitted_run["series"] and default_run["score"] == fitted_run["score"]
     assert default_run["ended"] == "", "the default 8-a-side universe stands"
+    assert fitted_run["steps_done"] == 24 and fitted_run["ended"] == "", "and so does the fitted one"
 
 
 @needs_gpu

@@ -24,7 +24,7 @@ cell's whole turns), CPU only.
   Nothing else is loose, except `__main__.py` where `python -m` needs it. Definitions
   never import logic.
 - **Only `physics.engine`'s public names** are imported outside the engine
-  (`scenes/placed_start` still breaks this: there is no public door for placing energy).
+  (`lay_start` is the door for a placed start; `scenes/placed_start` does not use it yet).
 - **The rules are the bible's axioms.** Each axiom's `CLAUDE.md` says what is "Assumed",
   "Not done" and "Open". A failing engine test is a clause the engine does not keep;
   never bend one to pass.

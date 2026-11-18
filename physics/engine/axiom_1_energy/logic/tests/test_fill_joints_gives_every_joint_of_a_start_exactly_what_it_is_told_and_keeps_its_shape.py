@@ -22,8 +22,8 @@ def test_every_joint_holds_its_level_exactly_no_box_is_empty_and_no_volume_is_to
     held = grid.host("cell_quanta")
     assert np.array_equal(held[kind == JOINT], np.rint(levels[kind == JOINT]).astype(np.int64))
     assert (after[kind == JOINT] <= -1).all() and np.array_equal(after[kind == ENERGY_VOLUME], before[kind == ENERGY_VOLUME])
-    assert moved == pytest.approx(np.max(np.abs(held[kind == JOINT] - 648000.0 * before[kind == JOINT].reshape(-1, 216).sum(axis=1) / -648000.0)
-                                         / -before[kind == JOINT].reshape(-1, 216).sum(axis=1)), rel=1e-6)
+    was = np.abs(before[kind == JOINT].astype(np.int64)).reshape(-1, 216).sum(axis=1)
+    assert moved == pytest.approx(np.max(np.abs(held[kind == JOINT] - was) / was)), "the largest change as a share"
 
 
 def test_a_joint_keeps_the_proportions_of_its_boxes_and_a_level_below_one_a_box_is_one_a_box(grid):

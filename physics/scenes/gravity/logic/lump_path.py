@@ -8,15 +8,14 @@ each lump again (`lump_centre` within `radius` volumes of where it was last). Re
   centres   per lump, per sample: its centre in volumes (x, y, z), followed past the edge
   amounts   per lump, per sample: its extra energy
   collapses, tears   joints collapsed and volumes torn in the run
-The run stops early, and says so in a shorter `steps`, when an event leaves fewer
-energy volumes than the start had: a lump that fell into one cell is no body to follow.
+The run stops, with one last sample, at the step of the first
+collapse or tear: a lump that fell into one cell is no body to follow, and a universe
+that tears is not standing (its tears double from step to step).
 Raises ValueError for steps < 0 or every < 1.
 """
 from __future__ import annotations
 
-import numpy as np
-
-from physics.engine import ENERGY_VOLUME, Grid, Settings, step
+from physics.engine import Grid, Settings, step
 from physics.scenes.gravity.definitions.lump_centre import lump_centre
 from physics.scenes.gravity.logic.volume_energy import volume_energy
 
@@ -28,17 +27,17 @@ def lump_path(universe: Grid, settings: Settings, near: list, radius: float, ste
         raise ValueError(f"steps must be 0 or more and every 1 or more, got {steps} and {every}")
     places = [tuple(float(one) for one in place) for place in near]
     path = {"steps": [], "centres": [[] for _ in places], "amounts": [[] for _ in places]}
-    volumes = int((universe.host("kind") == ENERGY_VOLUME).sum())
     for done in range(steps + 1):
-        if done % every == 0:
+        over = bool(universe.collapses or universe.tears)
+        if done % every == 0 or over:
             energy = volume_energy(universe)
             path["steps"].append(done)
             for lump, place in enumerate(places):
                 places[lump], amount = lump_centre(energy, place, radius)
                 path["centres"][lump].append(places[lump])
                 path["amounts"][lump].append(amount)
-            if int(np.count_nonzero(energy)) < volumes:
-                break
+        if over:
+            break
         if done < steps:
             step(universe, settings, quantum=quantum)
     path["collapses"] = int(universe.collapses)

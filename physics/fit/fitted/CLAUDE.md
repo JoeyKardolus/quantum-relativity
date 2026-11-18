@@ -7,14 +7,15 @@ What the fit chose, kept apart from the engine's defaults.
 
 ## Must not get wrong
 
-- **Nothing is fitted** (2026-11-18): no search has run on the rebuilt engine, so the
-  values are empty and the fitted universe is the default one.
-- **Only a point that holds is ever written here**, with the search that chose it
+- **Phase 1 (gravity) does not hold** (2026-11-18): the values are the best candidate
+  (score 0.10 of 1), kept so the viewer's gravity scenes can be watched. Its measured
+  parts are in `fitted_on`.
+- **A value here is a candidate until its phase holds**; `status` says which. It is written with the search that chose it
   (sizes, seeds, short and long scores) in `fitted_on`.
 - **Never change a default.** A scene that wants the fitted universe asks for it by
   name: `load_fitted()["settings"]`.
 - **A fitted value is a candidate** until the unfitted scenes pass with it.
-- **Every fitted name must be a searched setting inside its range**; a test checks it.
+- **Every fitted name must be a phase 1 setting inside its range** (`gravity_ranges.py`); a test checks it.
 
 ## Deleted with the rebuild
 

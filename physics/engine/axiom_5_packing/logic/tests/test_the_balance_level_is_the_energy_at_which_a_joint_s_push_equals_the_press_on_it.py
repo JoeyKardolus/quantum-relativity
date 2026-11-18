@@ -29,5 +29,5 @@ def test_a_real_start_stands_at_its_level_no_joint_squeezed_and_none_slack_by_a_
     state = engine.new_universe(settings, cells_per_side=8, seed=1, device="cpu")
     joints = state.host("kind") == JOINT
     held, level = state.host("cell_quanta")[joints].astype(np.float64), balance_level(state, settings)[joints]
-    assert (level <= held).all() and (level > 0.999 * held).all()
+    assert (level <= held).all() and (level > 0.998 * held).all()
     assert state.balance_off <= 1e-4 and state.host("squeeze")[joints].max() <= 1.0

@@ -22,6 +22,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+from scipy.sparse import csr_matrix
 
 from physics.engine.axiom_2_swirls.definitions.sign_law import makes_pull_host
 from physics.engine.axiom_3_structure.definitions.kinds import NO_CELL
@@ -51,12 +52,13 @@ def _solve(hearer: np.ndarray, heard: np.ndarray, weight: np.ndarray, wanted: np
            rounds: int) -> float:
     """Conjugate gradients on `sum of weight * (own - neighbour) = wanted`, in place; returns the last unrest."""
     cells = pull.size
-    summed = np.bincount(hearer, weights=weight, minlength=cells)
+    pairs = csr_matrix((weight, (hearer, heard)), shape=(cells, cells))
+    summed = np.asarray(pairs.sum(axis=1)).reshape(-1)
     hears = summed > 0.0
     scale = np.where(hears, summed, 1.0)
 
     def apply(field: np.ndarray) -> np.ndarray:
-        return np.bincount(hearer, weights=weight * (field[hearer] - field[heard]), minlength=cells)
+        return summed * field - pairs @ field
 
     left = np.where(hears, wanted - apply(pull), 0.0)
     scaled = left / scale
