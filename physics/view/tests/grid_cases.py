@@ -1,14 +1,20 @@
-"""Grid cases (test helper): plain-array lattices for the layout tests, no engine.
+"""Grid cases (test helper): plain-array lattices and a plain-array source, no engine.
 
 `uneven_lattice(side, seed, spread)` returns (kind, length, packing) for a perfect
 A B A B lattice whose volumes are about 10 long and joints about 1, each times
-exp(spread * a standard normal). `inside(points, quads)` counts, for every 2D point,
-the four-cornered faces (n, 4, 2) it lies strictly inside. `slice_faces(pieces, layer)`
-returns the slice's faces (n, 4, 2) in drawing order with their cell ids.
+exp(spread * a standard normal). `torn_lattice(side)` is the even one after volume 0
+tore along y: (kind, length, packing, lines, line_axis). `inside(points, quads)` counts,
+for every 2D point, the four-cornered faces (n, 4, 2) it lies strictly inside.
+`slice_faces(pieces, layer)` returns the slice's faces (n, 4, 2) with their cell ids.
+`FakeSource` fits the source interface: an 8-place lattice whose cells shrink 1% a
+step, and that raises at step `fail_at`.
 """
 from __future__ import annotations
 
 import numpy as np
+
+from physics.view.layout.logic.cell_pieces import cell_pieces
+from physics.view.layout.logic.torn_lines import torn_lines
 
 
 def uneven_lattice(side: int, seed: int = 1, spread: float = 0.3) -> tuple:
@@ -17,6 +23,17 @@ def uneven_lattice(side: int, seed: int = 1, spread: float = 0.3) -> tuple:
     noise = np.exp(spread * np.random.default_rng(seed).standard_normal(side ** 3))
     length = np.where(kind == 1, 10.0, 1.0) * noise
     return kind, length, (np.where(kind == 1, 10.0, 1.0) / length) ** 3
+
+
+def torn_lattice(side: int) -> tuple:
+    kind, length, packing = uneven_lattice(side, spread=0.0)
+    kind = np.concatenate([kind, [-1, 1]]).astype(np.int8)
+    length = np.concatenate([length, [2.0, 30.0]])
+    length[0] = 30.0
+    torn_from = np.full(len(kind), -1)
+    torn_from[side ** 3:] = 0
+    lines, line_axis = torn_lines(side ** 3, kind, torn_from, kind.copy(), np.ones(len(kind), dtype=int))
+    return kind, length, np.ones(len(kind)), lines, line_axis
 
 
 def slice_faces(pieces, layer: int) -> tuple:
@@ -35,3 +52,27 @@ def inside(points: np.ndarray, quads: np.ndarray) -> np.ndarray:
         turns = np.array(turns)
         count += (turns > 0).all(axis=0) | (turns < 0).all(axis=0)
     return count
+
+
+class FakeSource:
+    SIDE = 8
+
+    def __init__(self, fail_at: int = -1):
+        self.fail_at = fail_at
+        self.reset()
+
+    def reset(self):
+        self.kind, self.length, self.packing = uneven_lattice(self.SIDE, spread=0.1)
+        self.steps = 0
+
+    def step(self):
+        if self.steps == self.fail_at:
+            raise RuntimeError("the source broke")
+        self.length = self.length * 0.99
+        self.steps += 1
+
+    def view(self):
+        return cell_pieces(self.SIDE, self.kind, self.length, self.packing)
+
+    def stats(self):
+        return {"volumes": int((self.kind == 1).sum()), "joints": int((self.kind == -1).sum()), "size": 1.0}

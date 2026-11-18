@@ -56,8 +56,9 @@ The core depth/seam vocabulary used by `improve-codebase-architecture`, `tdd`, `
 - **seam**: a place where two joints touch in the joint web; energy enters or leaves a joint only there, never through its middle, less the more the joint is squeezed, and not at all past the seal point. Not the architecture seam above. _Avoid_: channel, pore, edge, wall, Plateau border.
 - **volume split**: an energy volume grown too big tearing apart, the tear becoming new joints; the mirror of joint collapse and the only way new volumes and joints appear. _Avoid_: division, creation, spawning.
 - **lump**: energy gathered into a region: energy volumes each holding at least twice the start's mean, joined to each other through joints. A lump **holds** when a run four times longer still has it; one that keeps growing until the volumes round it are empty is a runaway, not a lump that holds. _Avoid_: clump, blob, ball, galaxy, halo.
-- **spent volume**: an energy volume emptied to the engine's floor (fewer than 3 quanta per Planck box), or stretched past the tear length; by the size law it is enormous, so a universe's size made mostly of spent volumes is the floor's, not the rules'. _Avoid_: void (a region, not a cell), dead cell.
-- **whirl**: a quantised whirlpool in the energy fluid, turning only in whole steps; the candidate for spin, which is an unbreakable whirl. _Avoid_: vortex, eddy, swirl.
+- **spent volume**: an energy volume that holds no energy (by the size law it is endless), or one stretched past the tear length; the fit leaves an emptied volume out of the size and counts it as wholly spent. _Avoid_: void (a region, not a cell), dead cell.
+- **swirl**: what a cell is under axiom 2 (owner, 2026-11-17): the energy of one cell, energy volume or joint, going round inside that cell in whole steps. Every cell is one; it never spans two cells. _Avoid_: vortex, eddy, spin (a swirl that cannot unwind would be spin; none holds yet).
+- **whirl**: the older word for a whole-step turn in the energy fluid, kept for the winding measure (`physics/measure/winding`), which counts a swirl's whole turns. _Avoid_: vortex, eddy; for a cell itself say swirl.
 
 ## Project vocabulary
 

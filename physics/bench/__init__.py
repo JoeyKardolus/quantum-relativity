@@ -1,14 +1,12 @@
 """Bench: how fast the engine steps, and the largest universe that still runs a step a second.
 
-Two measures that know nothing of the engine's rules (they time any `advance`
-callable); `python -m physics.bench` points them at physics.engine.
-
-Module map:
-  throughput.py        throughput: universe-steps and cell-steps a second of any advance callable
-  largest_universe.py  largest_universe: bisect sizes for the biggest at >= 1 step a second
-  __main__.py          python -m physics.bench throughput|size
+One directory per purpose, each with `definitions/` (what things are), `logic/` (what
+happens) and `tests/`:
+  throughput/        steps and cell-steps a second of a universe
+  largest_universe/  the biggest size that fits the GPU and runs at one step a second
+`__main__.py` is the command line: python -m physics.bench throughput|size.
 """
-from physics.bench.largest_universe import largest_universe
-from physics.bench.throughput import throughput
+from physics.bench.largest_universe import Probe, Search, fitting_run, largest_universe
+from physics.bench.throughput import Rates, Run, engine_run, throughput
 
-__all__ = ["largest_universe", "throughput"]
+__all__ = ["Probe", "Rates", "Run", "Search", "engine_run", "fitting_run", "largest_universe", "throughput"]

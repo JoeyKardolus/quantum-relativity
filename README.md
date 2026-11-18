@@ -25,9 +25,10 @@ The full rules, open problems and milestones are in the bible chapter
 
 ## Status
 
-Early. The engine holds total energy exactly and draws live on the GPU, but it does not yet behave like
-a universe: with untuned settings everything falls into a few sealed cores and nothing expands. Next:
-check every rule is built in, then fit the few settings against a scorecard of scenes (expansion
+Early. The engine was rebuilt axiom by axiom (2026-11-18): it books every quantum exactly and draws live
+on the GPU, but it does not yet behave like a universe. With untuned settings more than half of the
+joints collapse in the first step and a single volume is left; cells do not stay swirls and the pull
+outruns light. Next: keep each axiom's clauses, then fit the few settings against a scorecard of scenes (expansion
 history, structure), and test, unfitted, on others (orbits, bound lumps, black hole size, the Hubble
 tension). Progress is tracked on [issue #1](https://github.com/JoeyKardolus/quantum-relativity/issues/1).
 Misses are reported as misses; nothing is tuned to look good.
@@ -46,12 +47,12 @@ to the GPU by itself.
 
 | Path | What it is |
 |---|---|
-| `physics/engine/` | the engine: a perfect grid of cells that have only neighbours and a size, each with its own block of compute boxes, on the GPU |
+| `physics/engine/` | the engine, one directory per axiom (`axiom_1_energy` to `axiom_7_quantum`), each with its definitions, its logic and its tests; the step only calls them in order |
 | `physics/bench/` | the bench: the engine's speed, and the largest universe that runs a step a second |
-| `physics/view/` | the GPU window that shows the grid, every cell at its own size |
+| `physics/view/` | the window that shows the whole grid in 3D, every cell at its own size, or saves pictures |
 | `physics/scenes/` | the scorecard: each scene runs the engine and returns measured numbers |
-| `physics/fit/` | the fit: searches the settings on expansion shape and structure, by random search |
-| `physics/measure/` | graph and whirl measures the scenes use (dimension, winding, circulation) |
+| `physics/fit/` | the fit: searches the settings on expansion shape and structure, by random search (nothing searched on the rebuilt engine yet) |
+| `physics/measure/` | the measures the scenes share: the dimension of the volume graph, and a cell's whole turns |
 | `docs/bible.md` | how everything works; the theory is the chapter `physics/quantum-relativity` |
 
 ## Built with

@@ -1,29 +1,44 @@
 # physics/measure/
 
-Measures read from the foam's relations alone (bible `physics/quantum-relativity`, rule 1 and
-"How results are trusted"). Host numpy and scipy; no engine import, no GPU. Module map in
-`__init__.py`. Scenes call these; a measure never runs the engine itself.
+Numbers read off the engine's grid. One directory per measure; each holds `definitions/`
+(what things are), `logic/` (what happens), `tests/` and its own `CLAUDE.md`.
+
+- `dimension/`: how many dimensions the grid of energy volumes has, read only from which
+  volumes neighbour which.
+- `winding/`: how many whole turns a cell's fluid makes round an axis of its own block.
+
+`__init__.py` holds only the public names. `tests/` runs both measures on the real engine.
 
 ## Must not get wrong
 
-- **Validated first.** A measure is used on the foam only after its test recovers a known
-  answer: ball and spectral dimension within 10% of 2 and 3 on plain grids (`grid_graph`); the
-  whirl measures on a placed whirl of known turns and direction. A new measure lands with its
-  reference test, and a scene reports the reference's own number beside the foam's (a small
-  graph pulls both estimates off the true value).
-- **No coordinates in the graph measures.** Ball and spectral dimension take only an
-  adjacency matrix; sources come from `central_nodes` (far points), never from box places.
-- **Ranges inside the graph.** Shells and walks must not reach the graph's edge: the rule used
-  in the tests and `scenes/space_dimension.py` is R = a quarter of the source's farthest
-  distance, radii 2..R, walk times R^2/10..R^2. Change it in both or neither.
-- **Winding is whole by construction** (wrapped phase steps round a closed loop), so "is it an
-  integer" is never the test; whether it stays equal to the placed turns, and how far the flow
-  circulation and the strength sit from it, are.
-- **Signs.** Squares and loops are walked right-handed about +normal (b = normal + 1,
-  c = normal + 2); a whirl's winding vector points along its line.
+- **Nothing loose.** A directory here holds subdirectories plus only `__init__.py`,
+  `conftest.py` and `CLAUDE.md`. A new measure is a new directory of the same shape.
+- **Proved first.** A measure is used on the engine only after a test gets a known answer
+  out of it. A scene reports the reference's number beside the engine's.
+- **Read, never change.** A measure takes host arrays the engine's public names hand out
+  (`read_ways`, `read_cells`, `state.block`, `state.host`). It never steps the engine and
+  never writes to it. The only engine import in the code is the constant `ENERGY_VOLUME`.
+- **Boxes are not space.** No measure may walk from one cell's boxes into another's. The
+  winding is read inside one block; the dimension reads relations only, no lengths.
+- **Definitions never import logic.**
+- **A failing test is a measure that is not proved.** Never bend one to pass.
+
+## Known on the real engine (16 a side, seed 1)
+
+- The start is exactly the wrapped 26-neighbour grid of 512 volumes, and it still is
+  after the 24 steps of the held run (tested).
+- Every cell of the start reads one whole turn its own way in all six layers (tested).
+
+## Not done
+
+- **The spectral dimension is not proved on the engine's shape.** Two tests are marked as
+  strict expected failures; see `dimension/CLAUDE.md`.
+- **Deleted, nothing used them:** `whirl_line`, `loop_circulation`, `whirl_strength`. They
+  followed a swirl's line through boxes as if boxes were space; a swirl now lives inside
+  one cell's block of 6 boxes a side.
 
 ## Run
 
 ```
-PYTHONPATH=. .venv/bin/pytest -q physics/measure
+PYTHONPATH=. .venv/bin/pytest -q physics/measure     # uses CUDA when there is one, else the CPU
 ```
