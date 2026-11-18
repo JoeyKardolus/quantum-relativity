@@ -5,7 +5,7 @@ How every scene gets its settings and steps its universe. Nothing here measures.
 ## Must not get wrong
 
 - **A start is settings.** The rebuilt engine takes the start's energies from `Settings`
-  (`volume_quanta`, `joint_quanta`, the three unevennesses, `slope`). A fit candidate's
+  (`volume_quanta`, the two unevennesses, `slope`; no setting says what a joint holds). A fit candidate's
   `start` is a dict of those names and nothing else; any other name raises. There is no
   joint length to pass any more: size comes from energy alone.
 - **No rule is switched off here.** `sampled_run` calls the engine's `step` and nothing else.

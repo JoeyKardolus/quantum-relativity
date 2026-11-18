@@ -12,7 +12,7 @@ def test_all_six_layers_of_every_volume_and_joint_read_the_expected_turns(device
     axes, senses = universe.host("swirl_axis"), universe.host("swirl_sense")
     living = np.flatnonzero(kinds != NO_CELL)
     assert np.count_nonzero(kinds == ENERGY_VOLUME) == 64 and np.count_nonzero(kinds == JOINT) == 448
-    assert set(axes[living].tolist()) == {0, 1, 2} and set(senses[living].tolist()) == {-1, 1}
+    assert len(set(axes[living].tolist())) == 1 and set(senses[living].tolist()) == {-1, 1}
     wrong = [int(cell) for cell in living
              if cell_turns(universe.block("quanta", int(cell)), universe.block("phase", int(cell)), int(axes[cell]))
              != [expected_turns(int(axes[cell]), int(senses[cell]))] * BLOCK]

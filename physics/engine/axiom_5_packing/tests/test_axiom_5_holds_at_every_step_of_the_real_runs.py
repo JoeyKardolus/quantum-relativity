@@ -53,9 +53,7 @@ def test_it_is_the_pull_that_gathers_it_a_hundred_times_weaker_and_the_fuller_ha
     assert held > 0 and gentle < held / 10, "without the pull the fuller half levels out; it gathers nothing"
 
 
-@pytest.mark.parametrize("name", [
-    pytest.param(name, marks=[_not_kept("the pull turns a box over half a turn a step")] if name in ("default", "uneven") else [])
-    for name in sorted(RUNS)])
+@EVERY_RUN
 def test_the_pull_never_turns_a_box_by_more_than_half_a_turn_in_one_step(name):
     turns = [record["largest_turn"] for record in _of(name)]
     assert max(turns) < math.pi, f"largest {max(turns)} rad at step {turns.index(max(turns)) + 1}"

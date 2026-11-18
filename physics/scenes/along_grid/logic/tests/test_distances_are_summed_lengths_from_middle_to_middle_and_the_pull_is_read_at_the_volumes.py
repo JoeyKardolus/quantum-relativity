@@ -18,7 +18,7 @@ def test_the_distance_to_the_next_volume_is_half_the_core_the_joint_and_half_tha
     assert found[0] == 0.0
     assert found[1] == pytest.approx(0.5 * 2.5 + 0.5 * length[row[1]])
     assert found[2] == pytest.approx(0.5 * 2.5 + length[row[1]] + 0.5 * length[row[2]])
-    assert 295.0 < length[row[1]] < 305.0 and 9.5 < length[row[2]] < 10.5, "a joint of 100 a box is 300 long, a volume 10"
+    assert length[row[1]] > 0.0 and 9.5 < length[row[2]] < 10.5, "a joint is as long as the balance makes it, a volume of 3000 a box 10"
 
 
 @needs_gpu

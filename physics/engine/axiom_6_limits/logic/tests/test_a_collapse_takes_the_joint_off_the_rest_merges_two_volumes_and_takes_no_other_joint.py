@@ -232,8 +232,10 @@ def test_a_squeezed_joint_makes_whole_minus_quanta_in_its_own_boxes_and_an_unsqu
 def test_a_making_larger_than_a_box_can_hold_is_refused_and_writes_nothing():
     state, settings = _universe()
     squeezed = int(np.flatnonzero(state.host("kind") == engine.JOINT)[0])
+    state.set_block("quanta", squeezed, np.full((engine.BLOCK,) * 3, -2 ** 30, dtype=np.int32))     # a joint whose boxes are half full
+    count_cells(state)
     clear_ledgers(state)
-    state.set_cell("squeeze", squeezed, 1.0e34)
+    state.set_cell("squeeze", squeezed, 1.0e8)
     before = state.quanta.numpy().copy()
     with pytest.raises(OverflowError):
         make_minus(state, settings)

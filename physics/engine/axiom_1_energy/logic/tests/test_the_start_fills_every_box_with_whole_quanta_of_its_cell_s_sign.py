@@ -8,8 +8,7 @@ import numpy as np
 
 from physics.engine.axiom_1_energy.definitions.draw_uniform import draw_uniform_host
 from physics.engine.axiom_1_energy.definitions.energy_settings import EnergySettings
-from physics.engine.axiom_1_energy.definitions.passes import (START_JOINT_A, START_JOINT_B, START_VOLUME_A,
-                                                               START_VOLUME_B)
+from physics.engine.axiom_1_energy.definitions.passes import START_VOLUME_A, START_VOLUME_B
 from physics.engine.axiom_1_energy.logic.start_energy import start_energy
 from physics.engine.axiom_1_energy.logic.tests.conftest import all_blocks, small_grid
 from physics.engine.axiom_1_energy.logic.uneven_field import uneven_field
@@ -28,15 +27,14 @@ def test_an_even_start_holds_exactly_the_start_numbers(grid):
     start_energy(grid, EVEN)
     quanta, kind = all_blocks(grid, "quanta"), grid.host("kind")
     assert (quanta[:grid.count][kind == ENERGY_VOLUME] == 3000).all()
-    assert (quanta[:grid.count][kind == JOINT] == -100).all()
+    assert (quanta[:grid.count][kind == JOINT] == -3000).all()     # where the balance starts from, not a setting
     assert not quanta[grid.count:].any()
     held = grid.host("cell_quanta")
-    assert (held[kind == ENERGY_VOLUME] == 3000 * 216).all() and (held[kind == JOINT] == 100 * 216).all()
+    assert (held[kind == ENERGY_VOLUME] == 3000 * 216).all() and (held[kind == JOINT] == 3000 * 216).all()
 
 
 def test_every_box_is_whole_of_its_cell_s_sign_and_none_starts_empty(grid):
-    start_energy(grid, replace(EnergySettings(), unevenness=0.3, inner_unevenness=0.5, joint_unevenness=0.4,
-                               joint_quanta=1.0))
+    start_energy(grid, replace(EnergySettings(), unevenness=0.3, inner_unevenness=0.5, volume_quanta=1.0))
     quanta, kind = all_blocks(grid, "quanta")[:grid.count], grid.host("kind")
     assert quanta.dtype == np.int32
     assert (quanta[kind == ENERGY_VOLUME] >= 1).all() and (quanta[kind == JOINT] <= -1).all()
@@ -44,7 +42,7 @@ def test_every_box_is_whole_of_its_cell_s_sign_and_none_starts_empty(grid):
 
 
 def test_each_box_holds_the_law_worked_by_hand(grid):
-    settings = replace(EnergySettings(), unevenness=0.2, joint_unevenness=0.3)
+    settings = replace(EnergySettings(), unevenness=0.2)
     start_energy(grid, settings)
     kind = grid.host("kind")
     volumes = np.flatnonzero(kind == ENERGY_VOLUME)
@@ -52,8 +50,7 @@ def test_each_box_holds_the_law_worked_by_hand(grid):
     for order, cell in ((3, int(volumes[3])), (None, int(np.flatnonzero(kind == JOINT)[10]))):
         block = grid.block("quanta", cell)
         if order is None:
-            mean = settings.joint_quanta * math.exp(
-                settings.joint_unevenness * _normal(grid.seed, START_JOINT_A, START_JOINT_B, cell))
+            mean = settings.volume_quanta
         else:
             mean = settings.volume_quanta * weight[order] / weight.mean()
         for place in ((0, 0, 0), (2, 5, 1), (5, 5, 5)):

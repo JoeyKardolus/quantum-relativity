@@ -43,9 +43,11 @@ def test_cells_are_drawn_at_the_engines_lengths_joints_far_longer_than_volumes(s
     odd = pieces.place % 2 == 1
     own = np.where(odd | (pieces.kind == 1)[:, None], length[:, None], np.nan)
     miss = np.abs(spans / own - 1.0)
-    assert np.nanmax(miss[pieces.kind == -1]) < 0.02, "a joint is drawn its own length along its odd axes"
+    assert np.nanmax(miss[pieces.kind == -1]) < 0.25 and np.nanmean(miss[pieces.kind == -1]) < 0.05, \
+        "a joint is drawn near its own length along its odd axes: joints differ since the balance, a layer of the layout has one width"
     assert np.nanmean(miss[pieces.kind == 1]) < 0.25, "a volume about its own length (the fit shares the mismatch)"
-    assert length[pieces.kind == -1].min() > 20 * length[pieces.kind == 1].max(), "one size law: less energy, longer"
+    assert length[pieces.kind == -1].mean() > 1.5 * length[pieces.kind == 1].mean(), \
+        "one size law: a default joint in balance holds less than a volume, so it is longer (about 2.2 times)"
     assert np.allclose(pieces.high - pieces.low, np.nansum(own.reshape(SIDE, SIDE, SIDE, 3)[:, 0, 0, 0]), rtol=0.05)
 
 

@@ -15,6 +15,8 @@ This file is the only one that calls the logic of several axioms. It holds:
   Settings       the six settings records in one frozen record; every number an axiom
                  leaves open is a field here, chosen before any run
   new_universe   the start: energies from the seed, sizes by the size law, nothing placed
+  lay_start      the start at rest in balance: the pull at rest and every joint holding
+                 the energy at which its push equals the pull across it
   step           one step: the axioms' logic called in a fixed order, nothing else
 and the public names in `__all__`. Everything else is imported from its own file.
 """
@@ -27,6 +29,7 @@ from physics.engine.axiom_1_energy.definitions.book_law import book_law
 from physics.engine.axiom_1_energy.definitions.energy_settings import EnergySettings
 from physics.engine.axiom_1_energy.logic.clear_ledgers import clear_ledgers
 from physics.engine.axiom_1_energy.logic.count_cells import count_cells
+from physics.engine.axiom_1_energy.logic.fill_joints import fill_joints
 from physics.engine.axiom_1_energy.logic.flow_inside import flow_inside
 from physics.engine.axiom_1_energy.logic.read_books import read_books
 from physics.engine.axiom_1_energy.logic.start_energy import start_energy
@@ -50,9 +53,11 @@ from physics.engine.axiom_4_crossing.definitions.crossing_settings import Crossi
 from physics.engine.axiom_4_crossing.logic.cross import cross
 from physics.engine.axiom_5_packing.definitions import packing_arrays
 from physics.engine.axiom_5_packing.definitions.packing_settings import PackingSettings
+from physics.engine.axiom_5_packing.logic.balance_level import balance_level
 from physics.engine.axiom_5_packing.logic.pack_cells import pack_cells
 from physics.engine.axiom_5_packing.logic.press_joints import press_joints
 from physics.engine.axiom_5_packing.logic.pull_fluid import pull_fluid
+from physics.engine.axiom_5_packing.logic.rest_pull import rest_pull
 from physics.engine.axiom_5_packing.logic.spread_pull import spread_pull
 from physics.engine.axiom_5_packing.logic.start_pull import start_pull
 from physics.engine.axiom_5_packing.logic.tick_clocks import tick_clocks
@@ -69,7 +74,7 @@ from physics.engine.axiom_7_quantum.logic.meet_fork import meet_fork
 from physics.engine.axiom_7_quantum.logic.react import react
 from physics.engine.axiom_7_quantum.logic.start_store import start_store
 
-__all__ = ["ARRAYS", "HOST", "Settings", "Grid", "new_universe", "step", "relink", "read_books", "book_law",
+__all__ = ["ARRAYS", "HOST", "Settings", "Grid", "new_universe", "lay_start", "step", "relink", "read_books", "book_law",
            "check_pattern", "measure_grid", "read_cells", "read_ways", "uneven_field", "react",
            "size_law_host", "ENERGY_VOLUME", "JOINT", "NO_CELL", "BLOCK", "BOXES"]
 
@@ -87,6 +92,9 @@ def _merged(table: str) -> dict:
             merged[name] = value
     return merged
 
+
+_BALANCE_ROUNDS = 60
+_BALANCED = 1e-4
 
 ARRAYS = _merged("ARRAYS")
 HOST = _merged("HOST")
@@ -113,24 +121,72 @@ def _resize(state, settings) -> None:
     pack_cells(state, settings)
 
 
+def _balance(state, settings) -> None:
+    """The start at rest in balance: every joint gets the energy at which its push equals the pull across it.
+
+    A joint's energy sets its length, and the lengths set the pull, so the level is asked
+    again (`balance_level`) until no
+    joint moves by more than `_BALANCED` of what it holds, at most `_BALANCE_ROUNDS` times.
+    Then every joint still squeezed is raised to its own level, again and again, until
+    none is: the start is not squeezed anywhere and slack by less than `_BALANCED`.
+    `state.balance_off` keeps the last round's largest move.
+    """
+    for _ in range(_BALANCE_ROUNDS):
+        press_joints(state, settings)
+        held = state.host("cell_quanta").astype("float64")
+        level = balance_level(state, settings)
+        state.balance_off = fill_joints(state, settings, level)
+        size_cells(state, settings)
+        pack_cells(state, settings)
+        rest_pull(state, settings)
+        if state.balance_off <= _BALANCED:
+            break
+    for _ in range(_BALANCE_ROUNDS):
+        press_joints(state, settings)
+        held = state.host("cell_quanta").astype("float64")
+        level = balance_level(state, settings)
+        if not (level > held).any():
+            break
+        fill_joints(state, settings, (level > held) * (level * (1.0 + _BALANCED) + 1.0) + (level <= held) * held)
+        size_cells(state, settings)
+        pack_cells(state, settings)
+        rest_pull(state, settings)
+
+
+def lay_start(state: Grid, settings: Settings) -> None:
+    """Lay a start at rest in balance for the energy as it lies: sizes, the pull at rest, balanced joints, the books.
+
+    `new_universe` ends with it, and a scene that placed energy by hand in a fresh universe
+    calls it again (the public door for a placed start). Raises ValueError after the first step.
+    """
+    if state.step != 0:
+        raise ValueError(f"lay_start lays a start; this universe is at step {state.step}")
+    _resize(state, settings)
+    start_pull(state, settings)
+    _balance(state, settings)
+    start_fresh(state)
+    start_store(state)
+    state.start_books = read_books(state)
+
+
 def new_universe(settings: Settings | None = None, cells_per_side: int = 32, seed: int = 1, spare: float = 0.25,
                  device: str = "cuda") -> Grid:
-    """A fresh universe: the lattice, energies and swirls from the seed, sizes by the size law, the pull at rest."""
+    """A fresh universe: the lattice, energies and swirls from the seed, laid at rest in balance."""
     settings = Settings() if settings is None else settings
     state = start_grid(cells_per_side, seed, spare, ARRAYS, HOST, device)
     start_energy(state, settings)
     start_swirls(state)
-    size_cells(state, settings)
-    pack_cells(state, settings)
-    start_pull(state, settings)
-    start_fresh(state)
-    start_store(state)
-    state.start_books = read_books(state)
+    lay_start(state, settings)
     return state
 
 
-def step(state: Grid, settings: Settings) -> None:
-    """One step of the whole engine: each axiom's logic, called in the one fixed order."""
+def step(state: Grid, settings: Settings, quantum: bool = True) -> None:
+    """One step of the whole engine: each axiom's logic, called in the one fixed order.
+
+    `quantum=False` is phase 1 of the fit (the bible, "The fit goes in phases"): the layers
+    below the quantum one. Axiom 7's splits are then not opened, carried or settled; every
+    other rule runs as it does with them. It is an argument of a run, never a setting.
+    """
     clear_ledgers(state)
     tick_clocks(state, settings)
     spread_pull(state, settings)
@@ -140,7 +196,8 @@ def step(state: Grid, settings: Settings) -> None:
             flow_inside(state, settings, axis, parity)
     cross(state, settings)
     count_cells(state)
-    meet_fork(state, settings)
+    if quantum:
+        meet_fork(state, settings)
     _resize(state, settings)
     press_joints(state, settings)
     make_minus(state, settings)
@@ -149,6 +206,7 @@ def step(state: Grid, settings: Settings) -> None:
     if state.found.numpy().any():
         relink(state, run_events(state, settings))
     count_cells(state)
-    follow(state)
+    if quantum:
+        follow(state)
     _resize(state, settings)
     state.step += 1

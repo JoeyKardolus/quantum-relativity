@@ -9,10 +9,10 @@ from physics.fit.search.definitions.unit_to_overrides import unit_to_overrides
 
 
 def test_a_point_task_and_a_defaults_task():
-    task = make_task("refine2", 5, np.full(12, 0.5), 3)
+    task = make_task("refine2", 5, np.full(10, 0.5), 3)
     assert task["id"] == "refine2:5:3" and task["phase"] == "refine2" and task["seed"] == 3
-    assert task["unit"] == [0.5] * 12 and all(type(value) is float for value in task["unit"])
-    assert task["overrides"] == unit_to_overrides([0.5] * 12)
+    assert task["unit"] == [0.5] * 10 and all(type(value) is float for value in task["unit"])
+    assert task["overrides"] == unit_to_overrides([0.5] * 10)
     defaults = make_task("defaults", 0, None, 4)
     assert defaults == {"id": "defaults:0:4", "phase": "defaults", "seed": 4, "unit": None, "overrides": {}}
 

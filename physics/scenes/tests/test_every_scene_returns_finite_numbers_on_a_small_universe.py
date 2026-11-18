@@ -24,6 +24,7 @@ SMALL = {
     "spin": {"cells_per_side": 8, "steps": 2, "count": 1},
     "quantum_split": {"cells_per_side": 8, "wait": 1},
     "two_lumps": {"cells_per_side": 12, "apart": (2,), "steps": 2, "settle": 1},
+    "gravity": {"cells_per_side": 24, "steps": 2, "every": 1},
 }
 NAN_BY_CONTRACT = ("held_power", "depth_power", "depth_law_power", "pull_power", "newton_power")
 
@@ -40,8 +41,8 @@ def _numbers(value):
         yield value
 
 
-def test_the_scorecard_has_its_twelve_scenes_and_each_has_a_small_run():
-    assert sorted(SCENES) == sorted(SMALL) and len(SCENES) == 12
+def test_the_scorecard_has_its_thirteen_scenes_and_each_has_a_small_run():
+    assert sorted(SCENES) == sorted(SMALL) and len(SCENES) == 13
 
 
 @needs_gpu

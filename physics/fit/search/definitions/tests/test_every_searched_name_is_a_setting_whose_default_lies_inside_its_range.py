@@ -1,4 +1,4 @@
-"""The twelve searched names are engine settings, each default inside its range, and no setting the engine lacks is searched."""
+"""The ten searched names are engine settings, each default inside its range, and no setting the engine lacks is searched."""
 import dataclasses
 
 from physics.engine import Settings
@@ -9,7 +9,7 @@ _NOT_SEARCHED = {"step_time", "size_constant", "slope", "inner_unevenness", "slo
 
 def test_the_searched_names_and_the_ones_left_alone_are_all_of_the_engines_settings():
     fields = {field.name for field in dataclasses.fields(Settings)}
-    assert len(SEARCHED) == len(set(SEARCHED)) == 12 and SEARCHED == list(LOG_RANGES) + list(LINEAR_RANGES)
+    assert len(SEARCHED) == len(set(SEARCHED)) == 10 and SEARCHED == list(LOG_RANGES) + list(LINEAR_RANGES)
     assert set(SEARCHED) | _NOT_SEARCHED == fields and not set(SEARCHED) & _NOT_SEARCHED
 
 

@@ -6,7 +6,7 @@ engine's public names, in the engine's layout.
 
 ## Layout
 
-One directory per scene (12) and per shared piece (`run`, `placed_start`, `volumes`,
+One directory per scene (13; `gravity` is phase 1 of the fit) and per shared piece (`run`, `placed_start`, `volumes`,
 `along_grid`). Each holds `CLAUDE.md`, `__init__.py`, `tests/`, `definitions/` (what
 things are: constants, pass marks, formulas) and `logic/` (what happens: build, step,
 read), each of those two with its own `CLAUDE.md` and `tests/`. Nothing else is loose;
@@ -41,8 +41,8 @@ a setting); `stats` readings (now `measure_grid`, `read_books`, `count_lumps`).
 
 - **No scene has been run at its scorecard size on the rebuilt engine.** The numbers of
   2026-11-17 (2 of 12) were the old engine's and are gone from this file.
-- Tests run on the engine's `held` settings (`tests/_gpu.py`): on the defaults a
-  universe of 8 a side falls into one volume within 30 steps.
+- Tests run on the engine's `held` settings (`tests/_gpu.py`), picked when the default
+  universe still collapsed; since 2026-11-18 it stands.
 
 ## Run
 

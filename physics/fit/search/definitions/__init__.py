@@ -2,6 +2,7 @@
 
   ranges.py             LOG_RANGES, LINEAR_RANGES, SEARCHED: the settings searched and their ranges
   unit_to_overrides.py  unit_to_overrides: a point of the unit cube as engine settings
+  gravity_ranges.py     GRAVITY_RANGES, GRAVITY_SEARCHED, gravity_point: what phase 1 (gravity) searches
   latin_hypercube.py    latin_hypercube: the random phase's points, one per stratum on every axis
   refine_width.py       refine_width: how wide a refine round steps round its best points
   make_task.py          make_task: one run to do, with its id

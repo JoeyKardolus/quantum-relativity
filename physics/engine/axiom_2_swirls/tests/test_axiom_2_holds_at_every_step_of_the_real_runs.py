@@ -11,8 +11,11 @@ EVERY_RUN = pytest.mark.parametrize("name", sorted(RUNS))
 
 #: A clause the engine does not keep yet (this axiom's CLAUDE.md, "Not done": no rule makes or keeps a cell a swirl).
 #: Strict: the day it holds, the mark turns the test red and must go.
-NOT_KEPT = pytest.mark.xfail(strict=True, reason="not kept: nothing keeps a cell a swirl (axiom 2, Not done)")
-_LOST = {("volumes", name) for name in RUNS} | {("joints", "uneven")}
+NOT_KEPT = pytest.mark.xfail(strict=True, reason="not kept: nothing keeps a cell a swirl through a collapse, a tear "
+                                               "or a fill of some 20 quanta a box (axiom 2, Not done)")
+#: Since 2026-11-18 the start's swirls mesh and stand: the volumes keep theirs in every run that stands. Lost:
+#: the volumes of the runs with events, and the joints where the balance leaves them few quanta (push 40).
+_LOST = {("volumes", "collapsing"), ("volumes", "uneven"), ("joints", "uneven"), ("joints", "held"), ("joints", "gentle")}
 
 
 def _cases(count: str) -> list:

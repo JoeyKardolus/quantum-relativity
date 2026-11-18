@@ -20,6 +20,7 @@ One directory per scene of the scorecard:
   spin/           does a cell stay the one whole swirl it was born as
   quantum_split/  do splits settle whole, in each cell as often as its share
   two_lumps/      the pull between two lumps against distance, beside one over distance squared
+  gravity/        phase 1 of the fit: stand, fall, coast, fade with distance, go round
 and the pieces they share:
   run/            a candidate's start in the settings; step and measure every few steps
   placed_start/   an even grid with chosen volumes packed
@@ -34,6 +35,7 @@ from physics.scenes.black_hole import black_hole
 from physics.scenes.bound_lump import bound_lump
 from physics.scenes.dimension import space_dimension
 from physics.scenes.expansion import expansion, growth_rates
+from physics.scenes.gravity import gravity
 from physics.scenes.hubble_gap import hubble_gap
 from physics.scenes.isotropy import isotropy
 from physics.scenes.orbit import orbit
@@ -48,7 +50,8 @@ from physics.scenes.volumes import LUMP_FACTOR, count_lumps, observer_cells, pow
 
 SCENES = {"orbit": orbit, "bound_lump": bound_lump, "black_hole": black_hole, "hubble_gap": hubble_gap,
           "timescape": timescape, "expansion": expansion, "structure": structure, "dimension": space_dimension,
-          "isotropy": isotropy, "spin": spin, "quantum_split": quantum_split, "two_lumps": two_lumps}
+          "isotropy": isotropy, "spin": spin, "quantum_split": quantum_split, "two_lumps": two_lumps,
+          "gravity": gravity}
 
 __all__ = ["LUMP_FACTOR", "SCENES", "black_hole", "bound_lump", "box_depth", "box_field", "count_lumps", "deceleration",
            "even_volume_quanta", "expansion", "growth_rates", "hubble_gap", "isotropy", "log_slope", "middle_distances",

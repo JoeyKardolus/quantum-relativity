@@ -1,7 +1,7 @@
 """The pull's own wave on a real universe at rest: one volume made heavier, and when the change arrives where.
 
 Only `spread_pull` runs, on two universes that differ in that one volume; what one hears
-before the other is the change. A hop is a neighbour: 155 long here, 620 steps of light.
+before the other is the change. A hop is a neighbour, half a volume's length plus half a joint's away.
 """
 from __future__ import annotations
 
@@ -24,11 +24,6 @@ wp.config.quiet = True
 pytestmark = pytest.mark.skipif(not wp.is_cuda_available(), reason="needs CUDA: 2,600 wave steps of two universes")
 
 SIDE, STEPS, HOPS = 16, 2600, (1, 2, 3, 4)
-
-#: A clause the engine does not keep yet (axiom 5's CLAUDE.md, "Not done": the pull outruns light).
-#: Strict: the day it holds, the mark turns the test red and must go.
-NOT_KEPT = pytest.mark.xfail(strict=True, reason="not kept: the pull outruns light (axiom 5, Not done)")
-
 
 def _universe(lump: float, at_rest: bool):
     """An even universe; volume 0 holds `lump` times the others, with the pull as it was or set at rest again."""
@@ -85,7 +80,8 @@ def test_a_change_reaches_no_cell_sooner_than_one_neighbour_a_step_so_nothing_is
 
 def test_a_change_of_a_thousandth_of_a_volume_s_energy_is_heard():
     story = _story(1.001)
-    assert abs(story["change"][1][999]) > 1e-4 and abs(story["change"][2][999]) > 1e-5
+    assert abs(story["change"][1][999]) > 0.2 * abs(story["target"][1]) > 0.0
+    assert abs(story["change"][2][999]) > 0.2 * abs(story["target"][2]) > 0.0
 
 
 def test_once_at_rest_the_change_is_weaker_with_every_neighbour_further_away():
@@ -94,14 +90,14 @@ def test_once_at_rest_the_change_is_weaker_with_every_neighbour_further_away():
     assert sizes == sorted(sizes, reverse=True) and sizes[-1] > 0.0
 
 
-@pytest.mark.parametrize("hops", [pytest.param(hops, marks=[NOT_KEPT] if hops in (2, 4) else []) for hops in HOPS])
+@pytest.mark.parametrize("hops", HOPS)
 def test_half_of_a_change_does_not_arrive_before_light_does(hops):
     story = _story(1.1)
     half = _first_step(story["change"][hops], 0.5 * abs(story["target"][hops]))
     assert half >= hops * story["light"], f"half the change was {hops} hops away at step {half}, light at {hops * story['light']:.0f}"
 
 
-@pytest.mark.parametrize("hops", [pytest.param(hops, marks=[NOT_KEPT]) for hops in HOPS])
+@pytest.mark.parametrize("hops", HOPS)
 def test_a_hundredth_of_a_change_does_not_arrive_before_light_does(hops):
     story = _story(1.1)
     trace = _first_step(story["change"][hops], 0.01 * abs(story["target"][hops]))

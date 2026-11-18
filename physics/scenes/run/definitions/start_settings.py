@@ -12,7 +12,7 @@ from dataclasses import replace
 
 from physics.engine import Settings
 
-START_AMOUNTS = ("volume_quanta", "joint_quanta", "unevenness", "slope", "inner_unevenness", "joint_unevenness")
+START_AMOUNTS = ("volume_quanta", "unevenness", "slope", "inner_unevenness")
 
 
 def start_settings(settings: Settings | None = None, start: dict | None = None) -> Settings:

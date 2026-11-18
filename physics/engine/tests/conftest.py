@@ -4,13 +4,18 @@ Contract:
   `needs_gpu`           a marker that skips a test cleanly on a machine without CUDA.
   `RUNS`                the real runs, fixed here before any run: name -> (settings that differ
                         from the defaults, cells a side, seed, steps).
-      default   `Settings()`, 16 a side, seed 1, 40 steps. With the pull at rest from the
-                start the default pull squeezes the joints far past their push at once,
-                so the collapses come in the first steps.
+      default   `Settings()`, 16 a side, seed 1, 40 steps. Since the start is laid at rest
+                in balance (2026-11-18) the default universe stands: no collapse and no
+                tear in these steps.
+      collapsing  the defaults with `collapse_thin = 1.01`, 40 steps: a joint then
+                collapses once it holds a hundredth more than it was made with, which
+                the default run's joints do within eight steps (largest squeeze 1.05).
+                Picked after the default run had shown no collapse, for one reason: it
+                is the run in which collapses happen (495 by step 8, 1,874 by step 24).
       uneven    `unevenness = 0.3` and `push_strength = 40`, 16 a side, seed 1, 8 steps:
                 a start with more spread in its volumes' energies, so some start longer
                 than `tear_length`, and joints that hold, so those volumes tear before
-                anything collapses. Picked, like `held`, after the default run: it is
+                anything collapses. Picked, like `held`, after the first default run: it is
                 the run in which tears happen. The tears double every step (the open
                 tear chain), which is why it is 8 steps.
       held      the defaults with `push_strength = 40` and `tear_length = 200`, 16 a
@@ -60,6 +65,7 @@ needs_gpu = pytest.mark.skipif(not HAS_GPU, reason="needs CUDA: the real runs ar
 
 RUNS = {
     "default": ({}, 16, 1, 40),
+    "collapsing": ({"collapse_thin": 1.01}, 16, 1, 40),
     "uneven": ({"unevenness": 0.3, "push_strength": 40.0}, 16, 1, 8),
     "held": ({"push_strength": 40.0, "tear_length": 200.0}, 16, 1, 24),
     "gentle": ({"pull_strength": 1e-9, "push_strength": 40.0, "tear_length": 200.0}, 16, 1, 24),

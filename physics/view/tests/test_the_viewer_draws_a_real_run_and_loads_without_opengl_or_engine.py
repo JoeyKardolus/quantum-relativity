@@ -27,14 +27,15 @@ def test_every_public_name_is_there_and_is_the_one_its_file_defines():
 
 def test_the_command_line_saves_slice_pictures_of_a_real_run_with_collapses(tmp_path):
     need_cuda()
-    done = _run("--cells", "8", "--pictures", str(tmp_path), "--steps", "4", "--every", "2", "--slice")
+    done = _run("--cells", "8", "--pictures", str(tmp_path), "--steps", "14", "--every", "7", "--slice", "--all-rules",
+                "--set", "collapse_thin=1.01")
     assert done.returncode == 0, done.stderr[-2000:]
     lines = [line for line in done.stdout.splitlines() if line.startswith("step ")]
-    assert [line.split(":")[0] for line in lines] == ["step 0", "step 2", "step 4"]
+    assert [line.split(":")[0] for line in lines] == ["step 0", "step 7", "step 14"]
     assert "collapses 0 tears 0" in lines[0] and "volumes 64" in lines[0]
-    assert int(lines[-1].split("collapses ")[1].split()[0]) > 0, "the default run collapses joints"
+    assert int(lines[-1].split("collapses ")[1].split()[0]) > 0, "a run whose joints collapse a hundredth above fresh collapses joints"
     files = sorted(path.name for path in tmp_path.iterdir())
-    assert files == ["step_00000.png", "step_00002.png", "step_00004.png"]
+    assert files == ["step_00000.png", "step_00007.png", "step_00014.png"]
     first, last = (tmp_path / files[0]).read_bytes(), (tmp_path / files[-1]).read_bytes()
     assert first[:8] == b"\x89PNG\r\n\x1a\n" and first != last, "the picture follows the run"
 

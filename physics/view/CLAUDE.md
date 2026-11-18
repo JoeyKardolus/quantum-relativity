@@ -31,10 +31,12 @@ whole viewer on a real engine run plus the helpers every test directory shares.
 
 ## What the pictures show now
 
-The engine has one size law for volumes and joints (more energy, smaller). A joint
-holds less energy, so at the defaults it is about 30 times longer than an energy
-volume (298 against 10). The grid is drawn that way: fat blue joints, energy volumes
-as small red specks between them. That is the engine's state, not a drawing choice.
+The engine has one size law for volumes and joints (more energy, smaller), and the start
+lays every joint in balance: at the defaults a joint is about 2.2 times as long as an
+energy volume (22 against 10). The grid is drawn that way. That is the engine's state,
+not a drawing choice. `--scene two_lumps | coast | orbit | lone` opens a gravity scene
+(`physics.scenes.gravity`) with the fitted phase 1 settings; a run steps the layers
+below axiom 7 unless `--all-rules` is given.
 
 ## Not done
 
@@ -44,7 +46,7 @@ as small red specks between them. That is the engine's state, not a drawing choi
 ## Run
 
 ```
-PYTHONPATH=. .venv/bin/python -m physics.view [--cells N] [--seed S] [--set name=value ...]
+PYTHONPATH=. .venv/bin/python -m physics.view [--scene NAME] [--all-rules] [--cells N] [--seed S] [--set name=value ...]
 PYTHONPATH=. .venv/bin/python -m physics.view --pictures DIR --steps 40 --every 4 [--slice]
 PYTHONPATH=. .venv/bin/pytest -q physics/view
 ```

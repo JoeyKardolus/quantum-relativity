@@ -36,11 +36,11 @@ own `CLAUDE.md`. `__init__.py` here lists the public names; `__main__.py` is the
 
 ## Open, for the owner
 
-- **The joints are 99% of the size.** By the one size law a default joint (100 quanta a
-  box) starts 300 long beside a volume's 10. So the universe's size and the gap between
-  lumps read mostly the joints. The score still uses both, as the bible says.
-- **The default universe ends in a few steps**: at 8 a side it is one volume after 4
-  steps (236 collapses), so the defaults score 0 with "ended".
+- **The joints are most of the size.** The start lays every joint in balance; at the
+  defaults a joint is 2.2 times a volume's length and the joints hold 76% of the energy.
+- **Phase 1 (gravity) comes first** (bible, "The fit goes in phases"): its score is
+  `scenes/gravity/definitions/pass_mark.py`, its ranges `search/definitions/gravity_ranges.py`.
+  The expansion and structure search below waits for it.
 
 ## Run
 

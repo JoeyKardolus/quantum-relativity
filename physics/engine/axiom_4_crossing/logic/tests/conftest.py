@@ -43,8 +43,12 @@ def ramp(state, volume: int, step: float) -> None:
 
 
 def still(state) -> None:
-    """Give every box of the universe the phase 0: a fluid of one phase."""
+    """Give every box of the universe the phase 0 and every cell's boxes one fill: an even fluid of one phase."""
     state.phase.zero_()
+    quanta = state.quanta.numpy()
+    even = np.abs(quanta).reshape(len(quanta), -1).sum(axis=1) // quanta[0].size
+    state.quanta.assign((np.sign(quanta.reshape(len(quanta), -1)[:, :1]) * even[:, None] * np.ones((1, quanta[0].size),
+                         dtype=np.int64)).reshape(quanta.shape).astype(np.int32))
 
 
 def held_by(state, cell: int) -> int:

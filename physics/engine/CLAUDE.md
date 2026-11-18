@@ -11,33 +11,24 @@ win over this file and the code. One directory per axiom:
 - `axiom_6_limits/`: squeezed joints make energy and collapse; overstretched volumes tear.
 - `axiom_7_quantum/`: phase everywhere; outflow that meets a fork splits, goes on, loses its momentum, settles whole.
 
-Each holds `definitions/`, `logic/`, `tests/` and its own `CLAUDE.md`: "Assumed", "Not done"
-and "Open" say what the axiom left open and what the engine does not do.
+Each holds `definitions/`, `logic/`, `tests/` and its own `CLAUDE.md` ("Assumed", "Not done", "Open").
 
 ## Must not get wrong
 
-- **Nothing loose.** A directory here holds subdirectories plus only `__init__.py`,
-  `conftest.py` and `CLAUDE.md`. There is no axiom 8.
+- **Nothing loose**: subdirectories plus only `__init__.py`, `conftest.py`, `CLAUDE.md`.
 - **`__init__.py` here is the only file that calls several axioms' logic**: the public
   names, `ARRAYS`, `HOST`, `Settings`, `new_universe` and `step`.
 - **Definitions never import logic**, and import only axioms earlier in the order
   3, 2, 1, 7, 5, 4, 6. Logic never imports another axiom's logic.
 - **One state object**, `Grid` (axiom 3), built from every axiom's `ARRAYS` and `HOST`.
-- **Never**: boxes as space (a cell's block is its own for good), links as springs, a base push, a drift setting, a charge
-  sign, a size at rest, an instant pull, a seal, a rate setting for crossing, an off
-  switch in a setting, a rule no axiom asks for, a default tuned to make a result look good.
-- **One fluid, one phase field.** Fluid flows from the wave whose phase is ahead (`pair_rotation`),
-  inside a cell and across a joint alike; `cross` reads two cells' phases as they stand. So a
-  rule that turns phases (`pull_fluid`) must turn alike on both sides of a joint. No law invents
-  fluid beyond a cell's side: that made motion out of nothing.
-- **The step's order** is in `step`: clocks, pull, fluid, crossing, splits, press, making, events, the one settling.
+- **Never**: boxes as space, links as springs, a base push, a drift setting, a charge sign, a size at rest, an instant pull, a seal, a rate setting for crossing, an off switch in a setting, a rule no axiom asks for, a default tuned to look good.
+- **One fluid, one phase field** (`pair_rotation`), inside a cell and across a joint alike.
+- **The step's order** is in `step`: clocks, pull, fluid, crossing, splits, press, making, events, the one settling. `step(..., quantum=False)` is phase 1 of the fit: the layers below axiom 7 (no split opened, carried or settled).
+- **The start is at rest in balance** (`lay_start`): the pull at rest, every joint holding the energy at which its push equals the pull across it (no setting says what a joint holds), every cell a standing swirl that mirrors its neighbours. A scene that places energy calls `lay_start` again.
 
 ## Tests
 
-`tests/conftest.py` makes four real runs (`run_records`), 16 a side: `default` (collapses), `uneven` (tears), `held` (the grid stands) and `gentle` (`held`, the pull a hundred times weaker). Every step runs each axiom's `tests/check_step.py`, the books and `check_pattern`; each
-axiom's `tests/` asserts on those. A failing test is a clause the engine does not keep; never bend one to pass. 20 are marked `NOT_KEPT` (strict expected failures): cells lose their swirl (10), the pull outruns light (6) and turns a box
-over half a turn a step (2), and the fuller volumes gain with the pull as good as off (2);
-see "Not done" in axioms 2 and 5.
+`tests/conftest.py` makes five real runs (`run_records`), 16 a side: `default` (stands), `collapsing` (a joint collapses a hundredth above fresh), `uneven` (tears), `held` (push 40) and `gentle` (`held`, pull a hundred times weaker). Every step runs each axiom's `tests/check_step.py`, the books and `check_pattern`. A failing test is a clause the engine does not keep; never bend one to pass. 16 are expected failures (see "Not done" in the axioms): swirls lost through events and in joints of one quantum a box (9), the fuller volumes gaining with the pull as good as off (2), no lump growing in 40 steps (1), the collapsing run running empty with short splits (4).
 
 ## Run
 

@@ -6,7 +6,7 @@ import physics.scenes as scenes
 
 ROOT = Path(scenes.__file__).parent
 SCENE_NAMES = {"orbit", "bound_lump", "black_hole", "hubble_gap", "timescape", "expansion", "structure", "dimension",
-               "isotropy", "spin", "quantum_split", "two_lumps"}
+               "isotropy", "spin", "quantum_split", "two_lumps", "gravity"}
 SHARED = {"run", "placed_start", "volumes", "along_grid"}
 LOOSE = {"CLAUDE.md", "__init__.py"}
 OVERLAY_WORDS = 500

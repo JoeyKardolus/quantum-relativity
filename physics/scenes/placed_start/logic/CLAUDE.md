@@ -2,7 +2,7 @@
 
 `packed_start` builds the universe of a placed scene.
 
-- The grid is made even first: `unevenness` and `joint_unevenness` are set to 0 whatever
+- The grid is made even first: `unevenness` is set to 0 whatever
   the start says; a placed scene never runs on an uneven start. The box-to-box jitter
   (`inner_unevenness`) stays, so two starts with the same seed are the same but for the
   packed volumes: that is what a twin run subtracts.

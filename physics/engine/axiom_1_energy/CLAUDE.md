@@ -22,14 +22,14 @@ They win over this file and the code.
 
 - A universe at rest (8 a side, one phase) with ONE quantum moved, fluid and crossing only: quanta changing box a step 3, 1,392, 39,402, 128,965, 183,144 at steps 1, 10, 50, 400, 800. That is the rounding of whole quanta spreading to all 64 volumes (as the square root of the steps; a closed cell has the same noise). The old side law reached 22,495,048.
 - Gentle run, 400 steps: 3.5 to 8% of the plus energy crosses a joint every step.
-- Default run: 1,928 collapses leave 4 volumes and about 102 of 333 million plus quanta by step 9. Books exact in every run.
+- Default run (2026-11-18): no collapse in 40 steps; 0.85% of the plus energy crosses a step. Books exact in every run.
 
 ## Not done
 
-- **Minus energy never changes cell**, and plus energy is never inside the joint it crosses: it is in the facing box of the next volume at the end of the same step, whatever the joint's length (300 long: 1,240 times `light_speed`). 18.9% of all energy only goes round inside closed blocks. Axiom 6 lets a joint's energy rise only while squeezed, so nothing may enter it.
-- **Default run after the collapse**: most energy sits in one volume whose clock all but stands; `check_step` cannot judge a cell that moves under one quantum a step (`unjudged_share`).
+- **Minus energy never changes cell**, and plus energy is never inside the joint it crosses: it is in the facing box of the next volume at the end of the same step, whatever the joint's length (22 long at the defaults). 18.9% of all energy only goes round inside closed blocks. Axiom 6 lets a joint's energy rise only while squeezed, so nothing may enter it.
+- **The collapsing run runs empty**: its collapses take every plus quantum (axiom 6).
 - **The total changes in one burst** on the defaults; on held settings joints make energy step by step from step 1,280 and collapse from 11,590 (8 a side, axiom 6).
-- **A cell does not coast by its own tilt**; a settling moves energy on no way (axiom 4).
+- **A settling moves energy on no way** (axiom 4).
 
 ## Open
 

@@ -16,21 +16,21 @@ They win over this file and the code. `tests/check_step.py` checks the axiom on 
 
 ## Assumed
 
-- One size constant: the start's joints are 300 long, its volumes 10.
+- One size constant. A joint's length follows from the balance the start is laid in (`lay_start`): at the defaults 22 against a volume's 10.
 - Wrapped means every neighbour of a volume is a joint and it has one. A side is a relation, so no count asks for 26 sides.
 - When a joint goes, the joints on its opposite sides touch (`close_web`, axiom 6); the web stays one piece.
 
 ## Real runs (16 a side, seed 1)
 
-- Every judged pattern count is 0 and the web is one piece at every step of all four runs: through 1,928 collapses (default) and 3,024 tears (uneven).
-- Default run ends as 4 volumes and 1,656 joints, 1,590 of them `inner_joints`.
+- Every judged pattern count is 0 and the web is one piece at every step of all five runs: through 1,874 collapses (collapsing) and the uneven run's tears. The default run has no event.
 
 ## Not done
 
 - **After a tear two pieces lie on one side of the joints beside them**, doubling every step (`crowded_mouths`).
-- **Lumps hardly warp the grid**: volumes are 0.48% of its length and no joint changes length while it holds. No crossing reads a length, and a settling (axiom 7) reads none.
-- **The default run ends with no A B A.** Nearly every joint left lies inside one merged volume (`inner_joints`, measured, not judged).
-- **"Wrapped" is not judged by a count.** `bare` asks for one living joint; a volume stripped to 6 of its 26 joints passes. After tears most volumes have fewer than 26.
+- **Thin joints need most of the energy.** One size law makes a thinner joint a fuller one: default joints are 2.2 times a volume's length and hold 76% of all energy. For the owner.
+- **No lump grows in 40 steps of the default run** (one expected failure). No crossing reads a length.
+- **The collapsing run ends with no A B A**: joints inside merged volumes (`inner_joints`, measured, not judged).
+- **"Wrapped" is not judged by a count**: `bare` asks for one living joint.
 
 ## Open
 

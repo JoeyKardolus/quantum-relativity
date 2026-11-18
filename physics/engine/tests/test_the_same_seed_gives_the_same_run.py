@@ -18,7 +18,7 @@ def _run(changed: dict, seed: int, steps: int):
     return state_digest(state), int(state.collapses), int(state.tears)
 
 
-@pytest.mark.parametrize("changed, steps", [({}, 150), ({"unevenness": 0.3}, 6)])
+@pytest.mark.parametrize("changed, steps", [({"collapse_thin": 1.01}, 40), ({"unevenness": 0.6}, 6)])
 def test_two_runs_from_one_seed_end_with_the_same_bits(changed, steps):
     first, second = _run(changed, 1, steps), _run(changed, 1, steps)
     assert first == second

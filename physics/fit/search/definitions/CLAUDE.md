@@ -3,7 +3,7 @@
 What is searched and the marks a run and a point are judged by. Each file's docstring
 is its contract.
 
-- `ranges.py`: the twelve searched settings and their ranges.
+- `ranges.py`: the ten searched settings and their ranges.
 - `unit_to_overrides.py`: a point of the unit cube as engine settings.
 - `latin_hypercube.py`, `refine_width.py`: where the random and the refine points lie.
 - `search_plan.py`: the sizes of a search, one frozen record.

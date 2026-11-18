@@ -7,8 +7,8 @@ from physics.scenes.run.definitions.start_settings import start_settings
 
 
 def test_a_named_amount_is_replaced_and_every_other_setting_is_kept():
-    changed = start_settings(None, {"unevenness": 0.3, "joint_quanta": 50.0})
-    assert changed.unevenness == 0.3 and changed.joint_quanta == 50.0
+    changed = start_settings(None, {"unevenness": 0.3, "slope": -2.0})
+    assert changed.unevenness == 0.3 and changed.slope == -2.0
     assert changed.friction == Settings().friction and changed.volume_quanta == Settings().volume_quanta
     assert start_settings(None, None) == Settings()
 

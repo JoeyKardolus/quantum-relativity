@@ -2,7 +2,6 @@
 
 Contract: constants only, the `pass_id` handed to draw_uniform.py.
   START_VOLUME_A, START_VOLUME_B   the two draws of a box's normal at the start (volume or joint box)
-  START_JOINT_A, START_JOINT_B     the two draws of a joint's own (whole-cell) normal at the start
   START_SWIRL_AXIS, START_SWIRL_SENSE  a cell's swirl axis and sense at the start
   START_FIELD_A, START_FIELD_B     the two draws of a volume's normal in the start's uneven field
   FLOW_ROUND     rounding inside a cell: add `axis * 2 + parity`, so 10 to 15
@@ -21,8 +20,6 @@ from __future__ import annotations
 
 START_VOLUME_A = 1
 START_VOLUME_B = 2
-START_JOINT_A = 3
-START_JOINT_B = 4
 START_SWIRL_AXIS = 5
 START_SWIRL_SENSE = 6
 START_FIELD_A = 7

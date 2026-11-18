@@ -18,16 +18,17 @@ They win over this file and the code.
 - `friction` is one share for every joint.
 - The phases of two cells are read as they stand: one fluid, one phase field.
 
-## Measured (fix round 3)
+## Measured (2026-11-18)
 
-- A universe of one phase and even energy: not one quantum crosses, at any friction. One volume doubled in that still fluid (1,296,000 among 648,000) has lost 164,475 quanta by step 10 and 684,755 by step 50, and stays level.
+- A universe of one phase and even energy: not one quantum crosses, at any friction.
 - The fluid a flow joins turns less the more friction there is.
-- Held and gentle runs: half of what crosses loses its direction; heat is 51% of the plus energy at step 24.
+- Held and gentle runs: at least 0.65% of the plus energy crosses a step (the meshing swirls send little by themselves).
+- A lump with a phase step of 0.3 a box across its whole fluid, even fluid of one phase: 6.6 boxes in 50 steps (the free fluid's own speed: 7.4). With meshing swirls: 4.2 boxes; with each cell wound round its own axis (before): 2.2, then back.
 
 ## Not done
 
-- **On a real start the volumes get lumpier**, pull as good as off: spread of their quanta 66,124 at step 1, 316,367 at step 33 (gentle run).
+- **A lump coasts only while it holds together.** Motion crosses a joint with the energy (the pair's own step; friction takes its share), but nothing but the pull holds a lump, and a pull strong enough for that packs it into single cells, which stay where they are (`scenes/gravity`).
 - **The joint's own fluid plays no part**, and energy crosses it in one step whatever its length (see axiom 1).
-- **Friction does not bring the fluid to rest; heat is a count.** A box has one phase for all its quanta. Pull off, 400 steps: the flow between boxes inside the volumes rises from 22.6 to 43.7 million at friction 0.5, to 48.9 million at friction 1: the phases grow disordered.
-- **A cell does not coast by its own tilt.** Which way energy crosses is set by the phase step across the joint. One volume given a phase ramp toward +x in a still universe lags its neighbours and draws energy in: +115,473 quanta in step 1, +856,323 by step 40. Where the phase runs on from cell to cell a lump does coast: in a universe streaming toward +x with every clock at full rate, a doubled volume hands 175,618 quanta to its +x neighbour in 10 steps, 29,503 are two volumes on by step 20, and the -x neighbour loses. For the owner: the old side law coasted from a tilt alone but made motion out of nothing.
+- **Friction does not bring the fluid to rest; heat is a count.** A box has one phase for all its quanta.
+- **Only 16 of a face's 36 boxes trade straight across**; the 20 at its rim trade with the neighbours across edges and corners (`mouth.py`).
 - **A settling (axiom 7) moves energy through no joint** (`off_ways`).

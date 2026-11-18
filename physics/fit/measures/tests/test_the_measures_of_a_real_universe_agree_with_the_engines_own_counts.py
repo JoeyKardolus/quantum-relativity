@@ -43,13 +43,14 @@ def test_a_very_uneven_start_has_lumps_a_gap_between_them_and_every_count_the_en
 
 @needs_gpu
 def test_after_collapses_the_volumes_alive_are_the_volumes_left_and_the_books_still_agree():
-    universe = new_universe(_SETTINGS, 8, 1)
-    for _ in range(8):
-        step(universe, _SETTINGS)
+    settings = Settings(tear_length=200.0, collapse_thin=1.01)         # a joint collapses a hundredth above fresh
+    universe = new_universe(settings, 8, 1)
+    while universe.collapses == 0 and universe.step < 20:
+        step(universe, settings)
     cells = read_universe(universe)
-    measured = measure_cells(cells, _SETTINGS.tear_length)
+    measured = measure_cells(cells, settings.tear_length)
     _agrees(universe, measured)
-    assert measured["collapses"] == universe.collapses > 0 and measured["tears"] == 0
+    assert measured["collapses"] == universe.collapses > 0 and measured["tears"] == universe.tears
     assert measured["alive"] == measured["volumes"] / 64 < 1.0
     fallen = np.flatnonzero(cells["fell_into"] >= 0)
     assert len(fallen) == 64 - measured["volumes"] and (cells["kind"][fallen] == 0).all()

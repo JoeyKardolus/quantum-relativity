@@ -30,7 +30,8 @@ def test_the_event_count_is_the_tears_and_collapses_and_each_left_a_record(run):
         assert record["version"] == limits["tears"] + limits["collapses"] == seen
 
 
-def test_the_default_run_has_collapses_and_the_uneven_run_has_tears():
-    default, uneven = run_records("default")[-1]["axiom_6_limits"], run_records("uneven")[-1]["axiom_6_limits"]
+def test_the_collapsing_run_has_collapses_the_uneven_run_has_tears_and_the_default_run_stands():
+    default, uneven = run_records("collapsing")[-1]["axiom_6_limits"], run_records("uneven")[-1]["axiom_6_limits"]
+    assert run_records("default")[-1]["version"] == 0, "the default universe stands: no collapse, no tear"
     assert default["collapses"] > 0
     assert uneven["tears"] > 0

@@ -34,13 +34,14 @@ def _back(state, way: dict) -> int:
 def test_a_volume_whose_fluid_runs_at_a_side_sends_through_it_and_nothing_comes_back():
     state, settings, volume, way = _moving(1e-9)
     before, far_before = held_by(state, volume), held_by(state, way["far"])
+    total = int(np.abs(state.quanta.numpy()).sum())
     cross(state, settings)
     count_cells(state)
     assert _out(state, way) > 0 and _back(state, way) == 0
     assert held_by(state, way["far"]) > far_before, "what leaves arrives next door in the same step"
     assert int(state.host("crossed")[way["joint"]]) == _out(state, way), "and is booked on the joint it went through"
     sent = int(state.host("way_out_a").sum() + state.host("way_out_b").sum())
-    assert before - held_by(state, volume) <= sent and int(np.abs(state.quanta.numpy()).sum()) == 8 * before + 56 * held_by(state, way["joint"])
+    assert before - held_by(state, volume) <= sent and int(np.abs(state.quanta.numpy()).sum()) == total
 
 
 def test_what_arrives_is_still_moving_and_the_more_friction_the_less_it_turns_the_fluid_it_joins():

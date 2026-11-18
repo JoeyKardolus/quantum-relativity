@@ -3,7 +3,7 @@
 Contract: `packed_start(cells_per_side, packed, seed=1, settings=None, device="cuda",
 start=None)` builds physics.engine.new_universe with the settings (default Settings();
 `start` puts a candidate's start amounts in, start_settings) made even: `unevenness`
-and `joint_unevenness` 0, so every volume is alike but for the jitter inside its boxes.
+so every volume is alike but for the jitter inside its boxes.
 Each energy volume named in `packed`, {(i, j, k) lattice place, all three even: factor},
 then holds round(factor * even_volume_quanta) quanta spread evenly over its own boxes
 (even_fill); its phases are left as its swirl wound them. Every cell's count, length,
@@ -30,7 +30,7 @@ from physics.scenes.run.definitions.start_settings import start_settings
 def packed_start(cells_per_side: int, packed: dict, seed: int = 1, settings: Settings | None = None,
                  device: str = "cuda", start: dict | None = None) -> Grid:
     """An even universe with the named energy volumes packed to their factors."""
-    settings = replace(start_settings(settings, start), unevenness=0.0, joint_unevenness=0.0)
+    settings = replace(start_settings(settings, start), unevenness=0.0)
     universe = new_universe(settings, cells_per_side, seed, device=device)
     even = even_volume_quanta(settings)
     for place, factor in packed.items():

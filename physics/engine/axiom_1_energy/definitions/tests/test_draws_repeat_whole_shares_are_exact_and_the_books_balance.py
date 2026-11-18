@@ -46,7 +46,7 @@ def test_draws_fill_zero_to_one_evenly_and_differ_by_seed_step_and_pass():
 
 def test_every_use_of_a_draw_has_its_own_pass():
     numbers = {name: value for name, value in vars(passes).items() if name.isupper()}
-    assert numbers == {"START_VOLUME_A": 1, "START_VOLUME_B": 2, "START_JOINT_A": 3, "START_JOINT_B": 4,
+    assert numbers == {"START_VOLUME_A": 1, "START_VOLUME_B": 2, 
                        "START_SWIRL_AXIS": 5, "START_SWIRL_SENSE": 6, "START_FIELD_A": 7,
                        "START_FIELD_B": 8, "FLOW_ROUND": 10, "WAY_ROUND": 20,
                        "WAY_FRICTION": 21, "MAKE_ROUND": 30, "SPLIT_SPEED": 40,
@@ -107,11 +107,11 @@ def test_arrays_and_host_counts():
 
 def test_settings_defaults_and_what_they_refuse():
     settings = EnergySettings()
-    assert (settings.step_time, settings.volume_quanta, settings.joint_quanta) == (0.25, 3000, 100)
+    assert (settings.step_time, settings.volume_quanta) == (0.25, 3000)
+    assert not hasattr(settings, "joint_quanta"), "no setting says what a joint holds: the start lays it in balance"
     assert not hasattr(settings, "fluid_pressure")
-    assert (settings.unevenness, settings.slope, settings.inner_unevenness, settings.joint_unevenness) == \
-        (0.1, -3.0, 0.1, 0.0)
-    for name in ("step_time", "volume_quanta", "joint_quanta"):
+    assert (settings.unevenness, settings.slope, settings.inner_unevenness) == (0.1, -3.0, 0.1)
+    for name in ("step_time", "volume_quanta"):
         with pytest.raises(ValueError):
             EnergySettings(**{name: 0.0})
     with pytest.raises(ValueError):

@@ -1,4 +1,9 @@
-"""Command line: `python -m physics.view [--cells N] [--seed S] [--set name=value ...] [--steps-per-frame F] [--pictures DIR --steps N --every K [--slice]]`.
+"""Command line: `python -m physics.view [--scene NAME] [--all-rules] [--cells N] [--seed S] [--set name=value ...] [--steps-per-frame F] [--pictures DIR --steps N --every K [--slice]]`.
+
+`--scene two_lumps | coast | orbit | lone` opens a gravity scene (`physics.scenes.gravity`)
+with the fitted phase 1 settings (`physics.fit.fitted`), `--set` on top of them, 24 cells
+a side unless `--cells` says more. Runs step the layers below axiom 7 (phase 1 of the
+fit: gravity first); `--all-rules` steps every axiom.
 
 Contract: builds a `CellsSource` (physics.engine, the default universe: 32 cells a
 side, seed 1; `--set` overrides of `Settings` fields, each a number, the start's
@@ -22,7 +27,10 @@ from physics.view.window.logic.use_gpu_driver import use_gpu_driver
 def main() -> None:
     """Parse the options, then step and draw until the window closes, or save pictures."""
     parser = argparse.ArgumentParser(prog="python -m physics.view")
-    parser.add_argument("--cells", type=int, default=32, help="cells along each edge of the start (even, at least 4)")
+    parser.add_argument("--scene", choices=["two_lumps", "coast", "orbit", "lone"],
+                        help="a gravity scene with the fitted phase 1 settings instead of the default universe")
+    parser.add_argument("--all-rules", action="store_true", help="step every axiom, axiom 7's splits too (slow)")
+    parser.add_argument("--cells", type=int, default=None, help="cells along each edge of the start (even, at least 4)")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--set", action="append", default=[], metavar="name=value",
                         help="override one rule setting, e.g. --set unevenness=0.3")
@@ -33,6 +41,10 @@ def main() -> None:
     parser.add_argument("--every", type=int, default=250, help="with --pictures: steps between pictures")
     arguments = parser.parse_args()
     overrides = {}
+    cells = arguments.cells or (24 if arguments.scene else 32)
+    if arguments.scene:
+        from physics.fit.fitted.definitions.fitted_values import FITTED
+        overrides.update(FITTED["settings"])
     for pair in arguments.set:
         name, separator, value = pair.partition("=")
         if not separator:
@@ -43,7 +55,7 @@ def main() -> None:
             parser.error(f"--set {pair}: expected name=number")
     from physics.view.source.logic.cells_source import CellsSource
     try:
-        source = CellsSource(arguments.cells, arguments.seed, overrides)
+        source = CellsSource(cells, arguments.seed, overrides, scene=arguments.scene, quantum=arguments.all_rules)
     except (TypeError, ValueError) as raised:
         parser.error(f"--set: {raised}")
     if arguments.pictures:

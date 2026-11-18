@@ -16,21 +16,11 @@ def _universe(side: int = 8, **changed):
     return engine.new_universe(settings, cells_per_side=side, seed=1, device="cpu"), settings
 
 
-def _far_and_reach(state, volume: int, mouth: int, joint: int) -> tuple:
-    """The mean pull behind a volume, on the side away from the joint, and the reach from the joint to there."""
-    pull, length, quanta = state.host("pull"), state.host("length").astype(np.float64), state.host("cell_quanta")
-    behind = [one for one, code in state.neighbours(volume) if code == 26 - mouth and quanta[one] > 0]
-    far = float(np.mean(pull[behind])) if behind else float(pull[volume])
-    far_length = float(np.mean(length[behind])) if behind else 0.0
-    return far, length[joint] / 2.0 + length[volume] + far_length / 2.0
-
-
 def _press_by_hand(state, way: tuple, joint: int) -> float:
     slot, way_a, way_b, mouth_a, mouth_b = way
     quanta, pull = state.host("cell_quanta").astype(np.float64), state.host("pull")
-    far_a, reach_a = _far_and_reach(state, way_a, mouth_a, joint)
-    far_b, reach_b = _far_and_reach(state, way_b, mouth_b, joint)
-    slopes = (far_a - pull[joint]) / reach_a + (far_b - pull[joint]) / reach_b
+    length = state.host("length").astype(np.float64)
+    slopes = sum((pull[joint] - pull[volume]) / ((length[joint] + length[volume]) / 2.0) for volume in (way_a, way_b))
     return quanta[way_a] * quanta[way_b] / (quanta[way_a] + quanta[way_b]) * slopes
 
 
@@ -65,49 +55,47 @@ def test_a_joint_s_press_is_its_hardest_way_never_a_sum_and_a_tie_goes_to_the_lo
     assert not press[volumes].any() and (hardest[volumes] == -1).all() and not state.host("squeeze")[volumes].any()
 
 
-def test_the_squeeze_is_the_press_over_the_joint_s_own_push_and_nothing_when_it_is_drawn_apart():
+def test_the_squeeze_is_the_press_over_the_joint_s_own_push_and_the_start_lies_in_balance():
     state, settings = _pressed()
     press, squeeze = state.host("press").astype(np.float64), state.host("squeeze")
     quanta, length = state.host("cell_quanta").astype(np.float64), state.host("length").astype(np.float64)
     joints = state.host("kind") == engine.JOINT
     push = settings.push_strength * (quanta[joints] / length[joints]) ** 2
     assert np.allclose(squeeze[joints], np.maximum(press[joints], 0.0) / push, rtol=1e-5)
-    assert (squeeze[joints][press[joints] <= 0.0] == 0.0).all() and (squeeze[joints] > 1.0).any()
+    assert (press[joints] > 0.0).all(), "two volumes always pull at the joint between them"
+    assert np.allclose(squeeze[joints], 1.0, atol=2e-3), "the start gives every joint the energy at which its push balances the pull across it"
 
 
-def test_two_equal_volumes_on_one_even_slope_press_nothing_and_pulled_together_they_press():
+def test_two_volumes_on_one_even_slope_press_nothing_and_two_that_lie_deeper_than_their_joint_press_it():
     state, settings = _universe(side=8)
     joint = next(int(cell) for cell in np.flatnonzero(state.host("kind") == engine.JOINT)
                  if len(state.ways_of(int(cell))) == 1)
     (slot, way_a, way_b, mouth_a, mouth_b), = state.ways_of(joint)
     length = state.host("length").astype(np.float64)
-    behind_a = next(one for one, code in state.neighbours(way_a) if code == 26 - mouth_a)
-    behind_b = next(one for one, code in state.neighbours(way_b) if code == 26 - mouth_b)
-    reach_a = length[joint] / 2.0 + length[way_a] + length[behind_a] / 2.0
-    reach_b = length[joint] / 2.0 + length[way_b] + length[behind_b] / 2.0
+    reach_a, reach_b = (length[joint] + length[way_a]) / 2.0, (length[joint] + length[way_b]) / 2.0
     for cell in range(state.count):
         state.set_cell("pull", cell, 0.0)
-    state.set_cell("pull", behind_a, 1.0 * reach_a)          # the pull falls by 1 a length from behind a ...
-    state.set_cell("pull", behind_b, -1.0 * reach_b)         # ... through the joint (0) to behind b: one even slope
+    state.set_cell("pull", way_a, 1.0 * reach_a)             # the pull falls by 1 a length from a ...
+    state.set_cell("pull", way_b, -1.0 * reach_b)            # ... through the joint (0) to b: one even slope
     clear_ledgers(state)
     press_joints(state, settings)
     scale = float(state.host("cell_quanta")[way_a])
     assert abs(state.host("way_press")[slot]) < 1e-6 * scale
-    state.set_cell("pull", behind_b, 1.0 * reach_b)          # now both sides slope down to the joint
+    state.set_cell("pull", way_a, -1.0 * reach_a)            # now both volumes lie deeper than the joint
     clear_ledgers(state)
     press_joints(state, settings)
     assert state.host("way_press")[slot] > 0.1 * scale
 
 
-def test_an_emptied_cell_behind_a_volume_is_empty_space_and_its_old_pull_is_not_read():
-    state, settings = _universe(side=8)
+def test_only_the_pull_at_the_joint_and_at_its_two_volumes_is_read():
+    state, settings = _pressed()
     joint = next(int(cell) for cell in np.flatnonzero(state.host("kind") == engine.JOINT)
                  if len(state.ways_of(int(cell))) == 1)
     way = state.ways_of(joint)[0]
-    behind = next(one for one, code in state.neighbours(way[1]) if code == 26 - way[3])
-    state.set_cell("cell_quanta", behind, 0)
-    state.set_cell("pull", behind, 1.0e9)
+    before = float(state.host("way_press")[way[0]])
+    for other in range(state.count):
+        if other not in (joint, way[1], way[2]):
+            state.set_cell("pull", other, 1.0e9)
     clear_ledgers(state)
     press_joints(state, settings)
-    assert abs(state.host("way_press")[way[0]]) < 1.0e6
-    assert np.isclose(state.host("way_press")[way[0]], _press_by_hand(state, way, joint), rtol=1e-5)
+    assert float(state.host("way_press")[way[0]]) == before

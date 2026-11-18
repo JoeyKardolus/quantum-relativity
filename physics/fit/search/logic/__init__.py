@@ -8,4 +8,5 @@
   find_holders.py      find_holders: which searched points still stand when run four times longer
   run_search.py        run_search: the phases in order (defaults, random, refine, hold, sweep), resumable
   summarize_search.py  summarize_search: a plain-text summary of a search's records
+  gravity_search.py    gravity_search: phase 1, a random search of the gravity ranges scored by the gravity scene
 """

@@ -10,21 +10,29 @@ def _largest(record: dict) -> float:
     return max(record["axiom_5_packing"]["largest_squeeze"].values())
 
 
-def test_with_a_push_that_beats_the_press_no_joint_is_squeezed_and_none_makes_energy_or_collapses():
-    records = run_records("held")
-    assert 0.0 < max(_largest(record) for record in records) < 1.0
-    assert all(sum(record["axiom_5_packing"]["squeezed_joints"].values()) == 0 for record in records)
+def test_the_start_lies_in_balance_so_after_one_step_the_hardest_squeeze_is_close_to_one():
+    for name in ("default", "collapsing"):
+        first = _largest(run_records(name)[0])
+        assert 0.9 < first < 1.1, f"{name}: largest squeeze after step 1 is {first}"
+
+
+def test_a_push_too_hard_to_balance_leaves_the_joints_at_one_quantum_a_box_and_slack():
+    # push 40 (the held runs): the balance would ask for less than one quantum a box, and no box starts empty
+    assert 0.0 < max(_largest(record) for record in run_records("held")) < 1.0
     assert all(record["axiom_6_limits"]["made"] == 0 and record["axiom_6_limits"]["collapses"] == 0
-               for record in records)
+               for record in run_records("held"))
 
 
-def test_at_the_default_push_the_press_beats_it_and_the_squeezed_joints_make_energy_at_once():
-    first = run_records("default")[0]
-    assert first["axiom_6_limits"]["made"] > 0 and first["axiom_6_limits"]["collapses"] > 0
-
-
-def test_once_the_joints_that_made_energy_have_collapsed_the_largest_squeeze_is_lower_than_at_the_start():
+def test_squeezed_joints_make_energy_and_hold_while_they_are_below_their_limit():
     records = run_records("default")
-    making = [record for record in records if record["axiom_6_limits"]["made"] > 0]
-    assert len(making) >= 2
-    assert _largest(records[len(making)]) < _largest(making[0])
+    assert any(record["axiom_6_limits"]["made"] > 0 for record in records)
+    assert all(sum(record["axiom_5_packing"]["squeezed_joints"].values()) > 0
+               for record in records if record["axiom_6_limits"]["made"] > 0), "only a squeezed joint makes energy"
+    assert all(record["axiom_6_limits"]["collapses"] == 0 for record in records), "none is squeezed to its limit of 3"
+    assert max(_largest(record) for record in records) < 1.5
+
+
+def test_with_a_limit_a_hundredth_above_fresh_the_joints_that_made_energy_collapse():
+    records = run_records("collapsing")
+    first = next(index for index, record in enumerate(records) if record["axiom_6_limits"]["collapses"] > 0)
+    assert first >= 1 and any(record["axiom_6_limits"]["made"] > 0 for record in records[:first])

@@ -21,7 +21,7 @@ def test_two_random_points_are_run_recorded_and_summarized_and_a_second_call_run
         assert "trace" not in record, record.get("trace")
         assert record.get("error", "ended").startswith("ended"), "the only error is a universe that was over early"
         assert 0.0 <= record["score"] <= 1.0 and 0.0 <= record["E"] <= 1.0 and 0.0 <= record["S"] <= 1.0
-        assert len(record["unit"]) == len(SEARCHED) == 12
+        assert len(record["unit"]) == len(SEARCHED) == 10
         for name, (low, high) in (LOG_RANGES | LINEAR_RANGES).items():
             assert low <= record["overrides"][name] <= high
         series = record["series"]

@@ -1,7 +1,9 @@
 """Packing arrays: the state axiom 5 owns, how packed each cell is, its clock, the pull and the press.
 
-Contract: `ARRAYS = {name: (dtype, shape, each_step)}` and one host value, `pull_unrest`: the
-largest move of the last sweep that set the pull at rest at the start (`start_pull`).
+Contract: `ARRAYS = {name: (dtype, shape, each_step)}` and two host values: `pull_unrest`, the
+largest move of the last sweep that set the pull at rest (`rest_pull`), and
+`balance_off`, the largest share any joint still moved by in the last round that laid
+the start in balance (`new_universe`).
 Per cell id:
   packing       float64: quanta over length cubed (packing_law.py)
   rate          float32 in (0, 1]: how fast the cell's local clock runs (clock_rate.py)
@@ -43,4 +45,5 @@ ARRAYS = {
 
 HOST = {
     "pull_unrest": 0.0,
+    "balance_off": 0.0,
 }

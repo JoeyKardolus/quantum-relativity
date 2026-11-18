@@ -8,14 +8,14 @@ They win over this file and the code. `tests/check_step.py` checks the axiom on 
 
 ## Clause by clause
 
-- "Cells are swirls": `logic/start_swirls.py` gives every cell, volume and joint, an axis and a sense from the seed and winds its fluid's phase once round that axis (`definitions/swirl_phase.py`). Fluid flows from the phase that is ahead, so the cell's own fluid goes round. No rule turns it afterwards: `flow_inside` (axiom 1) carries it on the cell's local time.
+- "Cells are swirls": `logic/start_swirls.py` makes every cell, volume and joint, a standing swirl (`swirl_phase.py`, `swirl_share.py`): the slowest standing wave of its six boxes along two directions, a quarter turn apart, so its phase goes once round the axis and its core stands open. No rule turns it afterwards: `flow_inside` (axiom 1) carries it.
 - "in whole steps": the phase comes back to itself after one whole turn round the axis.
 - "plus only pulls": `pull_source` asks `makes_pull`, `pull_fluid` asks `feels_pull` (axiom 5).
 - "minus only pushes": `press_joints` asks `pushes` (axiom 5).
 
 ## Assumed
 
-- One whole turn, the same in all six layers, at the start.
+- One axis for the whole grid, drawn from the seed, and neighbours of opposite sense (2026-11-18). Two volumes then hold equal waves in the boxes that face each other across a joint, so the swirls mesh like gears and nothing crosses a joint by itself. Own axes (before) ground on each other, unwound within 20 steps and carried no motion from cell to cell.
 - "Oscillate" is read as going round.
 - A torn volume's pieces keep its axis and sense; a merged volume keeps the kept one's.
 
@@ -25,15 +25,15 @@ Read off the fluid, not off a label: `against_*` (a cell whose own flow round it
 
 ## Measured (16 a side, seed 1)
 
-- Fluid alone: every cell goes round its own way for 40 steps (the test's length). A joint loses its swirl by itself later: 268 of 448 unwound at step 2,000.
-- Gentle run (pull as good as off): volumes unwound at steps 9, 13, 21: 79, 223, 354 of 512; 121 go against their sense at step 21. Held run: 424, 485, 498; 284 against. Joints keep theirs in both; in the uneven run 179 joints are unwound by step 5. Ten run tests are marked `NOT_KEPT`.
+- Default, held and gentle runs: every volume keeps its swirl at every step (none against its sense, none unwound). Even start, 200 steps: about 1e-4 of the plus energy crosses a step, heat 0.001 (own axes: 9%, heat 0.1).
+- Joints keep theirs in the default run. At push 40 the balance leaves a joint one quantum a box and the rounding of whole quanta unwinds it (1,810 of 3,584 against their sense).
 
 ## Not done
 
-- **No rule makes or keeps a cell a swirl.** It is wound at the start and the fluid undoes it at any pull strength: facing boxes of two volumes trade by their phases (axiom 4). A tear copies whatever phases are left.
-- **A joint's swirl does nothing.** Nothing outside a joint reads its fluid.
-- **The swirl drives energy through the sides**: with the volumes' phases flat nothing crosses in an even universe; with swirls 422,860 quanta cross in step 1 (8 a side).
-- **Nothing oscillates, and nothing is counted in whole steps.** Going round one way is no swing, and any phase pattern closes after a whole number of turns. `check_step` reads the middle ring only.
+- **No rule makes or keeps a cell a swirl.** It stands only while nothing disturbs it: lost through collapses and tears (a tear copies whatever phases are left) and in joints of few quanta. Nine run tests are expected failures.
+- **A lump is not a standing swirl**: placed extra energy and the pull's own slope across a cell unwind it there.
+- **The grid has a chosen direction**: one swirl axis for all cells.
+- **Nothing oscillates**; `check_step` reads the middle ring only.
 
 ## Open
 

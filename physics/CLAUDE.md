@@ -11,8 +11,7 @@ quanta and a phase) for its fluid; boxes are not space. The rest is built on the
 engine's public names:
 `view/` is the only viewer, a pyglet window (or pictures without one) of the whole grid
 in 3D. `scenes/` is the scorecard: each scene runs the engine and returns measured
-numbers, no verdict. `fit/` searches settings on the fit set only (expansion shape,
-structure) and never changes a default. `bench/` times the engine and finds the largest
+numbers, no verdict. `fit/` searches settings in phases, gravity first, and never changes a default. `bench/` times the engine and finds the largest
 universe at a step a second. `measure/` holds the measures scenes share (dimension, a
 cell's whole turns), CPU only.
 
@@ -33,9 +32,9 @@ cell's whole turns), CPU only.
   lengths (`measure_grid(state)["size"]`).
 - **Honesty.** Never tune a setting, seed or threshold until a result passes; report every
   number, seed, settings and miss.
-- **Nothing is measured at full size yet** on the rebuilt engine: no scorecard, no fit,
-  no trusted speed. The default universe collapses in its first steps
-  (`engine/CLAUDE.md`); package tests run on the engine's "held" settings.
+- **Phase 1 is gravity only** (`scenes/gravity`, `fit/`): no scorecard and no result pages
+  until it holds. The default universe stands since the start is laid in balance
+  (2026-11-18); many package tests still run on the engine's "held" settings.
 - **GPU**: RTX 5080, WSL2: no CUDA-OpenGL sharing, copy GPU to host once per frame. Tests that need CUDA skip cleanly without it.
 - **A machine keeps no datasets**: long runs and their results go to tmp or object
   storage, never into the repo.

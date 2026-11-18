@@ -37,23 +37,23 @@ def test_in_the_default_run_joints_do_make_energy_and_that_step_is_compared():
 
 
 def test_real_collapses_take_the_joint_s_energy_off_the_rest_and_merge_two_volumes():
-    collapses = _events("default", "collapse")
-    assert collapses, "the default run had no collapse"
+    collapses = _events("collapsing", "collapse")
+    assert collapses, "the collapsing run had no collapse"
     merging = [event for event in collapses if event["kept"] != event["gone"]]
     assert merging and all(event["kept"] < event["gone"] for event in merging)
     assert all(event["taken_volume"] <= event["taken_joint"] for event in collapses)
-    last = _of("default")[-1]
-    books = run_records("default")[-1]["books"]
+    last = _of("collapsing")[-1]
+    books = run_records("collapsing")[-1]["books"]
     assert books["taken_joint"] == sum(event["taken_joint"] for event in collapses)
     assert books["taken_volumes"] == sum(event["taken_volume"] for event in collapses)
     assert last["collapses"] == len(collapses) and last["merges"] == len(merging)
 
 
 def test_every_collapse_was_of_a_joint_squeezed_to_its_limit_and_no_other_joint_went_with_it():
-    records = _of("default")
+    records = _of("collapsing")
     gone = sum(len([event for event in record["events"] if event["what"] == "collapse"]) for record in records)
     joints_at_start = 16 ** 3 - 8 ** 3
-    joints_left = run_records("default")[-1]["axiom_3_structure"]["joints"]
+    joints_left = run_records("collapsing")[-1]["axiom_3_structure"]["joints"]
     assert joints_at_start - joints_left == gone
 
 
