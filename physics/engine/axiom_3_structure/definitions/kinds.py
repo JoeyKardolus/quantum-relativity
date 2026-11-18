@@ -1,18 +1,11 @@
-"""Kinds: the two kinds of cell and the size of a cell's block of compute boxes.
+"""Kinds: the two kinds of cell, and how many compute boxes a cell needs.
 
-Contract: constants only. A cell id is an energy volume (`ENERGY_VOLUME`, its boxes hold
-plus quanta or 0), a joint (`JOINT`, its boxes hold minus quanta or 0) or no cell
-(`NO_CELL`: an id not yet used, or one whose cell is gone; every box of it holds 0 and
-the id is never used again). A cell's kind never changes while it lives (axiom 3: the
-pattern never flickers). `BLOCK` is the number of Planck boxes along one edge of a
-cell's block and `BOXES` the number in the block. The boxes are not space (axiom 3):
-they sit inside the cell only to compute its fluid.
+Plus quanta make a cell an energy volume, minus quanta a joint: the sign of its total
+is the kind, so nothing else stores it. `ACROSS` is the least number of Planck boxes
+along a cell's edge that holds a proper swirl. The boxes are not space (axiom 3): they
+sit inside the cell only to compute its fluid.
 """
-from __future__ import annotations
-
-ENERGY_VOLUME = 1
-JOINT = -1
-NO_CELL = 0
-
-BLOCK = 6
-BOXES = BLOCK ** 3
+ACROSS = 6
+# A scene number, chosen once and not moved: enough quanta for a swirl to outlast the noise
+# of whole quanta. Measured at 6 across: 3,000 a box holds, 20 a box is gone in 100 steps.
+QUANTA_A_BOX = 3_000

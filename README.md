@@ -14,7 +14,7 @@ orbits.
 - **A pulls** on other A's through the joints between them, fading with distance, like gravity.
   **A joint pushes back**, harder the more it is squeezed, until it gives way past a limit and the
   region collapses, like a star becoming a black hole.
-- **Energy is a quantum fluid**, one complex number per Planck box: frictionless inside a volume, whirls
+- **Energy is a quantum fluid**, whole quanta and a phase per Planck box: frictionless inside a volume, whirls
   turning only in whole steps, friction only in passing a joint.
   Squeezed joints let less through and past a seal point nothing, so packed lumps seal themselves.
 - **Time is local**: where energy is more packed, everything happens more slowly.
@@ -25,34 +25,30 @@ The full rules, open problems and milestones are in the bible chapter
 
 ## Status
 
-Early. The engine was rebuilt axiom by axiom (2026-11-18): it books every quantum exactly and draws live
-on the GPU, but it does not yet behave like a universe. With untuned settings more than half of the
-joints collapse in the first step and a single volume is left; cells do not stay swirls and the pull
-outruns light. Next: keep each axiom's clauses, then fit the few settings against a scorecard of scenes (expansion
-history, structure), and test, unfitted, on others (orbits, bound lumps, black hole size, the Hubble
-tension). Progress is tracked on [issue #1](https://github.com/JoeyKardolus/quantum-relativity/issues/1).
+Early, and started afresh on 2026-11-18: the engine before had grown too big and basic gravity still did
+not work. The new one is small, built for a billion cells from the start, and grows in layers, each one
+something to look at. Layer 1 is built: one energy volume whose fluid turns as one whole swirl with an
+open core, every quantum counted exactly. Next: layer 2, many cells and the first gravity test; then
+layer 3, a billion cells on one graphics card. Progress is tracked on
+[issue #1](https://github.com/JoeyKardolus/quantum-relativity/issues/1).
 Misses are reported as misses; nothing is tuned to look good.
 
 ## Run it
 
 ```bash
 uv sync --all-packages --all-extras --all-groups
-PYTHONPATH=. .venv/bin/python -m physics.view      # opens a window; Space starts, R resets, Esc quits
-PYTHONPATH=. .venv/bin/pytest -q physics           # the tests
+PYTHONPATH=. .venv/bin/python -m physics.view.logic.window   # a window; Space starts, R resets, G calm/own, Esc quits
+PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, 5 seconds
 ```
 
-Needs Linux or WSL2, Python 3.12+, [`uv`](https://docs.astral.sh/uv/) and an NVIDIA GPU (the engine
-runs on [NVIDIA Warp](https://github.com/NVIDIA/warp)). On WSL2 the viewer switches the window's drawing
+Needs Linux or WSL2, Python 3.12+, [`uv`](https://docs.astral.sh/uv/) . The engine runs on
+[NVIDIA Warp](https://github.com/NVIDIA/warp): on an NVIDIA GPU when there is one, else on the CPU. On WSL2 the viewer switches the window's drawing
 to the GPU by itself.
 
 | Path | What it is |
 |---|---|
-| `physics/engine/` | the engine, one directory per axiom (`axiom_1_energy` to `axiom_7_quantum`), each with its definitions, its logic and its tests; the step only calls them in order |
-| `physics/bench/` | the bench: the engine's speed, and the largest universe that runs a step a second |
-| `physics/view/` | the window that shows the whole grid in 3D, every cell at its own size, or saves pictures |
-| `physics/scenes/` | the scorecard: each scene runs the engine and returns measured numbers |
-| `physics/fit/` | the fit: searches the settings on expansion shape and structure, by random search (nothing searched on the rebuilt engine yet) |
-| `physics/measure/` | the measures the scenes share: the dimension of the volume graph, and a cell's whole turns |
+| `physics/engine/` | the engine, one directory per axiom (`axiom_1_energy` to `axiom_7_quantum`), each with its definitions, its logic and its tests; layer 1 fills the first three |
+| `physics/view/` | the window on one red energy volume with its swirl; it can also save pictures |
 | `docs/bible.md` | how everything works; the theory is the chapter `physics/quantum-relativity` |
 
 ## Built with

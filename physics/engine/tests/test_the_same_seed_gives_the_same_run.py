@@ -1,29 +1,17 @@
-"""The same seed gives the same run, bit for bit, through collapses and through tears; another seed does not."""
-from __future__ import annotations
+"""The same seed gives the same run, box for box; another seed gives another."""
+import numpy as np
 
-import pytest
-
-from physics.engine import Settings, new_universe, step
-from physics.engine.tests.conftest import needs_gpu, state_digest
-
-pytestmark = needs_gpu
+from physics.engine import one_cell, step
 
 
-def _run(changed: dict, seed: int, steps: int):
-    """A small universe run for some steps: its digest and its counts of events."""
-    settings = Settings(**changed)
-    state = new_universe(settings, cells_per_side=8, seed=seed, device="cuda")
+def _after(seed: int, steps: int) -> tuple[np.ndarray, np.ndarray]:
+    store = one_cell(seed=seed)
     for _ in range(steps):
-        step(state, settings)
-    return state_digest(state), int(state.collapses), int(state.tears)
+        step(store)
+    return store.box_quanta.numpy(), store.box_phase.numpy()
 
 
-@pytest.mark.parametrize("changed, steps", [({"collapse_thin": 1.01}, 40), ({"unevenness": 0.6}, 6)])
-def test_two_runs_from_one_seed_end_with_the_same_bits(changed, steps):
-    first, second = _run(changed, 1, steps), _run(changed, 1, steps)
-    assert first == second
-    assert first[1] + first[2] > 0, "the run had no event, so events were not compared"
-
-
-def test_another_seed_gives_another_run():
-    assert _run({}, 1, 5)[0] != _run({}, 2, 5)[0]
+def test_the_same_seed_gives_the_same_run():
+    first, again, other = _after(1, 300), _after(1, 300), _after(2, 300)
+    assert np.array_equal(first[0], again[0]) and np.array_equal(first[1], again[1])
+    assert not np.array_equal(first[0], other[0])

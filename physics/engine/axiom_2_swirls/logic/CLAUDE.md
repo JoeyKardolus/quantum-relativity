@@ -1,19 +1,8 @@
-# Axiom 2: swirls, logic
+# Axiom 2, logic
 
-What happens in a step under this axiom. Each file's docstring is its contract.
+`read_swirl.py` reads a cell's boxes on the host, one function a measure: `whole_turns`, `round_flow`, `core_share`, `off_rule`.
 
-- `start_swirls.py`: at the start every living cell gets an axis and a sense drawn from the seed, and its fluid's phase is wound once round that axis.
-
-That is all. In a step nothing here runs, so nothing keeps a cell a swirl: see "Not done" in the axiom's overlay.
-
-## Must not get wrong
-
-- **No rule turns a swirl.** If a cell stops going round, the fluid did that (the crossing, the pull); do not add a step that sets it going again without the owner's word on what a swirl's whole steps are.
-- **Start swirls writes phases, so it runs after `start_energy`** and before anything reads a phase.
-- **Every cell, joint and volume alike**, and each from its own draw: the grid has no chosen direction.
-- **A tear hands the axis and sense on** (axiom 6) and copies the phases layer by layer: a piece is wound only if the volume still was.
-- Logic imports definitions of any axiom and never another axiom's logic.
-
-## Tests
-
-`tests/` runs the fluid alone on a real 4-a-side universe: 40 steps (no longer), every cell goes round its own way and no quantum leaves its cell.
+- `whole_turns` is `None` when rings disagree. That is a finding, not an error to hide.
+- The phase falls the way the fluid goes, so a swirl of sense +1 reads -1 turn.
+- `off_rule` is 1 for plain counting noise. That mark is fixed.
+- It is for titles and tests. Never call it inside a step.

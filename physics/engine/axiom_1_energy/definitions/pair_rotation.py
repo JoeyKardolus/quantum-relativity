@@ -1,59 +1,38 @@
-"""Pair rotation: the exact step of two waves that trade fluid with each other.
+"""Pair rotation: how the fluid of two neighbouring boxes moves in one step.
 
-Contract: `pair_rotation(amount_a, phase_a, amount_b, phase_b, turn)` (Warp func, all
-float64) returns `(new_amount_a, new_phase_a, new_amount_b, new_phase_b)`. A wave is
-`sqrt(amount) e^{i phase}`. What the two waves have in common, `(a + b) / 2`, stands as
-it is; what they differ by, `(a - b) / 2`, turns by `2 turn`:
-  a' = (a + b) / 2 + e^{2 i turn} (a - b) / 2
-  b' = (a + b) / 2 - e^{2 i turn} (a - b) / 2
-That keeps `amount_a + amount_b` (up to float64 rounding) and hands everything over at
-a turn of pi / 2. Which way the fluid goes is set by the phases: it flows from the wave
-whose phase is ahead. Two waves that are equal are left exactly as they are, so a fluid
-of one phase stands still whatever the number of partners a box has: a box at the side
-of its cell's block is not left behind, and the block's shape is no force.
-The new phases are in (-pi, pi]; a wave that comes out exactly 0 keeps the phase it had.
-Nothing is rounded to whole quanta here (whole_move.py does that). Used for two boxes
-inside one cell and, in `cross` (axiom 4), for two boxes that face each other across a joint. It is how
-waves add and cancel (axiom 7).
+A box's fluid is a wave, `sqrt(quanta) * e^(i phase)`, kept as (real, imaginary). What
+two waves have in common stands as it is; what they differ by turns by twice `TURN`.
+So two equal waves stand still, and fluid flows from the wave whose phase is ahead.
+Layer 1 holds plus quanta only: how a joint's minus fluid moves is not decided yet.
 """
-from __future__ import annotations
-
 import warp as wp
 
-wp.set_module_options({"fuse_fp": False})
-
-_HALF = wp.constant(wp.float64(0.5))
-_TWICE = wp.constant(wp.float64(2.0))
+# A chosen step size. No axiom sets it yet (the owner decides what does); it was never
+# fitted to a picture, and the standing swirl and its turn per step follow from it.
+TURN = 0.25
 
 
 @wp.func
-def pair_rotation(amount_a: wp.float64, phase_a: wp.float64, amount_b: wp.float64, phase_b: wp.float64,
-                  turn: wp.float64):
-    """The two waves' amounts and phases after their difference has turned by twice `turn`."""
-    root_a = wp.sqrt(amount_a)
-    root_b = wp.sqrt(amount_b)
-    real_a = root_a * wp.cos(phase_a)
-    imag_a = root_a * wp.sin(phase_a)
-    real_b = root_b * wp.cos(phase_b)
-    imag_b = root_b * wp.sin(phase_b)
-    common_real = _HALF * (real_a + real_b)
-    common_imag = _HALF * (imag_a + imag_b)
-    apart_real = _HALF * (real_a - real_b)
-    apart_imag = _HALF * (imag_a - imag_b)
-    cosine = wp.cos(_TWICE * turn)
-    sine = wp.sin(_TWICE * turn)
-    turned_real = cosine * apart_real - sine * apart_imag
-    turned_imag = sine * apart_real + cosine * apart_imag
-    new_real_a = common_real + turned_real
-    new_imag_a = common_imag + turned_imag
-    new_real_b = common_real - turned_real
-    new_imag_b = common_imag - turned_imag
-    new_amount_a = new_real_a * new_real_a + new_imag_a * new_imag_a
-    new_amount_b = new_real_b * new_real_b + new_imag_b * new_imag_b
-    new_phase_a = phase_a
-    if new_amount_a > wp.float64(0.0):
-        new_phase_a = wp.atan2(new_imag_a, new_real_a)
-    new_phase_b = phase_b
-    if new_amount_b > wp.float64(0.0):
-        new_phase_b = wp.atan2(new_imag_b, new_real_b)
-    return new_amount_a, new_phase_a, new_amount_b, new_phase_b
+def wave_of(quanta: wp.int32, phase: wp.float32) -> wp.vec2d:
+    """A box's wave from its whole quanta (0 or more) and its phase."""
+    root = wp.sqrt(wp.float64(quanta))
+    return wp.vec2d(root * wp.cos(wp.float64(phase)), root * wp.sin(wp.float64(phase)))
+
+
+@wp.func
+def phase_of(wave: wp.vec2d, old_phase: wp.float32) -> wp.float32:
+    """A wave's phase in (-pi, pi]; a wave that is 0 keeps the phase it had."""
+    if wp.dot(wave, wave) > wp.float64(0.0):
+        return wp.float32(wp.atan2(wave[1], wave[0]))
+    return old_phase
+
+
+@wp.func
+def pair_rotation(wave_a: wp.vec2d, wave_b: wp.vec2d, turn: wp.float64):
+    """The two waves after their difference has turned by twice `turn`. Nothing is rounded."""
+    common = (wave_a + wave_b) * wp.float64(0.5)
+    apart = (wave_a - wave_b) * wp.float64(0.5)
+    cosine = wp.cos(wp.float64(2.0) * turn)
+    sine = wp.sin(wp.float64(2.0) * turn)
+    turned = wp.vec2d(cosine * apart[0] - sine * apart[1], sine * apart[0] + cosine * apart[1])
+    return common + turned, common - turned
