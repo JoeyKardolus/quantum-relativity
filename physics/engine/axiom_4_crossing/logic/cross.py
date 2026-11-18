@@ -1,8 +1,8 @@
 """Cross: one step of plus energy crossing every joint that lies between two volumes.
 
 A joint's axis and its two volumes follow from its place (`axis_of`, `volume_beside`). A
-volume is laid as the mirror of the volume before it (the other sense, like meshing gears),
-so two calm volumes' facing fluid agrees. Each box of the one volume that faces the joint moves with the box of
+volume is laid as the volume before it turned half round about the line between them (like
+meshing gears), so two calm volumes' facing fluid agrees. Each box of the one volume that faces the joint moves with the box of
 the other facing it, by the pair rotation at the joint's `passing_turn`: energy goes the
 way its phase carries it and arrives with its phase, so it is still moving. Friction then
 takes its share of the motion across, and that share of the whole quanta that crossed is

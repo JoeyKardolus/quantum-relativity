@@ -6,7 +6,7 @@ Built: the storage, the size law, the grid: a cell's number is its place, neighb
 
 Assumed (the owner has not ruled):
 - A volume is round. The joints fill all the room the volumes leave; no cell stands where joints meet.
-- Every swirl turns about one direction: across it neighbours are mirrors, along it alike. That direction differs from the other two: its joints are squeezed 18% slower, to the same balance.
+- A volume is its neighbour turned half round about the line between them. The three directions are alike: their joints are squeezed on one course, within 0.0005.
 - A calm volume holds 3,000 quanta a box, a fresh joint the same in minus.
 
-Measured (8 volumes): balance after 1,000 steps; to 3,000 volumes within 0.0001, swirls whole.
+Measured (8 volumes): balance after 500 steps; to 3,000 volumes within 0.0003, whirls whole.

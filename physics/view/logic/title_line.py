@@ -8,9 +8,9 @@ from physics.engine.axiom_5_packing.logic.squeeze import squeeze
 
 
 def title_line(store: Store) -> str:
-    """Whole turns, total quanta, step, core, distance from the rule, the ledger, own or calm."""
+    """Whole turns about each direction, total quanta, step, core, distance from the rule, the ledger, own or calm."""
     seen = swirl_of(store, 0)
-    turns = "mixed" if seen["turns"] is None else seen["turns"]
+    turns = "mixed" if None in seen["turns"] else " ".join(map(str, seen["turns"]))
     kept = "own" if slot_of(store, 0) >= 0 else "calm"
     return (f"whole turns {turns}  quanta {peek(store.cell_quanta, 0):,}  step {store.step}  "
             f"core {seen['core']:.3f} of the mean  off the rule {seen['off_rule']:.2f}  "

@@ -37,5 +37,5 @@ def test_a_squeezed_joint_s_swirl_goes_irregular_and_one_not_squeezed_stays_as_l
     for _ in range(300):
         step(squeezed)
         step(held)
-    assert swirl_of(squeezed, 1)["off_rule"] > 100  # measured: 259
-    assert swirl_of(held, 1)["off_rule"] < 1 and swirl_of(held, 1)["turns"] == -1
+    assert swirl_of(squeezed, 1)["off_rule"] > 100  # measured: 549
+    assert swirl_of(held, 1)["off_rule"] < 1 and swirl_of(held, 1)["turns"] == (-1, -1, -1)

@@ -1,9 +1,9 @@
 """Window: the viewer's door. `PYTHONPATH=. .venv/bin/python -m physics.view`
 
-Opens a window on one energy volume, drawn as its swirl; `--scene crossing` shows a
-volume, a joint and a volume, `--scene calm` a small grid that wraps round, as a flat cut
-through one layer (`--cut`, `--slab` layers thick); `--pictures DIR` saves pictures. One process on the
-card: this one. `BOXES`, `SPEED` and `FRAMES` only draw: fine enough to look smooth.
+Opens a window on one energy volume, drawn as its ball whirl; `--scene crossing` shows a
+volume, a joint and a volume, `--scene calm` a small grid that wraps round, seen along one
+direction (`--along`) at one layer (`--cut`, `--slab` layers thick); `--pictures DIR` saves
+pictures. One process on the card: this one. `BOXES`, `SPEED` and `FRAMES` only draw.
 """
 import argparse
 import os
@@ -11,7 +11,7 @@ from pathlib import Path
 
 import warp as wp
 
-from physics.view.definitions.camera import PITCH, YAW
+from physics.view.definitions.camera import ALONG, PITCH, YAW
 from physics.view.logic.save_png import save_png
 from physics.view.logic.scene import SCENES, drawn, eye_distance, layers, title, trace
 from physics.view.logic.tracers import MARK_EVERY, MARKS, step_carrying
@@ -22,7 +22,7 @@ FRAMES = 120  # the window is drawn at most this often a second
 
 
 def save_pictures(folder: Path, across: int, steps: int, every: int, device: str,
-                  scene: str, cut: int, slab: int, turned: tuple | None) -> None:
+                  scene: str, cut: int, slab: int, turned: tuple | None, along: int | None) -> None:
     """Run `steps` steps and save a picture every `every` steps, the start included."""
     import pyglet
     from physics.view.logic.picture import picture
@@ -31,14 +31,16 @@ def save_pictures(folder: Path, across: int, steps: int, every: int, device: str
     folder.mkdir(parents=True, exist_ok=True)
     store = SCENES[scene](across, device=device)
     layer = cut if layers(store) else None  # a grid's layer; a line shows every cell
-    tracers = trace(store, layer, slab)
+    flat = along is not None if layer is None else not slab  # looking straight along a direction
+    along = 2 if along is None else along
+    tracers = trace(store, layer, slab, along)
     painter = SwirlPainter(MARKS, tracers.tail.shape[1])
-    painter.thick, painter.dots = max(layers(store), 1.0), scene != "one"
-    yaw, pitch = turned or ((0.0, 0.0) if layers(store) and not slab else (YAW, PITCH))
+    painter.thick = max(layers(store), 1.0)
+    yaw, pitch = turned or (ALONG[along] if flat else (YAW, PITCH))
     for done in range(steps + 1):
         if done % every == 0:
             file = folder / f"step_{done:05d}.png"
-            painter.load(drawn(store, tracers, layer, slab))
+            painter.load(drawn(store, tracers, layer, slab, along))
             wide = 800 if store.grid == (1, 1, 1) else 1000  # several: as the window shows
             seen = picture(painter, across, yaw, pitch, eye_distance(store), wide, 800)
             save_png(file, seen)
@@ -55,10 +57,10 @@ def main() -> None:
     parser.add_argument("--pictures", type=Path, metavar="DIR", help="save pictures, no window")
     parser.add_argument("--steps", type=int, default=80, help="steps to run for the pictures")
     parser.add_argument("--every", type=int, default=20, help="steps between two pictures")
-    parser.add_argument("--turned", type=float, nargs=2, metavar="ANGLE",
-                        help="the pictures' view: turned about the upright, and upward")
+    parser.add_argument("--turned", type=float, nargs=2, help="the view: about the upright, upward")
+    parser.add_argument("--along", type=int, choices=(0, 1, 2), help="the direction looked along")
     parser.add_argument("--cut", type=int, default=0, help="the pictures' layer of a grid")
-    parser.add_argument("--slab", type=int, default=0, help="layers thick, in 3D; 0: a flat cut")
+    parser.add_argument("--slab", type=int, default=0, help="layers thick, in 3D; 0: one layer, flat")
     chosen = parser.parse_args()
     chosen.boxes = chosen.boxes or (BOXES if chosen.scene == "one" else LINE_BOXES)
     wp.config.quiet = True
@@ -67,7 +69,7 @@ def main() -> None:
     os.environ.setdefault("MESA_D3D12_DEFAULT_ADAPTER_NAME", "NVIDIA")  # these two
     if chosen.pictures:
         return save_pictures(chosen.pictures, chosen.boxes, chosen.steps, chosen.every, device,
-                             chosen.scene, chosen.cut, chosen.slab, chosen.turned)
+                             chosen.scene, chosen.cut, chosen.slab, chosen.turned, chosen.along)
     import pyglet
     from physics.view.logic.cell_window import CellWindow
     CellWindow(chosen.boxes, chosen.speed, device, chosen.scene)

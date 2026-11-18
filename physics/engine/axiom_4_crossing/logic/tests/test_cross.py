@@ -75,5 +75,5 @@ def test_the_volumes_keep_their_whole_swirls_while_energy_crosses():
     for _ in range(300):
         step(store)
     left, right = swirl_of(store, 0), swirl_of(store, 2)
-    assert (left["turns"], right["turns"]) == (-1, 1)  # B is laid as A's mirror
+    assert left["turns"] == (-1, -1, -1) and right["turns"] == (1, -1, 1)  # B: A half round the line
     assert left["core"] < 0.3 and right["core"] < 0.3

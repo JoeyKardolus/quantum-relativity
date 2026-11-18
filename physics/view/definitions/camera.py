@@ -11,6 +11,9 @@ FOCAL = 2.75
 DISTANCE = 2.6   # the eye's first distance, in cell edges; a grid's: this for each volume along
 LINE_DISTANCE = 4.6  # and for three cells in a row: the whole line fits a window 1000 by 800
 YAW, PITCH = 0.2, 0.15
+# The eye looking along each of the three directions (the first runs down the picture, the
+# second right, the third toward the eye): turned about the upright, and upward.
+ALONG = ((0.0, 1.5707), (1.5708, 0.0), (0.0, 0.0))
 NEAREST, FARTHEST = 0.05, 200.0
 
 

@@ -1,4 +1,4 @@
-"""The tracers go round the swirl's axis with the fluid, and stand still when the fluid does."""
+"""The tracers go round the whirl's three lines with the fluid, and stand still when the fluid does."""
 import numpy as np
 
 from physics.engine import one_cell
@@ -7,27 +7,30 @@ from physics.engine.axiom_3_structure.logic.give_back import give_back
 from physics.view.logic.tracers import lay_tracers, step_carrying
 
 
-def _across_the_axis(tracers, across: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Each tracer's angle round the cell's third axis, its distance from it, its place along it."""
+def _round(tracers, across: int, axis: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Each tracer's angle round the line along `axis`, its distance from it, its place along it."""
     place = tracers.tail.numpy()[tracers.head] - across / 2
-    return np.arctan2(place[:, 1], place[:, 0]), np.hypot(place[:, 0], place[:, 1]), place[:, 2]
+    first, second = place[:, (axis + 1) % 3], place[:, (axis + 2) % 3]
+    return np.arctan2(second, first), np.hypot(first, second), place[:, axis]
 
 
-def test_the_tracers_go_round_the_axis_and_stay_spread_as_the_fluid():
+def test_the_tracers_go_round_the_line_along_each_direction_the_same_way():
     store = one_cell()
-    tracers = lay_tracers(store, 0, 400)
-    angle, distance, along = _across_the_axis(tracers, store.across)
-    turned = np.zeros(400)
+    tracers = lay_tracers(store, 0, 2000)
+    start = [_round(tracers, store.across, axis) for axis in range(3)]
+    angle, turned = [one[0] for one in start], np.zeros((3, 2000))
     for done in range(30):
         step_carrying(store, tracers, 0, mark=done % 5 == 0)
-        now = _across_the_axis(tracers, store.across)[0]
-        turned += (now - angle + np.pi) % (2 * np.pi) - np.pi
-        angle = now
-    _angle, distance_after, along_after = _across_the_axis(tracers, store.across)
-    assert (np.sign(turned) == np.sign(np.median(turned))).mean() > 0.95  # all the same way round
-    assert abs(np.median(turned)) > 1.5                                 # a good part of a round
-    assert abs(distance_after.mean() - distance.mean()) < 0.1           # not into the core, not out
-    assert np.abs(along_after - along).mean() < 0.1                     # not along the axis
+        for axis in range(3):
+            now = _round(tracers, store.across, axis)[0]
+            turned[axis] += (now - angle[axis] + np.pi) % (2 * np.pi) - np.pi
+            angle[axis] = now
+    for axis in range(3):  # those that started near the line, away from the middle where the three cross
+        near = (start[axis][1] < 1.5) & (np.abs(start[axis][2]) > 1.5)
+        assert near.sum() > 50 and (turned[axis][near] > 0).mean() > 0.95, (axis, near.sum())
+        assert np.median(turned[axis][near]) > 1.5                      # a good part of a round
+    place = tracers.tail.numpy()[tracers.head]
+    assert place.min() >= 0 and place.max() <= store.across
     assert tracers.head == 6 and not np.array_equal(*tracers.tail.numpy()[[5, 6]])  # tails kept
 
 

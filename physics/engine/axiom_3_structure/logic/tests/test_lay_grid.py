@@ -4,6 +4,7 @@ import numpy as np
 from physics.engine import step
 from physics.engine.axiom_3_structure.definitions.grid import joints_of
 from physics.engine.axiom_3_structure.logic.boxes_of import swirl_of
+from physics.engine.axiom_3_structure.logic.give_back import whole_turns_laid
 from physics.engine.axiom_3_structure.logic.lay_grid import calm_grid
 from physics.engine.axiom_5_packing.logic.squeeze import squeeze
 
@@ -18,17 +19,22 @@ def _books(store) -> np.ndarray:
     return held
 
 
-def test_every_volume_sees_the_same_laying_mirrors_across_the_swirl_and_its_like_along_it():
-    for swirl in range(3):
-        store = calm_grid(reds=(4, 4, 4), swirl=swirl)
-        held, laid = store.cell_quanta.numpy(), store.cell_laid.numpy()
-        assert (held > 0).sum() == 64 and (held < 0).sum() == 192 and store.count == 256
-        for volume in np.flatnonzero(held > 0):
-            joints = joints_of(store.grid, int(volume))
-            beyond = [joints_of(store.grid, joint)[way] for way, joint in enumerate(joints)]
-            other = [int(laid[one] != laid[volume]) for one in beyond]
-            assert (held[joints] == -CALM).all() and (held[beyond] == CALM).all()
-            assert other == [int(way // 2 != swirl) for way in range(6)] and laid[volume] // 2 == swirl
+def test_every_volume_s_neighbour_is_it_turned_half_round_about_the_line_between_them():
+    store = calm_grid(reds=(4, 4, 4))
+    held, laid = store.cell_quanta.numpy(), store.cell_laid.numpy()
+    assert (held > 0).sum() == 64 and (held < 0).sum() == 192 and store.count == 256
+    boxes = store.box_quanta.numpy().reshape(-1, 6, 6, 6)[np.argsort(store.own_cell.numpy())]
+    slot = np.cumsum(held != 0) - 1
+    for volume in np.flatnonzero(held > 0):
+        joints = joints_of(store.grid, int(volume))
+        beyond = [joints_of(store.grid, joint)[way] for way, joint in enumerate(joints)]
+        assert (held[joints] == -CALM).all() and (held[beyond] == CALM).all()
+        for way, other in enumerate(beyond):  # the same whirl, the other way along that line
+            assert np.abs(np.flip(boxes[slot[other]], axis=way // 2) - boxes[slot[volume]]).max() <= 1
+            faces = (np.take(boxes[slot[volume]], -(way % 2), axis=way // 2),
+                     np.take(boxes[slot[other]], (way % 2) - 1, axis=way // 2))
+            assert np.abs(faces[0] - faces[1]).max() <= 1  # what faces across the joint agrees
+    assert sorted(np.bincount(laid[held > 0]).tolist()) == [16, 16, 16, 16]
 
 
 def test_the_calm_grid_comes_to_balance_and_stands_with_exact_books_and_whole_swirls():
@@ -47,9 +53,10 @@ def test_the_calm_grid_comes_to_balance_and_stands_with_exact_books_and_whole_sw
     own = store.own_cell.numpy()[:store.count]
     pull, push, apart, _axis = store.own_squeeze.numpy()[:store.count][last[0][own] < 0].T
     assert np.abs(pull - push).max() < 0.001 * push.min() and np.abs(apart - 1.25).max() < 0.001
-    for volume in np.flatnonzero(last[0] > 0):  # every volume still turns as one whole swirl
+    for volume in np.flatnonzero(last[0] > 0):  # every volume still turns as one whole whirl
         swirl = swirl_of(store, int(volume))
-        assert abs(swirl["turns"]) == 1 and swirl["core"] < 0.2 and swirl["off_rule"] < 1
+        laid = whole_turns_laid(int(store.cell_laid.numpy()[volume]))
+        assert swirl["turns"] == laid and swirl["core"] < 0.2 and swirl["off_rule"] < 1
 
 
 def test_an_uneven_start_evens_out_and_nothing_runs_away():

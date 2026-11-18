@@ -29,14 +29,14 @@ def test_taking_a_second_cell_own_leaves_the_first_one_s_boxes():
 
 def test_after_one_round_the_cell_goes_back_and_the_calm_swirl_has_turned_with_it():
     store = one_cell()
-    for _ in range(92):                            # one round of the swirl at 6 across
+    for _ in range(46):                            # one round of the whirl's phase at 6 across
         step(store)
     stepped, stepped_phase = store.box_quanta.numpy()[0].astype(int), store.box_phase.numpy()[0].copy()
     assert give_back(store, 0) and peek(store.cell_quanta, 0) == 648_000
     assert store.ledger == np.abs(stepped - boxes_of(store, 0)[0].numpy()[0]).sum() // 2 > 0
     take_own(store, 0)
     assert int(store.box_quanta.numpy()[0].sum()) == 648_000
-    apart = np.angle(np.exp(1j * (store.box_phase.numpy()[0] - stepped_phase)))
+    apart = np.angle(np.exp(1j * (store.box_phase.numpy()[0] - stepped_phase)))[stepped > 300]  # fluid enough
     print(f"largest phase difference between the rule and the stepped fluid: {np.abs(apart).max():.4f} rad")
     assert np.abs(apart).max() < 0.1               # the rule's phase is where the stepped fluid's is
 

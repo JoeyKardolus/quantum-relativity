@@ -14,9 +14,9 @@ from physics.engine.axiom_5_packing.logic.squeeze import squeeze
 from physics.engine.axiom_6_limits.logic.make import make
 
 
-def calm_cells(cells: int, own_cap: int, across: int = ACROSS, laid: int = 4, seed: int = 1,
+def calm_cells(cells: int, own_cap: int, across: int = ACROSS, laid: int = 0, seed: int = 1,
                device: str = "cpu", tile_cap: int | None = None, grid: tuple = None) -> Store:
-    """A store of calm cells, each 3,000 quanta a box with the swirl `laid`.
+    """A store of calm cells, each 3,000 quanta a box, its ball whirl laid `laid`.
 
     Room for `own_cap` own cells in `tile_cap` tile rows (left out: a row each); no `grid`: a line.
     """
@@ -25,7 +25,7 @@ def calm_cells(cells: int, own_cap: int, across: int = ACROSS, laid: int = 4, se
     boxes = across ** 3
     with wp.ScopedDevice(device):
         return Store(
-            across=across, seed=seed, turn_per_step=standing_mode(across)[1],
+            across=across, seed=seed, turn_per_step=2 * standing_mode(across)[1],
             grid=grid or (1, cells, 1),
             cell_quanta=wp.full(cells, QUANTA_A_BOX * boxes, dtype=wp.int32),
             cell_laid=wp.full(cells, laid, dtype=wp.uint8),
@@ -41,7 +41,7 @@ def calm_cells(cells: int, own_cap: int, across: int = ACROSS, laid: int = 4, se
 
 
 def one_cell(across: int = ACROSS, seed: int = 1, device: str = "cpu") -> Store:
-    """One energy volume with its own boxes, one whole swirl laid in them."""
+    """One energy volume with its own boxes, one ball whirl laid in them."""
     store = calm_cells(1, 1, across, seed=seed, device=device)
     take_own(store, 0)
     return store
@@ -54,12 +54,13 @@ LINE_PARTS = (3, -2, 1)  # halves of a calm volume's quanta: volume A, the joint
 
 
 def three_cells(across: int = ACROSS, seed: int = 1, device: str = "cpu",
-                parts: tuple = LINE_PARTS) -> Store:
-    """A volume, a joint and a volume in a line, each with its own boxes and one whole swirl."""
-    store = calm_cells(4, 3, across, seed=seed, device=device)  # a ring; its 4th place is empty
+                parts: tuple = LINE_PARTS, along: int = 1) -> Store:
+    """A volume, a joint and a volume in a line along direction `along`, each with its own boxes."""
+    grid = tuple(4 if way == along else 1 for way in range(3))  # a ring; its 4th place is empty
+    store = calm_cells(4, 3, across, seed=seed, device=device, grid=grid)
     for cell, halves in enumerate((*parts, 0)):
         put(store.cell_quanta, cell, halves * QUANTA_A_BOX * across ** 3 // 2)
-        put(store.cell_laid, cell, 4 + cell // 2 % 2)  # each volume the mirror of the one before
+        put(store.cell_laid, cell, cell // 2 * (along + 1))  # B: A turned half round about the line
     for cell in range(3):
         take_own(store, cell)
     return store

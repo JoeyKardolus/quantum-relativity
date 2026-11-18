@@ -2,11 +2,11 @@
 
 > Plus only pulls, minus only pushes, both oscillate in whole steps.
 
-Built: one whole swirl. Its phase goes once round the axis, so the wave is 0 on the axis: the swirl holds its own core open by its turning. No pressure number is added.
+Built: the ball whirl, for volumes and joints alike. Its fluid is nothing on the line through the middle along each of the three directions and turns once round each, the same way. A step only turns it: once round in 46 steps at 6 boxes across.
 
-The pattern is solved from the step itself (`standing_mode`), so a step only turns it: the phase goes round in 92 steps at 6 boxes across (361 at 12), the fluid itself in about 71.
+Assumed (the owner has not ruled):
+- No axiom names a direction, so the whirl is the same along all three.
+- It is the simplest standing wave of the step that is: the three pairs of directions, a third of a turn apart.
+- It is nothing on one long diagonal too. One swirl about that diagonal shows no dark middle.
 
-- A swirl is read off the fluid (`read_swirl`), never off a label.
-- Measured: after 1,000 steps it still winds once on every ring.
-
-Not built: pull and push (layer 2).
+Measured: after 3,000 steps it still winds once about each direction.

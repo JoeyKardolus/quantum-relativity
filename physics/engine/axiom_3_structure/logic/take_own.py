@@ -8,14 +8,13 @@ total to the quantum. The phase is the pattern's, turned on by the steps so far.
 import warp as wp
 
 from physics.engine.axiom_2_swirls.definitions.swirl_pattern import dealt
-from physics.engine.axiom_3_structure.definitions.grid import place_of
 from physics.engine.axiom_3_structure.definitions.store import TILE, Store, entry_of, peek, put
 
 wp.set_module_options({"fuse_fp": False})
 
 
 @wp.kernel
-def _lay(own_cell: wp.array(dtype=wp.int32), first: wp.int32, turned: wp.float64, grid: wp.vec3i,
+def _lay(own_cell: wp.array(dtype=wp.int32), first: wp.int32, turned: wp.float64,
          cell_quanta: wp.array(dtype=wp.int32), cell_laid: wp.array(dtype=wp.uint8),
          pattern: wp.array2d(dtype=wp.vec2d),
          box_quanta: wp.array2d(dtype=wp.int32), box_phase: wp.array2d(dtype=wp.float32)):
@@ -24,14 +23,11 @@ def _lay(own_cell: wp.array(dtype=wp.int32), first: wp.int32, turned: wp.float64
     total = wp.abs(cell_quanta[own_cell[slot]])
     laid = wp.int32(cell_laid[own_cell[slot]])
     boxes = pattern.shape[1]
-    # along the direction after the swirl's, every second volume is laid half a turn on
-    on = place_of(grid, own_cell[slot], (laid // 2 + 1) % 3) // 2 % 2
-    half_on = turned + wp.float64(wp.pi) * wp.float64(on)
     left_over = total
     for box in range(boxes):
         left_over -= dealt(total, pattern[laid, box][0], boxes)
     for box in range(boxes):
-        angle = pattern[laid, box][1] + half_on
+        angle = pattern[laid, box][1] + turned
         angle -= wp.float64(wp.tau) * wp.floor((angle + wp.float64(wp.pi)) / wp.float64(wp.tau))
         box_phase[slot, box] = wp.float32(angle)
         share = dealt(total, pattern[laid, box][0], boxes)
@@ -45,7 +41,6 @@ def lay(store: Store, own_cell: wp.array, first: int, number: int,
     """Deal the rule's boxes of `number` cells, named by `own_cell` from `first` on."""
     wp.launch(_lay, dim=number, device=box_quanta.device,
               inputs=[own_cell, first, wp.float64(store.turn_per_step * store.step),
-                      wp.vec3i(*store.grid),
                       store.cell_quanta, store.cell_laid, store.pattern, box_quanta, box_phase])
 
 

@@ -1,6 +1,6 @@
 # View, definitions
 
-`camera.py`: the eye, the wheel's range. `carried.py`: a tracer's place along two boxes after fluid moved. `shape.py`: where a place in a cell's block lies in the picture. `shaders.py`: the programs that draw a streak and a dot.
+`camera.py`: the eye, the wheel's range, `ALONG`. `carried.py`: a tracer's place along two boxes after fluid moved. `shape.py`: where a place in a cell's block lies in the picture. `shaders.py`: the programs that draw a streak and a dot.
 
 - A volume's block is drawn as a ball as wide as its size; `even_share` makes a mark in its pressed corners count less, so the red is round.
 - A joint's block is two fans, each from the rim of the volume it faces to the square midway: together the joints fill all the room.

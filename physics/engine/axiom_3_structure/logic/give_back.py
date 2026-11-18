@@ -1,6 +1,6 @@
 """Give back: an own cell that is calm again becomes a rule again and frees its slot.
 
-It may go when its fluid still winds the swirl's whole number on every ring and
+It may go when its fluid still winds its whirl's whole turn about each direction and
 `off_rule` is under 1. No quantum is lost or made; what is dropped is the shape of its
 difference from the rule, and the quanta that so change box are added to the ledger.
 Layer 1 does this for one cell from the host; many cells on the card come with layer 2.
@@ -14,11 +14,16 @@ from physics.engine.axiom_3_structure.logic.boxes_of import rule_boxes, swirl_of
 CALM_UNDER = 1.0  # `off_rule` of plain counting noise; fixed, never moved to fit a run
 
 
+def whole_turns_laid(laid: int) -> tuple:
+    """The whole turns a cell laid `laid` winds about each direction: half round, the others turn back."""
+    return tuple(1 if laid and laid != way + 1 else -1 for way in range(3))  # the phase falls: -1
+
+
 def give_back(store: Store, cell: int) -> bool:
     """Send an own cell back to calm if it may go; says whether it went."""
     slot, last, seen = slot_of(store, cell), store.count - 1, swirl_of(store, cell)
-    laid_turns = 2 * (peek(store.cell_laid, cell) % 2) - 1  # the phase falls the way the fluid goes
-    if slot < 0 or seen["turns"] != laid_turns or seen["off_rule"] >= CALM_UNDER:
+    laid = whole_turns_laid(peek(store.cell_laid, cell))
+    if slot < 0 or seen["turns"] != laid or seen["off_rule"] >= CALM_UNDER:
         return False
     held = store.box_quanta[slot].numpy().astype(np.int64)
     put(store.cell_quanta, cell, int(held.sum()))

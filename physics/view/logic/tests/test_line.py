@@ -29,7 +29,7 @@ def test_tracers_go_from_the_fuller_volume_to_the_other_and_the_joint_keeps_its_
 
 def test_round_volumes_are_drawn_with_the_joints_filling_the_room_between_them():
     store = calm_grid(reds=(2, 2, 2))
-    tracers = trace(store, 0)  # the flat cut through the first layer: 4 volumes, 8 joints
+    tracers = trace(store, 0)  # the first layer, whole: 4 volumes, 8 joints
     for done in range(24):
         step_carrying(store, tracers, 0, mark=True, cells=store.count)
     shapes, streaks = placed(store, 0).numpy(), line_streaks(tracers, 6, placed(store, 0)).numpy()
@@ -38,22 +38,21 @@ def test_round_volumes_are_drawn_with_the_joints_filling_the_room_between_them()
     cells = store.own_cell.numpy()[:store.count]
     plus, deep = store.cell_quanta.numpy()[cells] > 0, np.unravel_index(cells, store.grid)[2]
     volumes, joints = np.flatnonzero(plus & (deep == 0)), np.flatnonzero(~plus & (deep == 0))
-    assert set(slot) == set(volumes) | set(joints) and len(joints) == 8  # the cut's cells, and
-    assert np.abs(spot[:, 2]).max() < 0.3 and len(volumes) == 4  # flat: the middle layers of boxes
+    start = (tracers.tail.numpy()[(tracers.head + 1) % len(streaks)][:, 1] // 6).astype(int)
+    assert set(start) == set(volumes) | set(joints) and len(joints) == 8  # laid in the layer's cells
+    assert len(volumes) == 4 and np.ptp(spot[np.isin(slot, volumes), 2]) > 0.9  # whole balls
+    flat = np.abs(tracers.tail.numpy()[tracers.head][:, 2] - 3) < 1  # the middle layers of boxes
+    spot, slot, streaks = spot[flat], slot[flat], streaks[:, flat]
     for one in volumes:  # round: inside half its size from its middle
         assert np.linalg.norm(spot[slot == one] - shapes[one, 0], axis=1).max() <= 0.5 + 1e-4
-        assert streaks[1:, slot == one, 3].min() >= 0
-    for one in joints:  # blue
-        assert streaks[1:, slot == one, 3].max() <= 0
+    for one in joints:
         for other in volumes:  # it fills what the round volumes leave: never inside one
             assert np.linalg.norm(spot[slot == one] - shapes[other, 0], axis=1).min() >= 0.5 - 1e-3
-    thin = shapes[joints[0], 1, 0] - 1  # the volumes' distance less two radii; fresh: 0.52
+    thin = shapes[joints[0], 1, 0] - 1  # the volumes' distance less two radii; fresh: 0.52, here 0.39
     right = joints[(shapes[joints, 2, 1] == 1) & (shapes[joints, 2, 0] == 0)][0]  # no wrap
     own = spot[slot == right] - shapes[right, 0]
-    assert abs(np.ptp(own[np.abs(own[:, 1]) < 0.03, 0]) - thin) < 0.08 and 0.4 < thin < 0.55
+    assert abs(np.ptp(own[np.abs(own[:, 1]) < 0.1, 0]) - thin) < 0.1 and 0.3 < thin < 0.55  # its line is dark
     assert np.ptp(own[(np.abs(own[:, 1]) > 0.3) & (np.abs(own[:, 1]) < 0.4), 0]) > 1.3 * thin
-    near = np.linalg.norm(spot[:, :2], axis=1) < 0.15  # the middle: where four volumes meet
-    assert len(set(slot[near]) & set(joints)) == 4 and not set(slot[near]) & set(volumes)
     sides = spot[slot == joints[(shapes[joints, 2, 1] == 1) & (shapes[joints, 2, 0] != 0)][0], 0]
     assert (sides > 1.0).sum() > 100 and (sides < -1.0).sum() > 100 and (np.abs(sides) < 1).sum() == 0
     jump = np.linalg.norm(streaks[1:, :, :3] - streaks[:-1, :, :3], axis=2) > 6

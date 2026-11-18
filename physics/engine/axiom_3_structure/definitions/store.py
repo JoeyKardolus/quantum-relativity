@@ -1,7 +1,7 @@
 """Store: where every cell is kept, built so a billion cells fit one graphics card.
 
-A calm cell is a rule, not boxes: its whole signed total, how its swirl is laid
-(`axis * 2`, plus 1 for the other sense) its heat count and what it has made, 13 bytes. Only a cell in the
+A calm cell is a rule, not boxes: its whole signed total, how its ball whirl is laid (0, or
+1 to 3: turned half round about that direction), its heat count and what it has made, 13 bytes. Only a cell in the
 own set holds boxes, in a slot; slots in use are always `0 .. count - 1`. Two plain
 arrays find the slot.
 """
@@ -27,7 +27,7 @@ class Store:
     own_squeeze: wp.array   # vec4d (cap): a joint's pull, push, volumes' distance, axis
     box_quanta: wp.array    # int32 (cap, boxes)
     box_phase: wp.array     # float32 (cap, boxes)
-    pattern: wp.array       # vec2d (6, boxes): each box's share and phase in the six swirls
+    pattern: wp.array       # vec2d (4, boxes): each box's share and phase in the four layings
     grid: tuple = (1, 1, 1)  # places along three directions; a cell's number is its place
     step: int = 0
     count: int = 0          # slots in use

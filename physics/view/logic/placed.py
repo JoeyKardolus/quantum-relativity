@@ -4,7 +4,7 @@ The engine's squeeze says how far apart a joint's two volumes stand. The volumes
 on a straight grid, as far apart along each direction as its joints say on the average;
 each joint lies between its two volumes, and the half of a joint past the last volume is
 drawn before the first, where the grid wraps round to. `layer` is the layer of volumes
-along the third direction that is drawn at the picture's middle.
+along direction `along` that is drawn at the picture's middle.
 """
 import numpy as np
 import warp as wp
@@ -13,7 +13,7 @@ from physics.engine.axiom_3_structure.definitions.kinds import QUANTA_A_BOX
 from physics.engine.axiom_5_packing.logic.squeeze import squeeze
 
 
-def placed(store, layer: float = None) -> wp.array:
+def placed(store, layer: float = None, along: int = 2) -> wp.array:
     """A mat33 for each own slot, as `shape.py` reads it; a joint with no volumes is left 0."""
     squeeze(store)
     cells = store.own_cell.numpy()[:store.count]
@@ -24,7 +24,9 @@ def placed(store, layer: float = None) -> wp.array:
     joint, reds = apart > 0, (np.array(store.grid) + 1) // 2
     wide = np.array([apart[joint & (axis == way)].mean() if (joint & (axis == way)).any() else 0.0
                      for way in range(3)])
-    first = (reds - 1) / 2 if layer is None else np.array([*(reds[:2] - 1) / 2, layer])
+    first = (reds - 1) / 2
+    if layer is not None:
+        first[along] = layer
     middle = (spot / 2 - first) * wide
     shapes = np.zeros((len(cells), 3, 3), dtype=np.float32)
     shapes[:, 0] = np.stack([middle[:, 1], -middle[:, 0], middle[:, 2]], axis=1)

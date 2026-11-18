@@ -6,7 +6,7 @@ import warp as wp
 
 from physics.engine.axiom_2_swirls.logic.read_swirl import (
     core_share, off_rule, round_flow, whole_turns)
-from physics.engine.axiom_3_structure.definitions.store import Store, peek, slot_of
+from physics.engine.axiom_3_structure.definitions.store import Store, slot_of
 from physics.engine.axiom_3_structure.logic.take_own import lay
 
 
@@ -26,10 +26,11 @@ def boxes_of(store: Store, cell: int) -> tuple[wp.array, wp.array, int]:
 
 
 def swirl_of(store: Store, cell: int) -> dict:
-    """What the cell's fluid is doing now, read on the host: the four measures of `read_swirl`."""
+    """What the cell's fluid is doing now, read on the host: `read_swirl`'s measures, each direction's."""
     box_quanta, box_phase, slot = boxes_of(store, cell)
     quanta, phase = box_quanta[slot].numpy(), box_phase[slot].numpy()
-    laid = peek(store.cell_laid, cell)
     rule = rule_boxes(store, cell)[0][0].numpy()
-    return {"turns": whole_turns(phase, laid), "round_flow": round_flow(quanta, phase, laid),
-            "core": core_share(quanta, laid), "off_rule": off_rule(quanta, rule)}
+    return {"turns": tuple(whole_turns(phase, axis) for axis in range(3)),
+            "round_flow": tuple(round_flow(quanta, phase, axis) for axis in range(3)),
+            "core": max(core_share(quanta, axis) for axis in range(3)),
+            "off_rule": off_rule(quanta, rule)}

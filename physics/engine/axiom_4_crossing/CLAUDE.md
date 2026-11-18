@@ -5,7 +5,7 @@
 Built: plus energy crosses a joint between two volumes' facing boxes, in whole quanta.
 
 Assumed (the owner has not ruled):
-- Across the swirls' direction each volume is its neighbour's mirror; along it, its like.
+- Neighbours are laid half round about their line, so calm facing fluid agrees.
 - Rubbing share: minus over minus and plus in the passage. It cuts the turn, so a squeezed joint lets less through.
 - Friction takes that share of the phase step across, half from each side.
 - Heat counts the rubbed quanta that arrived. It only rises.

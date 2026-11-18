@@ -5,4 +5,4 @@
 - `squeeze` runs before `make` and `press`: both read `own_squeeze`, so a run repeats.
 - The press and the making are one squeeze: both use `given` times `pressed`.
 - Only the joint's phases change here. No press once the push answers the pull.
-- Measured (6 across, 300 steps): the squeezed joint is 259 off its rule; one not squeezed stays under 1.
+- Measured (6 across, 300 steps): the squeezed joint is 549 off its rule; one not squeezed stays under 1.
