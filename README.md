@@ -11,7 +11,7 @@ Everything in the simulation has to follow from these seven sentences, and from 
 
 1. **Energy**: an always-moving quantum fluid, one whole signed number of quanta per Planck box at each
    moment of local time. The total is not fixed: a squeezed joint makes more minus energy out of itself,
-   and a collapse takes the joint's energy off the rest. Zero is empty space, which does nothing.
+   and when a joint collapses its minus energy flips to plus and joins the volumes beside it. Zero is empty space, which does nothing.
 2. **Cells are swirls**: plus only pulls, minus only pushes, both oscillate in whole steps.
 3. **Structure**: plus never touches plus; minus wraps every plus and forms one web. The cells are the
    grid, a perfect A B A B pattern. A cell has no geometry of its own, only relations to its neighbours
@@ -23,8 +23,9 @@ Everything in the simulation has to follow from these seven sentences, and from 
 5. **Packing**: more packed is smaller, slower and pulls harder; pull spreads at a finite speed, weaker
    with distance; squeezed minus pushes back steeply.
 6. **Limits**: a joint's energy rises only while it is squeezed, so a fresh joint is the fattest it will
-   ever be and shrinks as it is squeezed; squeezed too far it collapses, its energy is taken off the
-   rest, and its two volumes merge; a volume's leaking outside tears off as a layer of new volumes.
+   ever be and shrinks as it is squeezed; it collapses only past a limit, where the pull across it is so deep that
+   nothing moving at the top speed could climb out (a black hole opening): its minus energy flips to plus
+   and it merges with the pulling volumes beside it into one, so the collapse can spread; a volume's leaking outside tears off as a layer of new volumes.
 7. **Quantum**: each box's fluid also carries a phase, so waves add and cancel. Moving energy can split
    over several routes at once. Every split gets a direct pull between its halves, private to them, and
    its own oscillation. When something reacts with a half, or the energy loses its momentum, it settles
