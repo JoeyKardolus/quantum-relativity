@@ -38,9 +38,9 @@ def test_two_joined_volumes_never_stand_closer_than_their_widths_however_squeeze
     assert (apart > widths).all() and np.allclose(apart - widths, [1 / one[2] for one in held])
 
 
-def test_two_calm_volumes_hold_their_joint_as_thick_as_they_are_wide():
-    pull, push, gives, apart = _forces((1, 1, 1.017), felt=1.2)[0]  # alone, each feels 1.2
-    assert abs(apart - 1.983) < 0.001 and abs(pull - push) < 0.01 * push
+def test_two_calm_volumes_hold_their_joint_five_sixths_as_thick_as_they_are_wide():
+    pull, push, gives, apart = _forces((1, 1, 1.2003), felt=1.5455)[0]  # alone, each lies 1 and 1 over 1.83 deep
+    assert abs(apart - 1.833) < 0.001 and abs(pull - push) < 0.01 * push
 
 
 def test_the_pull_grows_with_both_volumes_and_falls_with_the_distance():

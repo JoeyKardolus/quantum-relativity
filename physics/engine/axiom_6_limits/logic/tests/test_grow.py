@@ -69,5 +69,5 @@ def test_two_layers_grow_with_exact_books_and_the_outermost_cells_are_volumes(gr
     store, _seen = grown
     held, volumes, joints = _cells(store)
     reach = np.abs(steps_of(np.concatenate([volumes, joints]), store.side) - store.side // 2).max()
-    assert reach == 4 and len(volumes) > 27  # four steps out: the second layer, at step 491 (19.7 turns)
+    assert reach == 4 and len(volumes) > 27  # four steps out: the second layer, at step 458 (18.3 turns)
     assert held[held > 0].sum() - held[held < 0].sum() == 2 ** 30 + store.cell_made.numpy().sum()

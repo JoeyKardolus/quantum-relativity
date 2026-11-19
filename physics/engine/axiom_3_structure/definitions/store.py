@@ -19,7 +19,7 @@ class Store:
     turn_per_step: float    # how far a calm swirl's phase turns in one step
     cell_quanta: wp.array   # int64 (cells): no squeeze and no merge can run it over; a box's stays int32
     cell_made: wp.array     # int64 (cells): quanta a joint has made out of itself
-    cell_pull: wp.array     # float32 (cells): the pull there, handed on from cell to cell
+    cell_pull: wp.array     # float32 (cells): how deep a volume lies: its own energy and every other's over its distance
     cell_flow: wp.array     # int64 (cells, 3): the fluid's common flow a direction, quanta times calm lengths a turn
     tile_home: wp.array     # int32 (cells / 512): the tile's row in tile_slots, -1: all calm
     tile_slots: wp.array    # int32 (tile rows * 512): the cell's slot, -1: calm
@@ -37,6 +37,7 @@ class Store:
     ledger: int = 0         # quanta that changed box when cells went back to calm
     collapses: int = 0      # joints that have collapsed
     flipped: int = 0        # minus quanta that collapses flipped to plus
+    cell_past: wp.array = None  # float32 (128, cells), on the host: the volumes' energy at the last steps, for the late pull
 
 
 @wp.func

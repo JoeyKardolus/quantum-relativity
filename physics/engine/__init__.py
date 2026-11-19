@@ -9,9 +9,8 @@ from physics.engine.axiom_3_structure.logic.starts import (  # noqa: F401, the e
     calm_cells, line_cells, one_cell, three_cells)
 from physics.engine.axiom_4_crossing.logic.cross import cross
 from physics.engine.axiom_4_crossing.logic.leak import leak
-from physics.engine.axiom_5_packing.logic.fall import fall
 from physics.engine.axiom_5_packing.logic.press import press
-from physics.engine.axiom_5_packing.logic.spread import spread
+from physics.engine.axiom_5_packing.logic.pull import pull
 from physics.engine.axiom_5_packing.logic.squeeze import squeeze
 from physics.engine.axiom_6_limits.logic.collapse import collapse
 from physics.engine.axiom_6_limits.logic.make import make
@@ -20,7 +19,7 @@ from physics.engine.axiom_6_limits.logic.tear import tear
 
 def step(store: Store, before_pass=None) -> None:
     """One step: gathered leak tears off; joints past their limit collapse; the fluid moves,
-    each whirl turns by its quanta, energy crosses and leaks; the pull is handed on and adds to the flow; squeezed joints make quanta.
+    each whirl turns by its quanta, energy crosses and leaks; every volume is pulled toward every other, late by the distance; squeezed joints make quanta.
 
     `before_pass(axis, parity)` lets a watcher look before each of the six passes inside.
     A calm cell's step is the count.
@@ -31,8 +30,7 @@ def step(store: Store, before_pass=None) -> None:
     turn(store)
     cross(store)
     leak(store)
-    spread(store)
-    fall(store)
+    pull(store)
     squeeze(store)
     make(store)
     press(store)

@@ -6,8 +6,8 @@ its two, as thick as its own size (the one size law). The distance between two v
 middles is half the one's width, the joint's thickness and half the other's: never less
 than their widths allow. The squeeze makes the joint's quanta rise, so it thins, never to 0.
 
-Pull across: `PULL` times the pull at the one volume (`pull.py`: its own energy and what
-all the others hand on) times the pull at the other, over that distance squared. Push back: how packed the joint is, its quanta over its room: quanta to the
+Pull across: `PULL` times how deep the one volume lies (`pull.py`: its own energy and every
+other's over its distance) times how deep the other lies, over that distance squared. Push back: how packed the joint is, its quanta over its room: quanta to the
 power `STEEP`. A joint is squeezed while the pull is the bigger, and gives by `GIVE`.
 """
 import warp as wp
@@ -19,7 +19,8 @@ from physics.engine.axiom_3_structure.definitions.store import slot_at
 STEEP = 4.0
 # The squeeze's one setting, kept as layer 4 chose it (under the distance law of then: 1.28
 # ** 4 * 1.25 ** 2 / 1.2 ** 2) and not moved when the distance became the plain sum: by that
-# sum two calm volumes alone hold their joint as thick as they are wide (it holds 1.02).
+# sum two calm volumes alone held their joint as thick as they are wide. Under the pair pull each
+# lies 1.55 deep, not 1.2, and the joint holds 1.20: 0.83 thick. The number's reason is gone; the owner's to rule.
 PULL = 2.92
 # How fast a joint gives way, chosen before any run: to a wholly unanswered pull, a quarter
 # in one turn of a calm swirl.

@@ -26,11 +26,11 @@ def _run(parts: tuple, steps: int):
 
 
 def test_the_joint_shrinks_under_the_squeeze_and_stops_where_push_equals_pull():
-    store = _run((2, -2, 2), 600)  # two calm volumes; an uneven pair (3 to 1) does not squeeze: pull 0.88
+    store = _run((2, -2, 2), 600)  # two calm volumes; each lies 1.55 deep
     pull, push = pull_push(store, JOINT)
     made, joint = store.cell_made.numpy()[JOINT], int(store.cell_quanta.numpy()[JOINT])
-    assert abs(pull - push) < 0.001 * pull  # the balance, within a thousandth (measured: 1.0688)
-    assert abs(size_of(joint, 6) - 0.9835) < 0.001 and abs(made - 10_884) < 100
+    assert abs(pull - push) < 0.001 * pull  # the balance, within a thousandth (measured: 2.076)
+    assert abs(size_of(joint, 6) - 0.8331) < 0.001 and abs(made - 129_786) < 300
     for _ in range(200):
         step(store)
     assert store.cell_made.numpy()[JOINT] - made < 10  # it has stopped

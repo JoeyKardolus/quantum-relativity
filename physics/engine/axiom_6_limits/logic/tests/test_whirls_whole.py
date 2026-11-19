@@ -25,8 +25,8 @@ def test_the_leaking_volume_and_the_volumes_torn_off_it_are_whole_whirls_when_th
     assert all(_whole(store)) and store.step > 50  # two turns of leaking left the first one whole
 
 
-@pytest.mark.xfail(strict=True, reason="(kept) whole whirls: 11 of 28 volumes at two layers, 32 of 62 at three, 77 of "
-                   "174 at six (29 of 29 and 113 of 118 before the fluid carried its flow); why is not found")
+@pytest.mark.xfail(strict=True, reason="(kept) whole whirls: 22 of 28 volumes at two layers (18.3 turns), 27 of 91 at "
+                   "three (22.6 turns, the first volume pouring out); 11 of 28 and 32 of 62 under the pull before")
 def test_every_volume_is_a_whole_whirl_at_two_layers_and_nearly_every_one_at_three(grown, grown_patch):
     assert all(_whole(grown[0])) and len(_whole(grown[0])) > 27  # 29 of 29 at 19.7 turns
     whole = _whole(grown_patch)
@@ -37,12 +37,12 @@ def test_every_volume_is_a_whole_whirl_at_two_layers_and_nearly_every_one_at_thr
 # The mark is every volume: axiom 2, cells are swirls. Measured on the card, outside the suite (6
 # across): 116 of 118 at three layers, 779 of 920 at six (271 turns), 1,002 of 2,106 at eight and 181
 # of 3,014 at nine (717 turns). The inner layers stay whole through eight; the outer volumes do not.
-@pytest.mark.xfail(strict=True, reason="32 of 62 volumes are whole whirls at three layers (13.8 turns)")
+@pytest.mark.xfail(strict=True, reason="27 of 91 volumes are whole whirls at three layers (22.6 turns)")
 def test_every_volume_is_a_whole_whirl_at_three_layers(grown_patch):
     assert all(_whole(grown_patch))
 
 
-@pytest.mark.xfail(strict=True, reason="(kept) through two layers a volume falls to 0.92 of a least whirl (1.71 before): "
+@pytest.mark.xfail(strict=True, reason="(kept) through two layers a volume falls to 0.88 of a least whirl (0.92 before): "
                    "the pull draws a thin outer volume's fluid back in faster than the leak feeds it")
 def test_the_leak_never_takes_a_volume_below_a_whirl_s_least_through_two_layers(grown):
     store, seen = grown

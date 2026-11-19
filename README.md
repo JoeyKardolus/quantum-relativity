@@ -83,17 +83,26 @@ and holds its energy for 20 turns (12,425 calm volumes, then 12,429); fed, it gr
 Since later that day energy carries its motion with it when it crosses a joint, and meets the joint's
 resistance at each crossing: a volume's fluid has one flow a direction, what crosses takes its share
 along and arrives still going, what friction holds back stays where it was, and the pull adds to the
-flow toward the deeper side. In a calm line of eleven volumes (`--scene gather`, `--scene coast`) a
-volume 4 times fuller gathers from its neighbours (4.0 to 6.29 calm volumes in 8 turns) and one set
-going travels six volumes in 8 turns as a body.
+flow toward the deeper side.
 
-Not right yet: that holds in a hand-laid line only. In a grown universe the first volume is set going
-by its own pull handed back through its lopsided surroundings and pours out (1,632 calm volumes at 10.9
-turns, 332 at 13.8), so no region made fuller there holds, two do not draw together, half the volumes
-are no whole whirls any more and of the hole scene's six joints only two fall; two lumps in the line
-do not draw each other either, because there the pull fades to a tenth with every volume; the fall
-fades as distance to the power -0.87, not -2; and by the limit as built no black hole forms in a grown
-universe, which the owner must rule on. Progress is tracked on
+The pull was then rebuilt, because a body was being moved by its own pull handed back to it. Now energy
+attracts energy pair by pair: every volume is pulled toward every other by the other's energy over the
+square of the distance between them, counted through the sizes of the cells between, and it reads the
+other as it was the distance over the top speed ago. A volume is in no sum of its own. Measured on
+hand-laid benches: the pull fades as distance to the power -2.05 and arrives late in step with the
+distance; two fuller volumes four apart in a line draw together, faster as they go (2.20 calm lengths
+each in 3 turns, a lone one drifts 1.11), the heavier moving less (`--scene fall`); a dense area
+gathers on its middle and its centre of mass stays put (`--scene dense`); a fuller volume gathers from
+its neighbours (4.0 to 6.62 calm volumes in 6 turns, `--scene gather`).
+
+Not right yet: in a grown universe the first volume holds longer but still pours out (1,649 calm
+volumes at 16 turns, 1,110 at 20, 34 at 24), not by its own pull but because a packed volume is tiny
+and the small speed its neighbours give it carries its fluid out; a lump set going no longer coasts
+(a bench with ends falls to its own middle; it stops at the fourth volume), nothing goes round
+anything, most volumes in a grown patch are no whole whirls, and no joint collapses by gathering
+(deepest pull 4,903 against the limit 6,050). The pull is summed over all pairs on the host, which is
+right for thousands of volumes and not for a billion. Whether the pull may be a law between pairs or
+must be carried from cell to cell is the owner's to rule. Progress is tracked on
 [issue #1](https://github.com/JoeyKardolus/quantum-relativity/issues/1).
 Misses are reported as misses; nothing is tuned to look good.
 
@@ -107,8 +116,10 @@ PYTHONPATH=. .venv/bin/python -m physics.view --scene grow       # one volume le
 PYTHONPATH=. .venv/bin/python -m physics.view --scene hole       # a packed middle collapses, keeps what it holds and takes in more
 PYTHONPATH=. .venv/bin/python -m physics.view --scene lumps      # two regions made fuller by hand in a small grown patch
 PYTHONPATH=. .venv/bin/python -m physics.view --scene gather     # a line of volumes: the fuller one gains from its neighbours
-PYTHONPATH=. .venv/bin/python -m physics.view --scene coast      # a line of volumes: a fuller one set going travels down it
-PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, about 40 seconds
+PYTHONPATH=. .venv/bin/python -m physics.view --scene coast      # a line of volumes: a fuller one set going (it stops at the fourth: not right yet)
+PYTHONPATH=. .venv/bin/python -m physics.view --scene fall       # a line of volumes: two fuller ones draw together
+PYTHONPATH=. .venv/bin/python -m physics.view --scene dense      # a sheet: the fuller middle nine gather on their middle; X looks at it face on
+PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, about 45 seconds
 ```
 
 Needs Linux or WSL2, Python 3.12+, [`uv`](https://docs.astral.sh/uv/) . The engine runs on

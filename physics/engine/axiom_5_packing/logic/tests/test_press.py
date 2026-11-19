@@ -6,7 +6,7 @@ from physics.engine.axiom_2_swirls.definitions.ring_boxes import cap_boxes
 from physics.engine.axiom_3_structure.logic.boxes_of import swirl_of
 from physics.engine.axiom_5_packing.definitions.pull_push import GIVE, PULL
 from physics.engine.axiom_5_packing.logic.press import press
-from physics.engine.axiom_5_packing.logic.spread import spread
+from physics.engine.axiom_5_packing.logic.pull import pull
 from physics.engine.axiom_5_packing.logic.squeeze import pull_push
 
 JOINT = line_cells()[1]
@@ -14,17 +14,19 @@ EVEN = (0.5 + 1 + 0.5) ** 2  # two calm volumes' distance squared across a fresh
 
 
 def _felt(store) -> np.ndarray:
-    """The pull across the joint and its push once the pull has been handed to and fro."""
-    for _ in range(40):
-        spread(store)
+    """The pull across the joint and its push once each volume's pull has reached the other."""
+    for _ in range(2):
+        pull(store)
+        store.step += 1
     return pull_push(store, JOINT)
 
 
 def test_the_squeeze_is_the_pull_felt_at_the_two_volumes_and_the_push_back_of_the_joint():
     uneven = (0.5 / 1.5 + 1 + 0.5 / 0.5) ** 2  # the distance squared: half widths and the joint
     assert np.allclose(pull_push(three_cells(), JOINT), [0, 1])  # no pull has arrived yet
-    assert np.allclose(_felt(three_cells()), [PULL * 1.7 * 0.7 / uneven, 1])  # 1.5 and 0.5, and a
-    assert np.allclose(_felt(three_cells(parts=(2, -2, 2))), [PULL * 1.44 / EVEN, 1])  # fifth back
+    deep = (1.5 + 0.5 / uneven ** 0.5) * (0.5 + 1.5 / uneven ** 0.5)  # each: its own and the other's over the distance
+    assert np.allclose(_felt(three_cells()), [PULL * deep / uneven, 1])
+    assert np.allclose(_felt(three_cells(parts=(2, -2, 2))), [PULL * 2.25 / EVEN, 1])  # 1 and 1 over 2, each
     assert np.allclose(_felt(three_cells(parts=(3, 0, 1))), [0, 0])  # no joint between
 
 
@@ -38,7 +40,7 @@ def test_one_press_turns_only_the_joint_s_facing_phases_by_what_it_gives():
     press(store)
     turned = (store.box_phase.numpy() - before + np.pi) % (2 * np.pi) - np.pi
     pressed = (quanta[0, front] + quanta[2, back]) / 6000  # each over its volume's mean box
-    gives = GIVE * store.turn_per_step * (1 - EVEN / (1.44 * PULL))  # of a whole turn
+    gives = GIVE * store.turn_per_step * (1 - EVEN / (2.25 * PULL))  # of a whole turn
     assert np.allclose(turned[1, back], gives * pressed, atol=1e-5) and pressed.std() > 0.09
     assert np.allclose(turned[1, front], gives * pressed, atol=1e-5)
     turned[1, front + back] = 0  # nothing else is turned, and no quantum moves

@@ -54,7 +54,7 @@ def uneven():
 def test_over_80_turns_the_two_fall_toward_each_other_until_they_hold_alike_and_all_three_stay_whole_whirls(uneven):
     store, held = uneven
     # each is pulled by what the other holds and the fuller rubs less, so more crosses from it: 1.5 and
-    # 0.5 calm volumes are 1.04 and 0.96 at 16 turns and 1.005 and 0.995 from 40 on, pressed on the joint
-    assert 972_000 - held[0] == held[2] - 324_000 and 0 < held[0] - held[2] < 13_000
+    # 0.5 calm volumes are 1.016 and 0.984 at 80 turns (1.005 and 0.995 under the pull before), pressed on the joint
+    assert 972_000 - held[0] == held[2] - 324_000 and 0 < held[0] - held[2] < 25_000
     for cell, turns in ((A, -1), (JOINT, 1), (B, -1)):
         assert swirl_of(store, cell)["turns"] == (turns,) * 3

@@ -1,7 +1,8 @@
 """Staged checks in the grown patch, two volumes out from the first; each gap is a strict xfail with its measured number.
 
-The same checks hold in a calm line of cells (`test_carried.py`); here the first volume has
-emptied into its neighbours and energy streams outward, and a staged region is torn along.
+The same checks hold in a calm line and a calm sheet (`test_carried.py`, `test_dense.py`); here, at
+22.6 turns, the first volume is pouring into its neighbours (283 calm volumes left, 102, 72 and 61
+beside it) and a staged region is torn along.
 """
 import numpy as np
 import pytest
@@ -53,9 +54,9 @@ def test_staging_makes_a_region_four_times_fuller_and_sets_it_going_with_exact_b
         _checked_step(patch)  # the books stay exact with the pull on
 
 
-@pytest.mark.xfail(strict=True, reason="(a) in the grown patch a region made 4 times fuller does not gain and no longer "
-                   "holds: 0.56 of what it was given after a turn (0.95 before the fluid carried its flow); the "
-                   "patch is streaming outward from the emptied first volume and the region goes with it")
+@pytest.mark.xfail(strict=True, reason="(a) in the grown patch a region made 4 times fuller does not gain and does not "
+                   "hold: 0.52 of what it was given after a turn; the first volume is pouring out beside it (283 "
+                   "calm volumes, the region's own middle 72) and the region is drawn into that")
 def test_a_fuller_region_gains_from_its_thinner_surroundings(grown_patch):
     cells = _stands(grown_patch, (0, 2, 0))
     first, more = _after(grown_patch, lambda store: fuller(store, cells), 25)
@@ -63,8 +64,8 @@ def test_a_fuller_region_gains_from_its_thinner_surroundings(grown_patch):
 
 
 @pytest.mark.xfail(strict=True, reason="(b) in the grown patch two fuller regions either side of the first volume do "
-                   "not draw together: 2.37 volumes apart, 2.95 after a turn; the patch is lopsided (3 calm "
-                   "volumes one side, 915 the other) and streaming outward")
+                   "not draw together: 2.68 volumes apart, 3.37 after a turn; the patch is mid-burst and lopsided "
+                   "(29 and 102 calm volumes one side of the first, 72 and 61 the other)")
 def test_two_fuller_regions_draw_together(grown_patch):
     stage = lambda store: [fuller(store, _stands(store, (0, way, 0))) for way in (-2, 2)]  # noqa: E731
     first, more = _after(grown_patch, stage, 25)

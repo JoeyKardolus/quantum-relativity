@@ -3,9 +3,10 @@
 > More packed is smaller, slower and pulls harder; pull spreads at a finite speed, weaker with distance; squeezed minus pushes back steeply.
 
 Assumed:
-- A volume's pull: its energy and a sixth of each side's joint's. A joint's: its volumes' mean.
-- Distance: two half widths and the joint's size.
-- Squeeze: `PULL` times the two pulls over the distance squared. Push: quanta to the power 4.
-- Fall: the pull is a speed squared; the others' pull's slope adds to a volume's flow, up to the top speed.
+- Pull: every volume toward every other, by its energy over the distance squared. No self term.
+- Distance: the sizes of the cells between, a direction at a time.
+- Delay: the other's energy as it was the distance over the top speed ago; sizes as they are now.
+- A calm volume pulls 1 at one calm length.
+- Depth (squeeze, limit): own energy and every other's over its distance.
 
-A calm line gathers and coasts. Not right: two lumps there do not draw together; grown, its own pull moves the first volume and it empties.
+Not right: a full volume among thin ones still pours out; nothing coasts or goes round.
