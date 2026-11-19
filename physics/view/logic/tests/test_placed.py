@@ -1,7 +1,6 @@
 """The picture's distances are the engine's: joined volumes are drawn as far apart as `apart` says."""
 import numpy as np
 
-from physics.engine import first_volume, step
 from physics.engine.axiom_3_structure.definitions.places import steps_of
 from physics.view.logic.placed import placed, settle
 from physics.view.logic.title_line import squeeze_read
@@ -9,17 +8,16 @@ from physics.view.logic.title_line import squeeze_read
 NEAR = 0.5  # a joint's drawn length may be this share off the engine's (measured: 0.48 at two layers)
 
 
-def _grown(steps: int) -> tuple:
-    """A cluster grown `steps` steps, its middles settled every step as the window does."""
-    store, middle = first_volume(layers=4), np.zeros((0, 3))
-    for _ in range(steps):
-        step(store)
+def _settled(store, times: int = 60) -> tuple:
+    """The grown patch, its middles settled `times` times from nothing, as the window does a frame."""
+    middle = np.zeros((0, 3))
+    for _ in range(times):
         middle = settle(store, middle)[0]
     return store, *settle(store, middle)
 
 
-def test_centre_and_rim_joints_are_drawn_at_the_engine_s_distance_and_volumes_at_one_scale():
-    store, middle, size, joints, volumes, apart = _grown(150)
+def test_centre_and_rim_joints_are_drawn_at_the_engine_s_distance_and_volumes_at_one_scale(grown_patch):
+    store, middle, size, joints, volumes, apart = _settled(grown_patch)
     cell, before, after, _axis = joints.T
     drawn = np.linalg.norm(middle[after] - middle[before], axis=1) / apart
     out = np.abs(steps_of(cell, store.side) - store.side // 2).max(axis=1)
@@ -35,8 +33,8 @@ def test_centre_and_rim_joints_are_drawn_at_the_engine_s_distance_and_volumes_at
     assert np.allclose(wide, 1 / 7.0, rtol=1e-5)  # every volume as wide as its size, one scale
 
 
-def test_a_joint_s_block_leans_from_the_one_of_its_volumes_to_the_other():
-    store, middle, size, joints, _volumes, _apart = _grown(150)
+def test_a_joint_s_block_leans_from_the_one_of_its_volumes_to_the_other(grown_patch):
+    store, middle, size, joints, _volumes, _apart = _settled(grown_patch)
     shapes = placed(store, middle, size, joints, 1.0).numpy()
     slot = np.full(len(size), -1)
     slot[store.own_cell.numpy()[:store.count]] = np.arange(store.count)

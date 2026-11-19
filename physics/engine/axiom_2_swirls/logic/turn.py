@@ -21,7 +21,7 @@ def turn_of(quanta: int, across: int, turn_per_step: float) -> float:
 
 
 @wp.kernel
-def _turn(own_cell: wp.array(dtype=wp.int32), cell_quanta: wp.array(dtype=wp.int32),
+def _turn(own_cell: wp.array(dtype=wp.int32), cell_quanta: wp.array(dtype=wp.int64),
           calm: wp.float64, calm_turn: wp.float64, own_turned: wp.array(dtype=wp.float32),
           box_phase: wp.array2d(dtype=wp.float32)):
     slot, box = wp.tid()

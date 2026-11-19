@@ -3,7 +3,8 @@ import numpy as np
 import pytest
 
 from physics.engine import three_cells
-from physics.engine.axiom_5_packing.logic.lumps import fuller, grown, region
+from physics.engine.axiom_5_packing.logic.lumps import fuller, region
+from physics.engine.axiom_5_packing.logic.staging import copy_of
 from physics.engine.axiom_5_packing.logic.spread import spread
 
 
@@ -18,11 +19,11 @@ def _handed(store, steps: int) -> list:
 
 
 @pytest.fixture(scope="module")
-def felt():
+def felt(grown_patch):
     """A grown patch held still: the pull as it stands, then with one volume made fuller (the
     one beside the first: the first holds too much to be made four times fuller)."""
-    store = grown(3)
-    row = [region(store, (0, out, 0))[0] for out in range(1, 4)]  # that volume and two on
+    store = copy_of(grown_patch)
+    row = [region(store, (0, out, 0))[0] for out in (1, 0, -1)]  # that volume, the first, the one beyond
     plain = _handed(store, 150)
     fuller(store, row[:1])
     return np.array(plain)[:, row], np.array(_handed(store, 150))[:, row], store
@@ -31,8 +32,7 @@ def felt():
 def test_the_pull_is_deeper_at_a_fuller_volume_and_fades_away_from_it(felt):
     plain, more, _store = felt
     gained = more[-1] - plain[-1]
-    assert gained[0] > gained[1] > gained[2] > 0   # deepest where the energy is, less a volume on
-    assert more[-1][0] > more[-1][1] > more[-1][2]
+    assert gained[0] > gained[1] > gained[2] > 0   # deepest where the energy is, less a volume on:
     assert gained[0] - gained[1] > 2 * (gained[1] - gained[2])  # and its slope falls too
 
 

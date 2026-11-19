@@ -18,14 +18,14 @@ wp.set_module_options({"enable_backward": False})  # nothing here is ever run ba
 
 @wp.func
 def _handed(place: wp.int32, side: wp.int32, tile_home: wp.array(dtype=wp.int32),
-            tile_slots: wp.array(dtype=wp.int32), cell_quanta: wp.array(dtype=wp.int32),
+            tile_slots: wp.array(dtype=wp.int32), cell_quanta: wp.array(dtype=wp.int64),
             was: wp.array(dtype=wp.float32)) -> float:
     """The pull of the cells at a volume's six sides: its joints, standing or collapsed."""
     handed = float(0.0)
     for axis in range(3):
         for way in range(-1, 2, 2):
             joint = beside(place, side, axis, way)
-            if joint >= 0 and cell_quanta[joint] != 0 and slot_at(tile_home, tile_slots, joint) >= 0:
+            if joint >= 0 and cell_quanta[joint] != wp.int64(0) and slot_at(tile_home, tile_slots, joint) >= 0:
                 handed += was[joint]
     return handed
 
@@ -33,14 +33,14 @@ def _handed(place: wp.int32, side: wp.int32, tile_home: wp.array(dtype=wp.int32)
 @wp.kernel
 def _spread(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32),
             tile_slots: wp.array(dtype=wp.int32), side: wp.int32, calm: wp.float32,
-            cell_quanta: wp.array(dtype=wp.int32), was: wp.array(dtype=wp.float32),
+            cell_quanta: wp.array(dtype=wp.int64), was: wp.array(dtype=wp.float32),
             cell_pull: wp.array(dtype=wp.float32)):
     cell = own_cell[wp.tid()]
     along = joint_axis(cell, side)
     own = wp.max(float(cell_quanta[cell]), 0.0) / calm  # plus pulls; a joint's minus adds none
     if along >= 0:  # a joint's place: it carries the mean of its two volumes' pull
         ends = joint_ends(cell, side, along)
-        cell_pull[cell] = (own + 0.5 * (was[ends[0]] + was[ends[1]])) * float(cell_quanta[cell] != 0)
+        cell_pull[cell] = (own + 0.5 * (was[ends[0]] + was[ends[1]])) * float(cell_quanta[cell] != wp.int64(0))
         return
     cell_pull[cell] = own + _handed(cell, side, tile_home, tile_slots, cell_quanta, was) / SIDES
 

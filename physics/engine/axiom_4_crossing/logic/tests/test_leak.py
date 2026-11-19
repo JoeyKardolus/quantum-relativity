@@ -39,8 +39,9 @@ def test_a_packed_volume_s_leak_gathers_alike_at_the_26_places_in_a_turn():
     assert gathered.max() < 1.5 * gathered.min()
 
 
-def test_the_crossing_bench_does_not_leak():
+def test_in_the_crossing_bench_nothing_gathers_outside_the_leak_only_passes_the_joint():
     store = three_cells()
     for _ in range(50):
         step(store)
-    assert (store.cell_quanta.numpy() != 0).sum() == 3
+    held = store.cell_quanta.numpy()
+    assert (held != 0).sum() == 3 and held[held > 0].sum() == 1_296_000 and held.max() < 972_000

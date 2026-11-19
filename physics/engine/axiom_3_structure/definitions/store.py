@@ -1,7 +1,7 @@
 """Store: where every cell is kept, built so a billion cells fit one graphics card.
 
 A calm cell is a rule, not boxes: its whole signed total (the sign is the way its whirl
-turns) and what it has made, 8 bytes. Only a cell
+turns) and what it has made, 16 bytes. Only a cell
 in the own set holds boxes, in a slot; slots in use are always `0 .. count - 1`. Two plain
 arrays find the slot. With `side` above 0 a cell's number is its place (`places.py`); a
 place that holds plus quanta and no slot is leaked energy gathering, not yet a cell.
@@ -17,8 +17,8 @@ TILE = 512  # cells in a tile: 512 cells that follow each other
 class Store:
     across: int             # boxes along a cell's edge
     turn_per_step: float    # how far a calm swirl's phase turns in one step
-    cell_quanta: wp.array   # int32 (cells)
-    cell_made: wp.array     # int32 (cells): quanta a joint has made out of itself
+    cell_quanta: wp.array   # int64 (cells): no squeeze and no merge can run it over; a box's stays int32
+    cell_made: wp.array     # int64 (cells): quanta a joint has made out of itself
     cell_pull: wp.array     # float32 (cells): the pull there, handed on from cell to cell
     tile_home: wp.array     # int32 (cells / 512): the tile's row in tile_slots, -1: all calm
     tile_slots: wp.array    # int32 (tile rows * 512): the cell's slot, -1: calm

@@ -2,10 +2,12 @@
 
 > Energy diffuses between plus swirls only through minus; that is the only friction.
 
-Built: plus crosses cap to cap, turned by the joint's own whirl (`gear`); a whirl leaks toward free places, each box where its phase points.
+The leak always happens. Energy crosses only where the pull or its own motion drives it.
 
 Assumed:
-- Rubbing share: minus over minus and plus in the passage.
-- Leak a turn: `size / (1 + 7 size)`, never a seventh (not ruled).
+- The facing boxes meet at the lesser of their amounts.
+- Rubbing share: the joint's minus over that and the plus that meets.
+- Leak a turn: `size / (1 + 7 size)`; friction does not cut it; it arrives at rest, round a core.
+- Toward an edge or corner where a volume stands, the leak takes a side's joint.
 
-Not right: uneven volumes stop evening out (3 to 1 ends at 1.9 to 1); the crossing floods a thin neighbour far past the leak's share and stops its whirls; a packed volume's leak is uneven (3 to 1 over a turn).
+Not right: the leak favours some directions (a tenth); a region set going does not travel; thin outer volumes are no whole whirls.

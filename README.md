@@ -57,18 +57,35 @@ the squeeze; a universe that grows from one energy volume, whose whirl leaks: wh
 layer of new volumes all round it, with joints between, and those shed the next layer; and one pull,
 a number a cell that every energy volume feeds and every cell hands on to its neighbours a step at a
 time, which squeezes the joints and bends crossing energy toward where it is deeper. Layer 5 (2026-11-19): a
-volume's leak never takes more than a seventh of it in a turn, two joined volumes stand their half widths and the
-joint's thickness apart so they cannot overlap, and a joint collapses where the pull at it is so deep
-that nothing at the grid's top speed could climb out: its minus energy flips to plus and it merges
-with its two volumes into one. Measured: every volume keeps at least 2.9 least whirls; the first joint
-falls at 13.9 turns at the centre and in 1.6 turns 3,346 joints fall, the inner six layers becoming one
-volume; the outer layers stand. Not yet: the merged volume does not hold (its energy crosses back out
-and the cluster grows again), a second collapse at 23.7 turns overflows a cell's whole number and stops
-the run, the collapsed region does not grow in step with its energy, hardly any volume winds whole
-turns, and a region made fuller by hand still spreads, does not fall and does not coast; so no gravity
-between bodies yet. Next: why a packed volume does not hold its energy. Progress is tracked on
+volume's leak never takes more than a seventh of it in a turn, and two joined volumes stand their half
+widths and the joint's thickness apart, so they cannot overlap. A cell is three ring whirls, one for
+each direction, round an empty core closed inside the cell; it turns in step with its energy, a joint
+turns the other way and meshes with its volumes like a gear, and nothing is drawn by chance.
+
+Since 2026-11-19 the leak and the crossing are two separate things. The leak always happens: every
+whirl sheds a small share of itself to every side, whatever its neighbours hold. Beyond that, energy
+crosses a joint only where something drives it: the pull, toward the deeper side, or the fluid's own
+motion. Two volumes that merely hold different amounts no longer even out. Measured: at three layers
+113 of 118 volumes are whole whirls (2 of 85 before), at six 779 of 920; the first volume keeps its
+energy (1,616 of 1,657 calm volumes at three layers), so the universe grows by its leak alone and far
+slower: three layers take 53 turns where they took 6.5. A region made fuller by hand now keeps 98% of
+what it was given after half a turn (24% before) and 95% after a turn.
+
+A joint collapses past one limit that is the same everywhere: where the pull at both its volumes is so
+deep that nothing at the top speed (one fixed speed, 110 calm lengths a turn, chosen) could climb out.
+It flips to plus where it stands and its two volumes and it are one; every cell keeps its place, so the
+grid beyond does not move (under 1% two cells out). Out of a volume past the limit nothing leaves, by
+the leak or the crossing, so a collapsed region keeps its energy and takes in what reaches it. In a
+grown universe nothing is as deep as the first volume, and that is under the limit: no collapse in nine
+layers. `--scene hole` stages one: a packed middle gives way in under a turn, six joints, thirteen cells,
+and holds its energy for 20 turns (12,425 calm volumes, then 12,429); fed, it grows to 49 cells.
+
+Not right yet: a fuller region holds but does not gain, two do not draw together and one set going
+does not travel, so no gravity between bodies; the outer volumes get too thin to be whirls, and at nine
+layers the inner ones have lost their whole turns too; the hole's size grows with its energy in jumps,
+not in step; and by the limit as built no black hole can form in a grown universe at all, which the
+owner must rule on. Progress is tracked on
 [issue #1](https://github.com/JoeyKardolus/quantum-relativity/issues/1).
-The whirl was rebuilt on 2026-11-19: a cell is now three ring whirls, one for each direction, round an empty core that is a ring closed inside the cell; it turns in step with its energy, a joint turns the other way and meshes with its volumes like a gear, and nothing is drawn by chance. A lone cell holds its whole turns for 10,000 steps. Still not right: in the grown cluster few volumes are whole whirls (52 of 195 at six layers), because the crossing floods thin new volumes; with the crossing off every one stays whole.
 Misses are reported as misses; nothing is tuned to look good.
 
 ## Run it
@@ -76,10 +93,11 @@ Misses are reported as misses; nothing is tuned to look good.
 ```bash
 uv sync --all-packages --all-extras --all-groups
 PYTHONPATH=. .venv/bin/python -m physics.view   # one cell; Up Down energy, F sign, 1 2 3 0 rings, Space, R, Esc
-PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing   # energy crossing from a volume through a joint into the next
+PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing   # a volume, a joint, a volume: the leak passes slowly; M sets the fuller one's fluid going
 PYTHONPATH=. .venv/bin/python -m physics.view --scene grow       # one volume leaks and sheds layer after layer of new volumes; X Y Z look along, C whole or flat cut
+PYTHONPATH=. .venv/bin/python -m physics.view --scene hole       # a packed middle collapses, keeps what it holds and takes in more
 PYTHONPATH=. .venv/bin/python -m physics.view --scene lumps      # two regions made fuller by hand in a small grown patch
-PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, about 30 seconds
+PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, about 40 seconds
 ```
 
 Needs Linux or WSL2, Python 3.12+, [`uv`](https://docs.astral.sh/uv/) . The engine runs on

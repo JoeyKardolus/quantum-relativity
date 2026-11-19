@@ -57,7 +57,7 @@ def given(squeeze: wp.vec4d, a_turn: wp.float64) -> wp.float64:
 
 
 @wp.func
-def pressed(box_quanta: wp.array2d(dtype=wp.int32), cell_quanta: wp.array(dtype=wp.int32),
+def pressed(box_quanta: wp.array2d(dtype=wp.int32), cell_quanta: wp.array(dtype=wp.int64),
             tile_home: wp.array(dtype=wp.int32), tile_slots: wp.array(dtype=wp.int32),
             ends: wp.vec2i, faces: wp.vec2i) -> wp.float64:
     """How hard the two volumes `ends` press on one row of their joint: 1 is their mean.

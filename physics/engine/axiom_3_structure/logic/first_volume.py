@@ -4,8 +4,8 @@ from physics.engine.axiom_3_structure.definitions.store import Store, put
 from physics.engine.axiom_3_structure.logic.starts import calm_cells
 from physics.engine.axiom_3_structure.logic.take_own import take_own
 
-# The first volume's quanta, the plainest: half of what a cell's whole number can hold, so
-# any two cells' totals can be added without running over.
+# The first volume's quanta: chosen when a cell's whole number was 32 bits wide (half of what that
+# held) and not moved since; the owner has not said how much a universe starts with.
 FIRST_QUANTA = 2 ** 30
 
 

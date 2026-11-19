@@ -44,14 +44,14 @@ def test_tracers_the_fluid_carries_off_the_flat_cut_are_laid_in_it_again_before_
     assert in_cut().all() and (marks[:, :, 3] != 0).mean() > 0.6  # none is drawn off the cut, tail and all
 
 
-def test_after_a_collapse_the_joint_is_drawn_as_plus_between_its_two_and_the_title_counts_it():
+def test_after_a_collapse_the_joint_is_drawn_as_plus_between_its_two_and_the_title_counts_it(patch):
     from physics.engine.axiom_6_limits.logic.tests.test_collapse import _staged
     from physics.view.logic.placed import placed, settle
     from physics.view.logic.scene import title
-    store, _before, joint, ends = _staged()
+    store, _before, joint, ends = _staged(patch)
     seen = Seen(trace(store))
     assert np.isfinite(drawn(store, seen).numpy()[-1]).all() and "collapses 1" in title(store, seen)
     middle, size, joints, _volumes, _apart = settle(store, seen.middle)
     shapes = placed(store, middle, size, joints, 1.0).numpy()
-    assert shapes[joint, 2, 2] == 1 and (shapes[:, 2, 2] == 1).sum() == 29  # the 28 volumes and it
+    assert shapes[joint, 2, 2] == 1 and (shapes[:, 2, 2] == 1).sum() == 119  # the 118 volumes and it
     assert np.allclose(shapes[joint, 0], (shapes[ends[0], 0] + shapes[ends[1], 0]) / 2)  # red, between its two

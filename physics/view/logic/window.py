@@ -2,8 +2,8 @@
 
 A window on one energy volume; `--scene crossing` a volume, a joint and a volume,
 `--scene grow` one volume whose leak tears off layer after
-layer, `--scene lumps` two fuller regions in a small grown patch; `--pictures DIR` saves
-pictures (`--along`, `--turned`, `--cut`, `--ring`). One process on the card. `BOXES`, `SPEED`, `FRAMES` only draw.
+layer, `--scene lumps` two fuller regions in a small grown patch, `--scene hole` a packed
+middle that collapses; `--pictures DIR` saves pictures (`--along`, `--turned`, `--cut`, `--ring`). One process on the card. `BOXES`, `SPEED`, `FRAMES` only draw.
 """
 import argparse
 import os
@@ -60,7 +60,7 @@ def main() -> None:
     parser.add_argument("--cut", action="store_true", help="the pictures show the flat cut")
     parser.add_argument("--ring", type=int, choices=(0, 1, 2), default=-1, help="one ring's fluid alone")
     chosen = parser.parse_args()
-    grows = chosen.scene in ("grow", "lumps")
+    grows = chosen.scene in ("grow", "lumps", "hole")
     chosen.boxes = chosen.boxes or (GROW_BOXES if grows else BOXES if chosen.scene == "one" else LINE_BOXES)
     chosen.speed = chosen.speed or (GROW_SPEED if grows else SPEED)
     wp.config.quiet = True

@@ -20,17 +20,17 @@ wp.set_module_options({"enable_backward": False})  # nothing here is ever run ba
 def _squeeze(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32),
              tile_slots: wp.array(dtype=wp.int32),
              side: wp.int32, calm: wp.float64,
-             cell_quanta: wp.array(dtype=wp.int32), cell_pull: wp.array(dtype=wp.float32),
+             cell_quanta: wp.array(dtype=wp.int64), cell_pull: wp.array(dtype=wp.float32),
              own_squeeze: wp.array(dtype=wp.vec4d)):
     joint = own_cell[wp.tid()]
     slot, none = wp.tid(), wp.float64(0.0)
     own_squeeze[slot] = wp.vec4d(none, none, none, none)
     axis = joint_axis(joint, side)
-    if axis < 0 or cell_quanta[joint] == 0:
+    if axis < 0 or cell_quanta[joint] == wp.int64(0):
         return  # not a joint's place, or nothing there
     ends = joint_ends(joint, side, axis)
     before, after = ends[0], ends[1]
-    if cell_quanta[before] <= 0 or cell_quanta[after] <= 0:
+    if cell_quanta[before] <= wp.int64(0) or cell_quanta[after] <= wp.int64(0):
         return  # only a joint between two volumes is pulled across
     if slot_at(tile_home, tile_slots, before) < 0 or slot_at(tile_home, tile_slots, after) < 0:
         return  # a calm volume does not press yet
@@ -38,7 +38,7 @@ def _squeeze(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.in
     left, right = wp.float64(cell_quanta[before]) / calm, wp.float64(cell_quanta[after]) / calm
     apart = apart_of(left, right, held)
     own_squeeze[slot] = wp.vec4d(none, none, apart, wp.float64(axis))
-    if cell_quanta[joint] < 0:  # a collapsed joint holds plus: it stands between, nothing squeezes it
+    if cell_quanta[joint] < wp.int64(0):  # a collapsed joint holds plus: it stands between, nothing squeezes it
         pull = pull_across(wp.float64(cell_pull[before]), wp.float64(cell_pull[after]), apart)
         own_squeeze[slot] = wp.vec4d(pull, push_back(held), apart, wp.float64(axis))
 

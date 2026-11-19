@@ -21,7 +21,7 @@ wp.set_module_options({"enable_backward": False})  # nothing here is ever run ba
 @wp.kernel
 def _carry_across(quanta: wp.array2d(dtype=wp.int32), phase: wp.array2d(dtype=wp.float32),
                   own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32),
-                  tile_slots: wp.array(dtype=wp.int32), cell_quanta: wp.array(dtype=wp.int32),
+                  tile_slots: wp.array(dtype=wp.int32), cell_quanta: wp.array(dtype=wp.int64),
                   own_turned: wp.array(dtype=wp.float32), side: wp.int32, axis: wp.int32,
                   cells: wp.int32, across: wp.int32, row: wp.int32, tail: wp.array2d(dtype=wp.vec3)):
     tracer = wp.tid()
@@ -33,10 +33,10 @@ def _carry_across(quanta: wp.array2d(dtype=wp.int32), phase: wp.array2d(dtype=wp
         end, front = 1, across - 1 - around  # in the back cap: the volume after it
     volume = own_cell[slot]
     if (layer != (axis + 1) * (across / 3) - 1 or front < across / 6 or front >= across / 3
-            or cell_quanta[volume] <= 0 or side == 0):
+            or cell_quanta[volume] <= wp.int64(0) or side == 0):
         return
     joint, beyond = beside(volume, side, axis, 1 - 2 * end), beside(volume, side, axis, 2 - 4 * end)
-    if joint < 0 or beyond < 0 or cell_quanta[joint] >= 0:
+    if joint < 0 or beyond < 0 or cell_quanta[joint] >= wp.int64(0):
         return
     between, other = slot_at(tile_home, tile_slots, joint), slot_at(tile_home, tile_slots, beyond)
     if between < 0 or other < 0:

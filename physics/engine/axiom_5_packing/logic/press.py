@@ -26,7 +26,7 @@ def _press(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int3
            tile_slots: wp.array(dtype=wp.int32),
           side: wp.int32, across: wp.int32,
            a_turn: wp.float64, own_squeeze: wp.array(dtype=wp.vec4d),
-           cell_quanta: wp.array(dtype=wp.int32),
+           cell_quanta: wp.array(dtype=wp.int64),
            box_quanta: wp.array2d(dtype=wp.int32), box_phase: wp.array2d(dtype=wp.float32)):
     slot, first, third = wp.tid()
     gives = given(own_squeeze[slot], a_turn)

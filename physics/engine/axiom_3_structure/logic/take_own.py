@@ -16,23 +16,23 @@ wp.set_module_options({"fuse_fp": False})
 
 @wp.kernel
 def _lay(own_cell: wp.array(dtype=wp.int32), first: wp.int32, turned: wp.float64,
-         cell_quanta: wp.array(dtype=wp.int32),
+         cell_quanta: wp.array(dtype=wp.int64),
          pattern: wp.array2d(dtype=wp.vec2d),
          box_quanta: wp.array2d(dtype=wp.int32), box_phase: wp.array2d(dtype=wp.float32)):
     slot = first + wp.tid()
-    sign = wp.sign(cell_quanta[own_cell[slot]])  # a joint is dealt like a volume, in minus
     total = wp.abs(cell_quanta[own_cell[slot]])
-    laid = wp.int32(sign < 0)  # a joint's whirl is a volume's in a mirror
+    laid = wp.int32(cell_quanta[own_cell[slot]] < wp.int64(0))  # a joint's whirl is a volume's in a mirror
+    sign = 1 - 2 * laid  # a joint is dealt like a volume, in minus
     boxes = pattern.shape[1]
     left_over = total
     for box in range(boxes):
-        left_over -= dealt(total, pattern[laid, box][0], boxes)
+        left_over -= wp.int64(dealt(total, pattern[laid, box][0], boxes))
     for box in range(boxes):
         angle = pattern[laid, box][1] + turned
         angle -= wp.float64(wp.tau) * wp.floor((angle + wp.float64(wp.pi)) / wp.float64(wp.tau))
         box_phase[slot, box] = wp.float32(angle)
         share = dealt(total, pattern[laid, box][0], boxes)
-        if box < left_over:
+        if wp.int64(box) < left_over:
             share += 1
         box_quanta[slot, box] = sign * share
 

@@ -1,9 +1,9 @@
-"""Cell window: the window on a scene and its keys.
+"""Cell window: the window on a scene and its keys. `TICKS` steps a second.
 
-Space stops and starts, R lays a fresh start, drag turns, the wheel zooms, Esc quits; X, Y
-and Z look along a direction; 1, 2, 3 show one ring's fluid alone, 0 all three. A growing
-cluster: C, whole or flat cut. One cell: Up and Down double and halve its energy, F flips
-its sign, G sends it to calm or takes it own. `TICKS` steps a second.
+Space stops and starts, R lays a fresh start, drag turns, the wheel zooms, Esc quits; X, Y, Z
+look along a direction; 1, 2, 3 show one ring's fluid alone, 0 all. A growing cluster: C,
+whole or flat cut. One cell: Up, Down double and halve its energy, F flips its sign, G calm
+or own. The crossing: M sets the fuller volume's fluid going toward the other.
 """
 import pyglet
 from pyglet.window import key
@@ -13,7 +13,7 @@ from physics.engine.axiom_3_structure.logic.boxes_of import boxes_of
 from physics.engine.axiom_3_structure.logic.give_back import give_back
 from physics.engine.axiom_3_structure.logic.take_own import take_own
 from physics.view.definitions.camera import ALONG, PITCH, YAW, eye_distance, zoomed
-from physics.view.logic.cell_keys import flipped, scaled
+from physics.view.logic.cell_keys import flipped, going, scaled
 from physics.view.logic.scene import SCENES, Seen, advance, cut, drawn, title, trace
 from physics.view.logic.swirl_painter import SwirlPainter
 from physics.view.logic.tracers import MARKS
@@ -33,8 +33,7 @@ class CellWindow(pyglet.window.Window):
         pyglet.clock.schedule_interval(self.tick, 1 / TICKS)
         pyglet.clock.schedule_interval(self.retitle, 0.5)
 
-    def lay(self) -> None:
-        """A fresh start of the scene, with fresh tracers."""
+    def lay(self) -> None:  # a fresh start of the scene, with fresh tracers
         self.store = self.fresh()
         self.seen, self.boxes = Seen(trace(self.store)), boxes_of(self.store, 0)
 
@@ -47,8 +46,7 @@ class CellWindow(pyglet.window.Window):
         self.painter.load(drawn(self.store, self.seen))
 
     def retitle(self, _elapsed: float) -> None:
-        stopped = "" if self.running else "  (stopped: Space)"
-        self.set_caption(title(self.store, self.seen) + stopped)
+        self.set_caption(title(self.store, self.seen) + ("" if self.running else "  (stopped: Space)"))
 
     def on_draw(self) -> None:
         self.painter.draw(self.store.across, self.yaw, self.pitch, self.distance,
@@ -66,6 +64,8 @@ class CellWindow(pyglet.window.Window):
             flipped(self.store, 0) if symbol == key.F else scaled(self.store, 0, symbol == key.UP)
         elif symbol in (key._0, key._1, key._2, key._3):
             self.seen.ring = symbol - key._1
+        elif symbol == key.M and self.store.side == 3:
+            going(self.store)
         elif symbol == key.C:
             self.seen.whole = cut(self.store, self.seen)
         elif symbol == key.R:

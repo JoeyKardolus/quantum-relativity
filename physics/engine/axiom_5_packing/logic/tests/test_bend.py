@@ -1,4 +1,4 @@
-"""Of what a volume gives its neighbours, more crosses toward the side where the pull is deeper."""
+"""Energy crosses toward the side where the pull is deeper; with no pull, or an even one, nothing crosses."""
 import numpy as np
 
 from physics.engine import calm_cells
@@ -35,14 +35,14 @@ def _crossed(pulls: tuple, steps: int = 20):
     return held[0] - 648_000, held[4] - 648_000, store
 
 
-def test_with_no_pull_or_an_even_pull_a_fuller_volume_gives_alike_to_both_sides():
-    for pulls in ((0, 0, 0), (2, 2, 2)):
+def test_with_no_pull_or_an_even_pull_a_fuller_volume_gives_nothing_to_either_side():
+    for pulls in ((0, 0, 0), (2, 2, 2)):  # the middle volume holds twice its neighbours' quanta
         before, after, _store = _crossed(pulls)
-        assert before > 8_000 and abs(before - after) < 0.01 * before  # measured: 9,048 and 9,084
+        assert before == after == 0  # different amounts alone move nothing (9,048 each when they evened out)
 
 
-def test_more_crosses_toward_the_side_where_the_pull_is_deeper():
+def test_energy_crosses_toward_the_side_where_the_pull_is_deeper():
     before, after, _store = _crossed((1, 2, 3))  # deeper after the middle volume than before it
-    assert after > 1.3 * before > 0 and after > 1.1 * _crossed((0, 0, 0))[1]  # measured: 5,544, 12,588
+    assert before < -3_000 and after > 3_000  # the first gives to the middle, the middle to the last
     mirrored = _crossed((3, 2, 1))
-    assert mirrored[0] > 1.3 * mirrored[1]  # and the other way round alike (12,564, 5,574)
+    assert mirrored[0] > 3_000 and mirrored[1] < -3_000  # and the other way round alike

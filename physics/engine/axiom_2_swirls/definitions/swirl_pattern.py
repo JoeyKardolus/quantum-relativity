@@ -26,6 +26,6 @@ def swirl_patterns(across: int) -> np.ndarray:
 
 
 @wp.func
-def dealt(total: wp.int32, share: wp.float64, boxes: wp.int32) -> wp.int32:
+def dealt(total: wp.int64, share: wp.float64, boxes: wp.int32) -> wp.int32:
     """A box's whole share of its cell's total, rounded down."""
     return wp.int32(wp.floor(wp.float64(total) * share / wp.float64(boxes)))

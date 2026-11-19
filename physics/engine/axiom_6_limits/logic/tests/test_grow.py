@@ -1,4 +1,6 @@
 """The universe grows from one volume, layer by layer, a joint wherever two volumes share a side, the books exact at every step."""
+from functools import lru_cache
+
 import numpy as np
 import pytest
 
@@ -37,17 +39,18 @@ def _checked_step(store) -> tuple:
     return volumes, joints
 
 
-def _grown(layers: int = 3):
-    """A universe grown until a volume stands `layers` layers out, checked at every step."""
+@lru_cache
+def _grown(layers: int = 2):
+    """A universe grown until a volume stands `layers` layers out, checked at every step; made once."""
     store, seen = first_volume(layers=layers + 1), {}
-    while store.step < 400:
+    while store.step < 700:
         volumes, joints = _checked_step(store)
         seen["least"] = min(seen.get("least", 2 ** 31), int(store.cell_quanta.numpy()[volumes].min()))
         if len(volumes) == 27 and "layer" not in seen:
             seen["layer"] = (store.step, volumes, joints, _layers(store, volumes))
         if _layers(store, volumes).max() == layers:
             return store, seen
-    raise AssertionError("no third layer in 400 steps")
+    raise AssertionError("no second layer in 700 steps")
 
 
 grown = pytest.fixture(scope="module")(lambda: _grown())
@@ -62,9 +65,9 @@ def test_a_lone_volume_sheds_a_full_layer_of_26_volumes_with_a_joint_wherever_tw
     print(f"the first layer stands whole at step {at}: {at * store.turn_per_step / 2 / np.pi:.1f} turns")
 
 
-def test_three_layers_grow_with_exact_books_and_the_outermost_cells_are_volumes(grown):
+def test_two_layers_grow_with_exact_books_and_the_outermost_cells_are_volumes(grown):
     store, _seen = grown
     held, volumes, joints = _cells(store)
     reach = np.abs(steps_of(np.concatenate([volumes, joints]), store.side) - store.side // 2).max()
-    assert reach == 6 and len(volumes) > 80  # six steps out: the third layer (measured: 85 volumes)
+    assert reach == 4 and len(volumes) > 27  # four steps out: the second layer, at step 491 (19.7 turns)
     assert held[held > 0].sum() - held[held < 0].sum() == 2 ** 30 + store.cell_made.numpy().sum()

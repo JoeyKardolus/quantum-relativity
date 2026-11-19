@@ -8,7 +8,9 @@ always leaves the volume standing and what comes from further in can keep it a w
 floor: nothing stops a volume that is not fed. It leaks alike toward the 26 directions
 round it (6 sides, 12 edges, 8 corners). A quantum cannot be shared, so each box's leak
 of a step goes one of them: the one the box's own phase points to at that moment
-(`pointed`), and the rest of the phase's turn settles the odd quantum.
+(`pointed`), and the rest of the phase's turn settles the odd quantum. Joints lie only at
+a volume's six sides, so toward an edge or a corner where a volume stands already the leak
+takes one of the sides that way (`leaned`).
 """
 import warp as wp
 
@@ -46,3 +48,20 @@ def toward(cell: wp.int32, side: wp.int32, pick: wp.int32) -> wp.int32:
     if place >= 0:
         place = beside(place, side, 2, 2 * (pick % 3 - 1))
     return place
+
+
+@wp.func
+def leaned(pick: wp.int32, part: wp.float64) -> wp.vec2i:
+    """Of the sides direction `pick` leans to (1 for a side, 2 an edge, 3 a corner), the one the
+    phase stands at `part` of the way through: its axis and its way along it."""
+    if pick >= 13:
+        pick += 1
+    ways = wp.vec3i(pick / 9 - 1, pick / 3 % 3 - 1, pick % 3 - 1)
+    wanted = wp.int32(part * wp.float64(wp.abs(ways[0]) + wp.abs(ways[1]) + wp.abs(ways[2])))
+    found = wp.vec2i(0, 0)
+    for axis in range(3):
+        if ways[axis] != 0:
+            if wanted == 0:
+                found = wp.vec2i(axis, ways[axis])
+            wanted -= 1
+    return found

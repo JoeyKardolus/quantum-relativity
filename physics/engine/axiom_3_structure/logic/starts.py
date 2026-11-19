@@ -25,8 +25,8 @@ def calm_cells(cells: int, own_cap: int, across: int = ACROSS, device: str = "cp
     with wp.ScopedDevice(device):
         return Store(
             across=across, turn_per_step=standing_mode(across)[1],
-            cell_quanta=wp.full(cells, QUANTA_A_BOX * boxes, dtype=wp.int32),
-            cell_made=wp.zeros(cells, dtype=wp.int32),
+            cell_quanta=wp.full(cells, QUANTA_A_BOX * boxes, dtype=wp.int64),
+            cell_made=wp.zeros(cells, dtype=wp.int64),
             cell_pull=wp.zeros(cells, dtype=wp.float32),
             tile_home=wp.full(tiles, -1, dtype=wp.int32),
             tile_slots=wp.full(rows * TILE, -1, dtype=wp.int32),

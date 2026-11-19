@@ -3,8 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
-from physics.engine import one_cell, step, three_cells
-from physics.engine.axiom_6_limits.logic.tests.test_grow import _grown
+from physics.engine import first_volume, one_cell, step, three_cells
 
 
 def _after(steps: int, lay=one_cell) -> tuple[np.ndarray, np.ndarray]:
@@ -26,8 +25,11 @@ def test_the_same_start_gives_the_same_crossing():
 
 
 def test_the_same_start_gives_the_same_growth():
-    first, again = (_grown(layers=2)[0] for _ in range(2))
-    assert first.step == again.step and first.count == again.count > 27
+    first, again = first_volume(layers=2), first_volume(layers=2)
+    for _ in range(150):
+        step(first)
+        step(again)
+    assert first.count == again.count > 27  # the first layer has torn off
     assert np.array_equal(first.box_quanta.numpy(), again.box_quanta.numpy())
     assert np.array_equal(first.box_phase.numpy(), again.box_phase.numpy())
     assert np.array_equal(first.cell_quanta.numpy(), again.cell_quanta.numpy())

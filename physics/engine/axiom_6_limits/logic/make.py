@@ -21,7 +21,7 @@ def _make(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32
           side: wp.int32, across: wp.int32,
           a_turn: wp.float64,
           own_squeeze: wp.array(dtype=wp.vec4d),
-          cell_quanta: wp.array(dtype=wp.int32), cell_made: wp.array(dtype=wp.int32),
+          cell_quanta: wp.array(dtype=wp.int64), cell_made: wp.array(dtype=wp.int64),
           box_quanta: wp.array2d(dtype=wp.int32), box_phase: wp.array2d(dtype=wp.float32)):
     slot, layer, around, along = wp.tid()
     gives = given(own_squeeze[slot], a_turn)
@@ -36,8 +36,8 @@ def _make(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32
     made = wp.int32(wp.floor(wp.float64(-box_quanta[slot, box]) * share
                              + odd_part(box_phase[slot, box], across)))
     box_quanta[slot, box] -= made
-    wp.atomic_add(cell_quanta, joint, -made)
-    wp.atomic_add(cell_made, joint, made)
+    wp.atomic_add(cell_quanta, joint, wp.int64(-made))
+    wp.atomic_add(cell_made, joint, wp.int64(made))
 
 
 def make(store: Store) -> None:
