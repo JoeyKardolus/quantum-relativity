@@ -5,9 +5,9 @@ kind of stuff: energy. The goal is not to replace quantum physics or relativity,
 these rules, run on a computer, produce things we know from nature: gravity, expansion, black holes,
 orbits.
 
-![One energy volume: a ball of energy turning as three ring whirls](docs/media/whirl.gif)
+![One energy volume: a swirl of energy](docs/media/whirl.gif)
 
-*One energy volume in the viewer: a ball of energy turning as three ring whirls.*
+*One energy volume in the viewer: a swirl of energy.*
 
 ## The seven axioms
 
