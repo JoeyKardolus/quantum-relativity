@@ -44,13 +44,14 @@ def test_tracers_the_fluid_carries_off_the_flat_cut_are_laid_in_it_again_before_
     assert in_cut().all() and (marks[:, :, 3] != 0).mean() > 0.6  # none is drawn off the cut, tail and all
 
 
-def test_after_a_collapse_the_emptied_cells_are_not_drawn_and_the_title_counts_it():
-    from physics.engine.axiom_6_limits.logic.tests.test_merged import _staged
-    from physics.view.logic.lay_tracers import shown
+def test_after_a_collapse_the_joint_is_drawn_as_plus_between_its_two_and_the_title_counts_it():
+    from physics.engine.axiom_6_limits.logic.tests.test_collapse import _staged
+    from physics.view.logic.placed import placed, settle
     from physics.view.logic.scene import title
-    store = _staged()[0]
+    store, _before, joint, ends = _staged()
     seen = Seen(trace(store))
-    marks = drawn(store, seen).numpy()[-1]
-    assert np.isfinite(marks).all() and (shown(store, False) == 0).sum() == 2  # the joint, a volume
-    assert not (shown(store, False) == 0)[_slots(seen)].any()  # no tracer is left in them
-    assert "collapses 1" in title(store, seen)
+    assert np.isfinite(drawn(store, seen).numpy()[-1]).all() and "collapses 1" in title(store, seen)
+    middle, size, joints, _volumes, _apart = settle(store, seen.middle)
+    shapes = placed(store, middle, size, joints, 1.0).numpy()
+    assert shapes[joint, 2, 2] == 1 and (shapes[:, 2, 2] == 1).sum() == 29  # the 28 volumes and it
+    assert np.allclose(shapes[joint, 0], (shapes[ends[0], 0] + shapes[ends[1], 0]) / 2)  # red, between its two

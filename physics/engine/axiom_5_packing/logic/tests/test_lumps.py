@@ -63,13 +63,11 @@ def test_a_fuller_region_gains_from_its_thinner_surroundings(patch):
     assert more[4:7].sum() > first[4:7].sum()
 
 
-@pytest.mark.xfail(strict=True, reason="(c) two fuller regions either side of the first volume: their "
-                   "energy's middles lie 2.78 volumes apart, then 3.41 after half a turn: neither falls")
 def test_two_fuller_regions_draw_together(patch):
     stage = lambda store: [fuller(store, _stands(store, (0, way, 0))) for way in (-2, 2)]  # noqa: E731
     first, more, _staged = _after(patch, stage, 12)
     apart = lambda row: _middle(row, slice(4, 7)) - _middle(row, slice(0, 3))  # noqa: E731
-    assert apart(more) < apart(first)
+    assert apart(more) < apart(first)  # measured: 2.78 volumes apart, then 2.73 (no joint gives way now)
 
 
 @pytest.mark.xfail(strict=True, reason="(e) a fuller region set going one way: after a turn its energy's "

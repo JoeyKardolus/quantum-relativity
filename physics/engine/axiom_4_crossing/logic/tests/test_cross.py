@@ -41,11 +41,13 @@ def test_equal_volumes_in_step_exchange_nothing():
     assert abs(int(store.cell_quanta.numpy()[A]) - 648_000) < 100
 
 
+AROUND, RING = np.indices((6, 6, 6))[1].ravel(), np.indices((6, 6, 6))[0].ravel() // 2 == 1
+FAR = np.minimum((AROUND - 4) % 6, (4 - AROUND) % 6) * RING  # boxes from the back cap, in ring 1
+
+
 def test_energy_arrives_still_moving_the_way_it_went():
-    around, ring = np.indices((6, 6, 6))[1].ravel(), np.indices((6, 6, 6))[0].ravel() // 2 == 1
-    far = np.minimum((around - 4) % 6, (4 - around) % 6) * ring  # boxes from the back cap, in ring 1
     for way in (1, -1):  # A's fluid moving toward B, then away from it
-        store = _still((2, -2, 2), a_phase=-way * 0.3 * far)
+        store = _still((2, -2, 2), a_phase=-way * 0.3 * FAR)
         sent = flow_along(store.box_quanta.numpy()[0], store.box_phase.numpy()[0], 1)
         for _ in range(30):
             step(store)

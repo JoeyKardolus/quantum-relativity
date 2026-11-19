@@ -12,7 +12,6 @@ import numpy as np
 import warp as wp
 
 from physics.engine.axiom_3_structure.definitions.kinds import QUANTA_A_BOX
-from physics.engine.axiom_3_structure.definitions.merged import slots_of
 from physics.engine.axiom_3_structure.definitions.places import steps_of
 from physics.engine.axiom_5_packing.logic.squeeze import squeeze
 from physics.view.logic.fit import begun, fitted
@@ -21,17 +20,16 @@ OTHERS = np.array([[1, 2], [0, 2], [0, 1]])  # the two directions a joint does n
 
 
 def joined(store) -> tuple:
-    """Each cell's size, the joints that lie between two volumes (cell, before, after, axis),
-    the own volumes, and how far apart each joint's two volumes stand."""
+    """Each cell's size, the joints that lie between two volumes, standing or collapsed (cell,
+    before, after, axis), the own volumes, and how far apart each joint's two volumes stand."""
     squeeze(store)
     held, own = store.cell_quanta.numpy(), store.own_cell.numpy()[:store.count]
     size = np.where(held == 0, 0.0, QUANTA_A_BOX * store.across ** 3 / np.maximum(np.abs(held), 1))
     felt = store.own_squeeze.numpy()[:store.count]
     lies = felt[:, 2] > 0
     joints, axis = own[lies], felt[lies, 3].astype(int)
-    whole = store.own_whole.numpy()  # a merged volume is drawn where it stands
-    ends = [own[whole[slots_of(store, joints + way * store.side ** (2 - axis))]] for way in (-1, 1)]
-    return size, np.column_stack([joints, *ends, axis]), own[held[own] > 0], felt[lies, 2]
+    ends = [joints + way * store.side ** (2 - axis) for way in (-1, 1)]
+    return size, np.column_stack([joints, *ends, axis]), own[(held[own] > 0) & ~lies], felt[lies, 2]
 
 
 def settle(store, middle: np.ndarray) -> tuple:
@@ -69,8 +67,8 @@ def placed(store, middle: np.ndarray, size: np.ndarray, joints: np.ndarray, span
     shapes[cell, 0] = (shapes[before, 0] + shapes[after, 0]) / 2
     shapes[cell, 1] = np.column_stack([reach[:, 0], size[before] / 2, size[after] / 2]) / span
     shapes[cell, 2] = np.column_stack([lean, -1.0 - axis])
-    own = store.own_cell.numpy()[:store.count]
-    shapes = shapes[own]
-    shapes[:, 0] = shapes[store.own_whole.numpy()[:store.count], 0]  # a merged part: at its volume
+    fell = cell[store.cell_quanta.numpy()[cell] > 0]  # a collapsed joint: a red ball between its two
+    shapes[fell, 1], shapes[fell, 2] = np.column_stack([size[fell], 0 * fell, 0 * fell]) / span, (0, 0, 1)
+    shapes = shapes[store.own_cell.numpy()[:store.count]]
     shapes[:, 2, 2] *= np.ravel(shown)
     return wp.array(shapes, dtype=wp.mat33, device=store.cell_quanta.device)

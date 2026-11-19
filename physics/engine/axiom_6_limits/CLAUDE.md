@@ -3,9 +3,9 @@
 > A joint collapses only past a limit, where nothing at the top speed could climb out; leaking outside tears off as new volumes.
 
 Assumed:
-- A place tears off once seven least whirls have gathered, shared in seven.
-- Limit: twice the pull at a joint is at least the top speed squared, the joint's distance in two steps. A pull of 1 is read as a speed squared of 1: the owner must rule.
-- The merged volume stands at the fuller one's place, a fresh whirl.
-- Two joints to one neighbour both stay; one inside a volume flips into it.
+- A place tears off at seven least whirls, shared in seven.
+- The top speed is 110 calm lengths a calm turn (chosen; under 100.2 the first volume could not leak): the limit is a pull of 6,050.
+- A joint is past the limit when both its volumes are.
+- A merged volume's cells stay at their places, each with its own number.
 
-Not right: the merged volume floods out again; at 2 to the power 31 quanta the run stops.
+Not right: nothing grown is as deep as the first volume, so only a staged region collapses; a merged volume's cells do not mix their fluid.

@@ -2,7 +2,7 @@
 import numpy as np
 
 from physics.engine import step
-from physics.engine.axiom_3_structure.logic.shared_sides import joints_of
+from physics.engine.axiom_3_structure.logic.joints_of import joints_of
 from physics.engine.axiom_5_packing.logic.lumps import grown
 from physics.engine.axiom_5_packing.logic.squeeze import squeeze
 

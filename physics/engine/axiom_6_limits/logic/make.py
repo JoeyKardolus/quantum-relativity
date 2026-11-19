@@ -11,13 +11,13 @@ import warp as wp
 from physics.engine.axiom_1_energy.definitions.whole_move import odd_part
 from physics.engine.axiom_3_structure.definitions.store import Store
 from physics.engine.axiom_4_crossing.definitions.facing import faced
-from physics.engine.axiom_3_structure.definitions.merged import joint_volumes
+from physics.engine.axiom_3_structure.definitions.places import joint_ends
 from physics.engine.axiom_5_packing.definitions.pull_push import given, pressed
 
 
 @wp.kernel
 def _make(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32),
-          tile_slots: wp.array(dtype=wp.int32), own_whole: wp.array(dtype=wp.int32),
+          tile_slots: wp.array(dtype=wp.int32),
           side: wp.int32, across: wp.int32,
           a_turn: wp.float64,
           own_squeeze: wp.array(dtype=wp.vec4d),
@@ -30,7 +30,7 @@ def _make(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32
     joint, axis = own_cell[slot], wp.int32(own_squeeze[slot][3])
     box = (layer * across + around) * across + along
     row = around % (across / 6) * across + along  # the caps' row this box lies behind
-    ends = joint_volumes(joint, side, axis, tile_home, tile_slots, own_whole, own_cell)
+    ends = joint_ends(joint, side, axis)
     share = gives * pressed(box_quanta, cell_quanta, tile_home, tile_slots, ends,
                             faced(row, across, axis))
     made = wp.int32(wp.floor(wp.float64(-box_quanta[slot, box]) * share
@@ -44,7 +44,7 @@ def make(store: Store) -> None:
     """One step of making in every own joint that `squeeze` found squeezed."""
     across = store.across
     wp.launch(_make, dim=(store.count, across, across, across), device=store.box_quanta.device,
-              inputs=[store.own_cell, store.tile_home, store.tile_slots, store.own_whole,
+              inputs=[store.own_cell, store.tile_home, store.tile_slots,
                       store.side, across, wp.float64(store.turn_per_step / (2.0 * wp.pi)),
                       store.own_squeeze, store.cell_quanta, store.cell_made, store.box_quanta,
                       store.box_phase])

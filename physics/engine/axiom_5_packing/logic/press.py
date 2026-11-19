@@ -10,7 +10,7 @@ import warp as wp
 
 from physics.engine.axiom_3_structure.definitions.store import Store
 from physics.engine.axiom_4_crossing.definitions.facing import faced
-from physics.engine.axiom_3_structure.definitions.merged import joint_volumes
+from physics.engine.axiom_3_structure.definitions.places import joint_ends
 from physics.engine.axiom_5_packing.definitions.pull_push import given, pressed
 
 
@@ -23,7 +23,7 @@ def _turned(phase: wp.float32, turn: float) -> wp.float32:
 
 @wp.kernel
 def _press(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32),
-           tile_slots: wp.array(dtype=wp.int32), own_whole: wp.array(dtype=wp.int32),
+           tile_slots: wp.array(dtype=wp.int32),
           side: wp.int32, across: wp.int32,
            a_turn: wp.float64, own_squeeze: wp.array(dtype=wp.vec4d),
            cell_quanta: wp.array(dtype=wp.int32),
@@ -34,7 +34,7 @@ def _press(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int3
         return  # not squeezed: nothing presses
     axis, joint = wp.int32(own_squeeze[slot][3]), own_cell[slot]
     faces = faced(first * across + third, across, axis)  # the joint's own two caps, the other way round
-    ends = joint_volumes(joint, side, axis, tile_home, tile_slots, own_whole, own_cell)
+    ends = joint_ends(joint, side, axis)
     turn = float(wp.float64(wp.tau) * gives * pressed(
         box_quanta, cell_quanta, tile_home, tile_slots, ends, faces))
     box_phase[slot, faces[1]] = _turned(box_phase[slot, faces[1]], turn)
@@ -45,7 +45,7 @@ def press(store: Store) -> None:
     """One step of the squeeze's press on the fluid of every own joint `squeeze` found squeezed."""
     wp.launch(_press, dim=(store.count, store.across // 6, store.across),
               device=store.box_quanta.device,
-              inputs=[store.own_cell, store.tile_home, store.tile_slots, store.own_whole,
+              inputs=[store.own_cell, store.tile_home, store.tile_slots,
                       store.side, store.across,
                       wp.float64(store.turn_per_step / (2.0 * wp.pi)), store.own_squeeze,
                       store.cell_quanta, store.box_quanta, store.box_phase])

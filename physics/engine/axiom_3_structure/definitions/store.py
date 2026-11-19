@@ -24,9 +24,6 @@ class Store:
     tile_slots: wp.array    # int32 (tile rows * 512): the cell's slot, -1: calm
     own_cell: wp.array      # int32 (cap): which cell holds this slot
     own_squeeze: wp.array   # vec4d (cap): a joint's pull, push, volumes' distance, axis
-    own_whole: wp.array     # int32 (cap): the slot of the volume this slot is part of (`merged.py`)
-    own_ring: wp.array      # int32 (cap): the next slot of the same volume, round to itself
-    own_part: wp.array      # vec4i (cap): a joint's rank and count on its two volumes' sides
     own_turned: wp.array    # float32 (cap): how far the cell has turned past the calm turn
     box_quanta: wp.array    # int32 (cap, boxes)
     box_phase: wp.array     # float32 (cap, boxes)

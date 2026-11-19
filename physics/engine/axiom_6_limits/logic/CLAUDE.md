@@ -2,8 +2,8 @@
 
 `make.py`: every box of the own joints, after `squeeze`. `tear.py`: what the leak tears off, first in a step, on the host. `collapse.py`: joints past the limit, right after, on the host.
 
-- A joint's quanta never fall; at a collapse they flip: minus lost is plus gained (`store.flipped`).
-- Emptied slots stay in the own set, holding nothing.
+- A joint's quanta never fall; at a collapse they flip where they stand: minus lost is plus gained (`store.flipped`).
+- A collapse touches one cell, the joint. No slot is emptied, no number pooled, no neighbour moved.
+- The limit reads the pull of the step before: a collapse spreads a cell a step at most.
 - Plus lost at a tear is minus gained, to the quantum.
-- No joint is made but here: one wherever a new volume shares a side with a volume.
-- Each new cell is laid as whole ring whirls of its total.
+- Each new cell is laid as whole ring whirls.
