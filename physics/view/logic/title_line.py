@@ -5,6 +5,7 @@ from physics.engine.axiom_3_structure.definitions.kinds import QUANTA_A_BOX
 from physics.engine.axiom_3_structure.definitions.places import steps_of
 from physics.engine.axiom_3_structure.definitions.store import Store, peek, slot_of
 from physics.engine.axiom_3_structure.logic.boxes_of import swirl_of
+from physics.view.logic.placed import joined
 
 
 def title_line(store: Store) -> str:
@@ -37,3 +38,20 @@ def cells_title(store: Store) -> str:
     return (f"{layers}{volumes.size} volumes {_sizes(volumes, calm)}{blue}  "
             f"plus {held[held > 0].sum():,}  minus {joints.sum():,}  "
             f"made {store.cell_made.numpy().sum():,}  step {store.step}")
+
+
+def squeeze_read(store: Store, middle: np.ndarray) -> str:
+    """The squeeze as numbers, in calm sizes: how far apart two joined reds stand and how thick
+    the joint between them is, round the first volume and in the outermost layer; and how far
+    the drawn distances are off the engine's (the root of the mean square, in a hundred)."""
+    size, joints, _volumes, apart = joined(store)
+    if len(middle) != len(size) or not len(joints):
+        return ""
+    cell, before, after, _axis = joints.T
+    out = np.abs(steps_of(cell, store.side) - store.side // 2).max(axis=1)  # steps from the first
+    thick = apart - (size[before] + size[after]) / 2
+    drawn = np.linalg.norm(middle[after] - middle[before], axis=1) / apart
+    centre, rim = out <= 2, out >= out.max() - 1
+    return (f"  red to red: centre {np.median(apart[centre]):.2g} rim {np.median(apart[rim]):.2g}"
+            f"  joint thick: centre {np.median(thick[centre]):.2g} rim {np.median(thick[rim]):.2g}"
+            f"  drawn off {100 * np.sqrt(np.nanmean((drawn - 1) ** 2)):.0f}%")

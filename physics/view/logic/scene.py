@@ -2,8 +2,7 @@
 a blue joint and a red volume in a line; `grow` one volume whose leak tears off layer after
 layer of new volumes round it; `lumps` a small grown patch with two fuller regions.
 Every cell is drawn as wide as its size where its joints put it (`placed.py`). A growing
-cluster is drawn whole while it is `WHOLE_UP_TO` cells or fewer; beyond that only its flat
-cut, the middle layer across the third direction, and no tracer that left it (`strays.py`).
+cluster above `WHOLE_UP_TO` cells shows only its flat cut, the middle layer (`strays.py`).
 """
 from dataclasses import dataclass, field
 from functools import partial
@@ -20,7 +19,7 @@ from physics.view.logic.lay_tracers import move_into, shown, trace  # noqa: F401
 from physics.view.logic.line_streaks import line_streaks
 from physics.view.logic.placed import placed, settle
 from physics.view.logic.strays import bring_back
-from physics.view.logic.title_line import cells_title, title_line
+from physics.view.logic.title_line import cells_title, squeeze_read, title_line
 from physics.view.logic.tracers import MARK_EVERY, Tracers, step_carrying
 
 SCENES = {"one": one_cell, "crossing": three_cells, "grow": partial(first_volume, layers=12), "lumps": two_lumps}
@@ -60,7 +59,7 @@ def drawn(store: Store, seen: Seen) -> wp.array:
         move_into(store, seen.tracers, seen.traced[0], shown(store, flat))
     seen.traced = (store.count, flat)
     bring_back(store, seen.tracers, shown(store, flat))
-    seen.middle, size, joints, volumes = settle(store, seen.middle)
+    seen.middle, size, joints, volumes, _apart = settle(store, seen.middle)
     reach = (np.abs(seen.middle[volumes]) + size[volumes, None] / 2).max() / FITS
     seen.span = reach if store.leaks else max(1.0, reach)
     return line_streaks(seen.tracers, store.across,
@@ -72,7 +71,8 @@ def title(store: Store, seen: Seen = None) -> str:
     if store.side == 0:
         return title_line(store)
     flat = "  flat cut through the middle (C: whole)" if seen and cut(store, seen) else ""
-    return cells_title(store) + (f"  drawn 1 : {seen.span:.3g}{flat}" if seen else "")
+    read = squeeze_read(store, seen.middle) if seen else ""
+    return cells_title(store) + read + (f"  drawn 1 : {seen.span:.3g}{flat}" if seen else "")
 
 
 def eye_distance(store: Store) -> float:
