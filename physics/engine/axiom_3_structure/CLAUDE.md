@@ -2,13 +2,10 @@
 
 > A cell has no geometry of its own, only relations to its neighbours and a size set by its energy alone.
 
-Built: storage, size law, relations: a joint names its two volumes, its axis and its part of each one's side. Only a tear adds one.
+Built: storage, size law, places: a cell's number is its steps along the three directions, volumes at even steps, a joint at the odd step between its two. Bookkeeping only: empty until a leak makes a cell there.
 
-Assumed (the owner has not ruled):
+Assumed:
 - A volume is round; a joint fills the room between its two.
-- A tear's halves keep their parent's frame.
-- A joint cut by a tear keeps half of the other volume's side.
 - A calm volume holds 3,000 quanta a box.
-- The first volume holds half a calm volume's quanta less one: the least overstretched.
-
-Not right: a relation takes 44 bytes a cell.
+- The first volume holds 2 to the power 30 quanta (1,657 calm volumes): half of what a cell's number can hold.
+- Past the store's room the growth stops.

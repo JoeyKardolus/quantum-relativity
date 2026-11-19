@@ -1,9 +1,10 @@
 # Axiom 6, logic
 
-`make.py`: one launch over every box of the own joints, after `squeeze`. `tear.py`: finds and tears, on the host, first in a step. `cut.py`: hands the torn volume's joints to its halves, cuts those along its side, makes the new cells.
+`make.py`: one launch over every box of the own joints, after `squeeze`. `tear.py`: `torn` finds what the leak tears off, `tear` makes the cells, first in a step, on the host.
 
-- A joint's quanta never fall, but by a cut, which shares them between its two parts.
-- Plus lost at a tear is minus gained, to the quantum; a cut changes no total.
-- Every direction is read before any volume tears, so the order of the tears does not matter.
-- Each half and each cut part is laid as a whole ball whirl of its total.
+- A joint's quanta never fall.
+- Plus lost at a tear is minus gained, to the quantum.
+- All places that tear in one step are found before any is made, so their order does not matter.
+- No joint is made but here: one wherever a new volume shares a side with a volume.
+- Each new cell is laid as a whole ball whirl of its total, by its place.
 - `make` reads the squeeze from `own_squeeze`, never from the joint's total.

@@ -5,7 +5,8 @@ import pytest
 from physics.engine import one_cell
 from physics.view.definitions.camera import FARTHEST, NEAREST
 from physics.view.logic.scene import Seen, drawn as marks
-from physics.view.logic.tracers import MARK_EVERY, MARKS, lay_tracers, step_carrying
+from physics.view.logic.lay_tracers import lay_tracers
+from physics.view.logic.tracers import MARK_EVERY, MARKS, step_carrying
 
 pyglet = pytest.importorskip("pyglet")
 

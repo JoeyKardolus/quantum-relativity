@@ -4,7 +4,7 @@ The course is counted in turns of a calm swirl, the cell's own time (a step is n
 """
 import numpy as np
 
-from physics.engine import step, three_cells
+from physics.engine import line_cells, step, three_cells
 
 
 def _course(across: int) -> np.ndarray:
@@ -14,7 +14,7 @@ def _course(across: int) -> np.ndarray:
     for moment in (0.5, 1.0):
         while store.step < round(moment * a_turn):
             step(store)
-        seen.append(store.cell_quanta.numpy() / (3000 * across ** 3))
+        seen.append(store.cell_quanta.numpy()[list(line_cells())] / (3000 * across ** 3))
     return np.array(seen)
 
 

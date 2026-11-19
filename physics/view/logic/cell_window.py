@@ -1,10 +1,10 @@
 """Cell window: the window on a scene and its keys.
 
 Space stops and starts, R lays a fresh start, drag turns the view, the wheel zooms, Esc
-quits; X, Y and Z look along the first, second and third direction. Several cells: C goes
-from the joints drawn whole to the joints cut along their length, a web between the balls
-seen turned, and back. One cell: G sends it to calm or takes it own again. The fluid steps
-`TICKS` times a second.
+quits; X, Y and Z look along the first, second and third direction. A growing cluster: C
+goes from the whole cluster to its flat cut through the middle and back. One cell: G sends
+it to calm or takes it own again. The fluid steps `TICKS` times a second; a cluster that
+has filled its store's room stops, and R starts it again.
 """
 import pyglet
 from pyglet.window import key
@@ -14,7 +14,7 @@ from physics.engine.axiom_3_structure.logic.boxes_of import boxes_of
 from physics.engine.axiom_3_structure.logic.give_back import give_back
 from physics.engine.axiom_3_structure.logic.take_own import take_own
 from physics.view.definitions.camera import ALONG, PITCH, YAW, zoomed
-from physics.view.logic.scene import SCENES, Seen, advance, drawn, eye_distance, title, trace
+from physics.view.logic.scene import SCENES, Seen, advance, cut, drawn, eye_distance, title, trace
 from physics.view.logic.swirl_painter import SwirlPainter
 from physics.view.logic.tracers import MARKS
 
@@ -25,10 +25,10 @@ class CellWindow(pyglet.window.Window):
     def __init__(self, across: int, speed: int, device: str, scene: str = "one"):
         super().__init__(1000, 800, resizable=True, vsync=False, caption="energy")
         self.fresh = lambda: SCENES[scene](across, device=device)
-        self.speed, self.running, self.web = speed, True, False
+        self.speed, self.running = speed, True
         self.lay()
         self.painter = SwirlPainter(MARKS, self.seen.tracers.tail.shape[1])
-        self.alone = self.store.cell_quanta.shape[0] == 1
+        self.alone = self.store.side == 0
         self.yaw, self.pitch = (YAW, PITCH) if self.alone else ALONG[2]
         self.distance = eye_distance(self.store)
         pyglet.clock.schedule_interval(self.tick, 1 / TICKS)
@@ -40,9 +40,12 @@ class CellWindow(pyglet.window.Window):
         self.seen, self.boxes = Seen(trace(self.store)), boxes_of(self.store, 0)
 
     def tick(self, _elapsed: float) -> None:
-        for _ in range(self.speed if self.running else 0):
-            advance(self.store, self.seen, self.boxes)
-        self.painter.load(drawn(self.store, self.seen, self.web))
+        try:
+            for _ in range(self.speed if self.running else 0):
+                advance(self.store, self.seen, self.boxes)
+        except RuntimeError as full:  # the store's room is full
+            self.running = print(full) or False
+        self.painter.load(drawn(self.store, self.seen))
 
     def retitle(self, _elapsed: float) -> None:
         stopped = "" if self.running else "  (stopped: Space)"
@@ -61,9 +64,8 @@ class CellWindow(pyglet.window.Window):
             return self.close()
         elif symbol == key.G and self.alone:
             (take_own if slot_of(self.store, 0) < 0 else give_back)(self.store, 0)
-        elif symbol == key.C and not self.alone:
-            self.web = not self.web
-            self.yaw, self.pitch = (YAW, PITCH) if self.web else ALONG[2]
+        elif symbol == key.C:
+            self.seen.whole = cut(self.store, self.seen)
         elif symbol == key.R:
             self.lay()
         self.boxes = boxes_of(self.store, 0)  # asked once a key: a calm cell's cost a frame

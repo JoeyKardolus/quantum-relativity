@@ -1,6 +1,6 @@
 """Tracers: dots of fluid that the cells' own flow carries, each with the way it came.
 
-A tracer starts in a box drawn by its quanta, so the dots lie as the fluid lies. Before
+A tracer starts in a box drawn by its quanta (`lay_tracers.py`). Before
 each of a step's six passes it moves with the fluid of its box and that box's partner:
 the engine's own pair rotation says how much crosses between the two, and the tracer
 keeps as much of their fluid behind it as it had. Fluid that stands still moves no dot.
@@ -8,7 +8,6 @@ With several cells a place's second number says which slot's cell: `across` a sl
 """
 from dataclasses import dataclass
 
-import numpy as np
 import warp as wp
 
 from physics.engine import step
@@ -52,19 +51,6 @@ def _carry(quanta: wp.array2d(dtype=wp.int32), phase: wp.array2d(dtype=wp.float3
                                              float(high_has), stays)
     place[1] += float(cell * across)
     tail[write_row, tracer] = place
-
-
-def lay_tracers(store, cell: int, count: int = COUNT, seed: int = 1, cells: int = 1,
-                shown=1) -> Tracers:
-    """`count` tracers at rest in `cells` cells from `cell` on, by the quanta of boxes `shown`."""
-    box_quanta, _phase, slot = boxes_of(store, cell)
-    quanta = (np.abs(box_quanta[slot:slot + cells].numpy()) * shown).ravel()
-    chance = np.random.default_rng(seed)
-    boxes = chance.choice(quanta.size, size=count, p=quanta / quanta.sum())
-    corner = np.stack(np.unravel_index(boxes % store.across ** 3, (store.across,) * 3), axis=1)
-    place = (corner + chance.random((count, 3))).astype(np.float32)
-    place[:, 1] += (boxes // store.across ** 3) * store.across  # the cell's place in the line
-    return Tracers(wp.array(np.tile(place, (MARKS, 1, 1)), dtype=wp.vec3, device=box_quanta.device))
 
 
 def step_carrying(store, tracers: Tracers, cell: int, mark: bool, boxes: tuple = None,

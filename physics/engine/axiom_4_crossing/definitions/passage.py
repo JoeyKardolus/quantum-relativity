@@ -17,16 +17,7 @@ import warp as wp
 
 from physics.engine.axiom_1_energy.definitions.pair_rotation import TURN
 from physics.engine.axiom_3_structure.definitions.kinds import ACROSS
-
-
-@wp.func
-def stride_of(across: wp.int32, axis: wp.int32) -> wp.int32:
-    """How far apart in a block two boxes lie that follow each other along `axis` (0, 1 or 2)."""
-    if axis == 0:
-        return across * across
-    if axis == 1:
-        return across
-    return 1
+from physics.engine.axiom_3_structure.definitions.places import stride_of  # noqa: F401, handed on
 
 
 @wp.func

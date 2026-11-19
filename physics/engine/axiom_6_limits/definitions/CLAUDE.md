@@ -1,7 +1,7 @@
 # Axiom 6, definitions
 
-`overstretched.py`: `TEAR_SIZE`, `least_whirl`, `spread` and `torn_across` (where a volume tears), `half_round`.
+`least_whirl.py`: `least_whirl` (the fewest quanta that are a whirl) and `PARTS` (7: a volume and its six sides).
 
-- `TEAR_SIZE` was chosen with its reason before any run. Never move it to make a picture or a test look right; a fit may search it.
-- `least_whirl` is counted at the least boxes across, so it is the same share of a cell at any boxes.
-- Nothing here brakes the tearing: a volume that is overstretched, a turn old and whose halves are whirls tears.
+- `least_whirl` is counted at the least boxes across, so it is the same share of a cell at any boxes: 1/60 of a calm volume.
+- `PARTS` is no setting: it counts a volume's sides.
+- Nothing here brakes the growth. It slows when the outer volumes hold too little for their leak to gather seven least whirls at a place.

@@ -1,14 +1,15 @@
-"""Starts: the stores a scene begins from. Nothing here lays a grid: joints come by tears.
+"""Starts: the stores a scene begins from. Nothing here lays a grid: joints come by the leak's tears.
 
 `calm_cells` lays cells as rules, `one_cell` one cell with its own boxes, `three_cells` the
-crossing scene's volume, joint and volume, `first_volume` one overstretched volume alone.
+crossing bench's volume, joint and volume (nothing leaks there); `first_volume.py` has the
+one volume a universe grows from.
 """
 import warp as wp
 
 from physics.engine.axiom_2_swirls.definitions.standing_mode import standing_mode
-from physics.engine.axiom_2_swirls.definitions.swirl_pattern import swirl_patterns
+from physics.engine.axiom_2_swirls.definitions.swirl_pattern import laid_at, swirl_patterns
 from physics.engine.axiom_3_structure.definitions.kinds import ACROSS, QUANTA_A_BOX
-from physics.engine.axiom_3_structure.definitions.relations import join
+from physics.engine.axiom_3_structure.definitions.places import steps_of
 from physics.engine.axiom_3_structure.definitions.store import TILE, Store, put
 from physics.engine.axiom_3_structure.logic.take_own import take_own
 
@@ -24,13 +25,10 @@ def calm_cells(cells: int, own_cap: int, across: int = ACROSS, laid: int = 0, se
     boxes = across ** 3
     with wp.ScopedDevice(device):
         return Store(
-            across=across, seed=seed, turn_per_step=2 * standing_mode(across)[1], cells=cells,
+            across=across, seed=seed, turn_per_step=2 * standing_mode(across)[1],
             cell_quanta=wp.full(cells, QUANTA_A_BOX * boxes, dtype=wp.int32),
             cell_laid=wp.full(cells, laid, dtype=wp.uint8),
             cell_made=wp.zeros(cells, dtype=wp.int32),
-            cell_born=wp.zeros(cells, dtype=wp.int32),
-            joint_ends=wp.full(cells, wp.vec3i(-1, -1, -1), dtype=wp.vec3i),
-            joint_part=wp.zeros((cells, 2), dtype=wp.vec4),
             tile_home=wp.full(tiles, -1, dtype=wp.int32),
             tile_slots=wp.full(rows * TILE, -1, dtype=wp.int32),
             own_cell=wp.full(own_cap, -1, dtype=wp.int32),
@@ -53,24 +51,19 @@ def one_cell(across: int = ACROSS, seed: int = 1, device: str = "cpu") -> Store:
 LINE_PARTS = (3, -2, 1)  # halves of a calm volume's quanta: volume A, the joint, volume B
 
 
+def line_cells(along: int = 1) -> tuple:
+    """The numbers of `three_cells`' volume A, joint and volume B: 0, 1 and 2 steps along `along`."""
+    return tuple(steps * 3 ** (2 - along) for steps in range(3))
+
+
 def three_cells(across: int = ACROSS, seed: int = 1, device: str = "cpu",
                 parts: tuple = LINE_PARTS, along: int = 1) -> Store:
     """A volume, a joint and a volume in a line along direction `along`, each with its own boxes."""
-    store = calm_cells(3, 3, across, seed=seed, device=device)
-    for cell, halves in enumerate(parts):
-        put(store.cell_quanta, cell, halves * QUANTA_A_BOX * across ** 3 // 2)
-        put(store.cell_laid, cell, cell // 2 * (along + 1))  # B: A turned half round about the line
-        take_own(store, cell)
-    join(store, 1, 0, 2, along)
-    return store
-
-
-def first_volume(across: int = ACROSS, seed: int = 1, device: str = "cpu", room: int = 2048) -> Store:
-    """One energy volume and no joint: the least overstretched there is, half a calm volume's
-    quanta less one (`TEAR_SIZE` is 2). Room for `room` cells; the rest come by tears."""
-    store = calm_cells(room, room, across, seed=seed, device=device)
+    store = calm_cells(27, 3, across, seed=seed, device=device)
+    store.side = 3
     store.cell_quanta.zero_()
-    put(store.cell_quanta, 0, QUANTA_A_BOX * across ** 3 // 2 - 1)
-    store.cells = 1
-    take_own(store, 0)
+    for cell, halves in zip(line_cells(along), parts):
+        put(store.cell_quanta, cell, halves * QUANTA_A_BOX * across ** 3 // 2)
+        put(store.cell_laid, cell, laid_at(steps_of(cell, 3)))  # B: A half round about the line
+        take_own(store, cell)
     return store

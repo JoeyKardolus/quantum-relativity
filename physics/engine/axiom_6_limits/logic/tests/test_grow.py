@@ -1,56 +1,79 @@
-"""The universe grows from one volume: every joint made by a tear or the cut of one, each
-between two volumes, the books exact at every step, the same seed the same growth."""
+"""The universe grows from one volume, layer by layer: the leak tears off 26 volumes round it,
+then the next layer; every joint lies between two volumes, the books are exact at every step."""
 import numpy as np
+import pytest
 
-from physics.engine import first_volume, step, three_cells
-from physics.engine.axiom_6_limits.logic.tests.test_tear import _books, _joints_lie_between_two_volumes
-
-
-def test_a_volume_no_bigger_than_the_limit_or_too_young_does_not_tear():
-    store = three_cells(parts=(3, 0, 1))  # the emptier one is exactly twice a calm volume's size
-    for _ in range(100):
-        step(store)
-    assert store.tears == 0 and store.cells == 3
-    grows = first_volume()
-    for _ in range(46):
-        step(grows)
-    assert grows.tears == 0  # a tear takes a turn of the whirl: 46.3 steps at 6 across
-    step(grows)
-    step(grows)
-    assert grows.tears == 1
+from physics.engine import first_volume, step
+from physics.engine.axiom_3_structure.definitions.places import steps_of
 
 
-def _grown(seed: int = 1, steps: int = 190):
-    """The universe from one volume through four turns of a whirl, checked at every step."""
-    store = first_volume(seed=seed)
-    for _ in range(steps):
-        tears, (plus, minus), made = store.tears, _books(store), int(store.cell_made.numpy().sum())
-        step(store)
-        after_plus, after_minus = _books(store)
-        assert plus + minus + int(store.cell_made.numpy().sum()) - made == after_plus + after_minus
-        assert (after_plus < plus) == (store.tears > tears)  # plus only falls, and only by a tear
-        _joints_lie_between_two_volumes(store)
-    return store
+def _cells(store) -> tuple:
+    """Every place's quanta, the own volumes and the own joints."""
+    held, own = store.cell_quanta.numpy().astype(np.int64), store.own_cell.numpy()[:store.count]
+    boxes = store.box_quanta.numpy()[:store.count].astype(np.int64).sum(axis=1)
+    assert (boxes == held[own]).all()  # each cell's total is its boxes'
+    return held, own[held[own] > 0], own[held[own] < 0]
 
 
-def test_four_generations_grow_from_one_volume_with_exact_books_and_no_joint_but_by_a_tear():
-    store = _grown()
-    held = store.cell_quanta.numpy()[:store.cells]
-    assert store.tears >= 7 and (held > 0).sum() == store.tears + 1 and store.cuts > 0
-    print(f"{(held > 0).sum()} volumes, {(held < 0).sum()} joints after {store.step} steps")
+def _layers(store, volumes: np.ndarray) -> np.ndarray:
+    """How many layers out from the first volume each volume lies."""
+    return np.abs(steps_of(volumes, store.side) - store.side // 2).max(axis=1) // 2
 
 
-def test_the_same_seed_gives_the_same_growth():
-    first, again, other = _grown(1, 150), _grown(1, 150), _grown(2, 150)
-    assert first.cells == again.cells > 3
-    assert np.array_equal(first.box_quanta.numpy(), again.box_quanta.numpy())
-    assert np.array_equal(first.joint_ends.numpy(), again.joint_ends.numpy())
-    assert not np.array_equal(first.box_quanta.numpy()[:3], other.box_quanta.numpy()[:3])
+def _checked_step(store) -> tuple:
+    """One step, its books and its pattern checked; the volumes and joints after it."""
+    before, made = _cells(store)[0], int(store.cell_made.numpy().sum())
+    step(store)
+    held, volumes, joints = _cells(store)
+    made = int(store.cell_made.numpy().sum()) - made
+    flipped = before[before > 0].sum() - held[held > 0].sum()
+    assert flipped >= 0 and held[held < 0].sum() == before[before < 0].sum() - flipped - made
+    axis = np.argmax(steps_of(joints, store.side) % 2, axis=1)  # a joint's one odd step
+    assert (steps_of(joints, store.side) % 2).sum() == len(joints) == (held < 0).sum()
+    stands = np.isin(np.arange(held.size), volumes)
+    apart = store.side ** (2 - axis)
+    assert stands[joints - apart].all() and stands[joints + apart].all()  # between two volumes
+    pairs = sum(int((stands[volumes] & stands[volumes + 2 * store.side ** way]).sum()) for way in range(3))
+    assert pairs == len(joints)  # a joint wherever two volumes share a side, and nowhere else
+    return volumes, joints
 
 
-def test_the_word_for_what_friction_was_once_booked_as_is_gone_from_the_code():
-    from pathlib import Path
-    code = Path(__file__).parents[4]  # physics/
-    named = [str(file) for file in code.rglob("*.py")
-             if "he" + "at" in file.read_text().lower() and "site-packages" not in str(file)]
-    assert named == []
+def _grown(seed: int = 1, layers: int = 3, laid: int = 0):
+    """A universe grown until a volume stands `layers` layers out, checked at every step."""
+    store, seen = first_volume(seed=seed, layers=layers + 1), {}
+    if laid:
+        from physics.engine.axiom_3_structure.logic.take_own import lay
+        store.cell_laid.fill_(laid)
+        lay(store, store.own_cell, 0, 1, store.box_quanta, store.box_phase)
+    while store.step < 400:
+        volumes, joints = _checked_step(store)
+        if len(volumes) == 27 and "layer" not in seen:
+            seen["layer"] = (store.step, volumes, joints, _layers(store, volumes))
+        if _layers(store, volumes).max() == layers:
+            return store, seen
+    raise AssertionError("no third layer in 400 steps")
+
+
+grown = pytest.fixture(scope="module")(lambda: _grown())
+
+
+def test_a_lone_volume_sheds_a_full_layer_of_26_volumes_with_a_joint_wherever_two_share_a_side(grown):
+    store, seen = grown
+    at, volumes, joints, layers = seen["layer"]
+    middle = store.side ** 3 // 2
+    assert sorted(layers) == [0] + [1] * 26 and len(joints) == 54
+    assert sum(abs(joint - middle) in (1, store.side, store.side ** 2) for joint in joints) == 6
+    print(f"the first layer stands whole at step {at}: {at * store.turn_per_step / 2 / np.pi:.1f} turns")
+
+
+def test_the_layer_forms_the_same_from_a_start_turned_half_round():
+    store, seen = _grown(layers=2, laid=1)
+    assert len(seen["layer"][1]) == 27 and len(seen["layer"][2]) == 54
+
+
+def test_three_layers_grow_with_exact_books_and_the_outermost_cells_are_volumes(grown):
+    store, _seen = grown
+    held, volumes, joints = _cells(store)
+    reach = np.abs(steps_of(np.concatenate([volumes, joints]), store.side) - store.side // 2).max()
+    assert reach == 6 and len(volumes) > 100  # six steps out: a volume's place, the third layer
+    assert held[held > 0].sum() - held[held < 0].sum() == 2 ** 30 + store.cell_made.numpy().sum()

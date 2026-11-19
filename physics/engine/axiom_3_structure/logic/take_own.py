@@ -3,12 +3,12 @@
 The cell takes the next free slot. Each box gets its whole share of the total rounded
 down, then the left-over quanta go one each from box 0 up, so the boxes sum to the
 total to the quantum. The phase is the pattern's, turned on by the steps so far.
-`lay` deals any number of cells in one launch; `take_own` is one cell from the host.
+`lay` deals any number of cells in one launch; `take_all` takes many from the host.
 """
 import warp as wp
 
 from physics.engine.axiom_2_swirls.definitions.swirl_pattern import dealt
-from physics.engine.axiom_3_structure.definitions.store import TILE, Store, entry_of, peek, put
+from physics.engine.axiom_3_structure.definitions.store import TILE, Store, slot_of
 
 wp.set_module_options({"fuse_fp": False})
 
@@ -44,19 +44,24 @@ def lay(store: Store, own_cell: wp.array, first: int, number: int,
                       store.cell_quanta, store.cell_laid, store.pattern, box_quanta, box_phase])
 
 
+def take_all(store: Store, cells: list) -> None:
+    """Give calm cells their own boxes, the next free slots in the order given, in one launch."""
+    home, slots, own = (kept.numpy() for kept in (store.tile_home, store.tile_slots, store.own_cell))
+    if store.count + len(cells) > len(own):
+        raise RuntimeError(f"the own set is full: {store.count} cells hold their own boxes")
+    for slot, cell in enumerate(cells, store.count):
+        if home[cell // TILE] < 0 and store.open_tiles * TILE == len(slots):
+            raise RuntimeError(f"the tile rows are full: {store.open_tiles} tiles hold own cells")
+        if home[cell // TILE] < 0:
+            home[cell // TILE], store.open_tiles = store.open_tiles, store.open_tiles + 1
+        slots[home[cell // TILE] * TILE + cell % TILE], own[slot] = slot, cell
+    for kept, now in ((store.tile_home, home), (store.tile_slots, slots), (store.own_cell, own)):
+        kept.assign(now)
+    lay(store, store.own_cell, store.count, len(cells), store.box_quanta, store.box_phase)
+    store.count += len(cells)
+
+
 def take_own(store: Store, cell: int) -> None:
     """Give a calm cell its own boxes; an own cell is left as it is."""
-    entry = entry_of(store, cell)
-    if entry >= 0 and peek(store.tile_slots, entry) >= 0:
-        return
-    if store.count == store.own_cell.shape[0]:
-        raise RuntimeError(f"the own set is full: {store.count} cells hold their own boxes")
-    if entry < 0 and store.open_tiles * TILE == store.tile_slots.shape[0]:
-        raise RuntimeError(f"the tile rows are full: {store.open_tiles} tiles hold own cells")
-    if entry < 0:
-        put(store.tile_home, cell // TILE, store.open_tiles)
-        store.open_tiles += 1
-    put(store.tile_slots, entry_of(store, cell), store.count)
-    put(store.own_cell, store.count, cell)
-    lay(store, store.own_cell, store.count, 1, store.box_quanta, store.box_phase)
-    store.count += 1
+    if slot_of(store, cell) < 0:
+        take_all(store, [cell])

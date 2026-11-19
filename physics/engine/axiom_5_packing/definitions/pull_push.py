@@ -64,17 +64,14 @@ def given(squeeze: wp.vec4d, a_turn: wp.float64) -> wp.float64:
 @wp.func
 def pressed(box_quanta: wp.array2d(dtype=wp.int32), cell_quanta: wp.array(dtype=wp.int32),
             tile_home: wp.array(dtype=wp.int32), tile_slots: wp.array(dtype=wp.int32),
-            ends: wp.vec3i, faces: wp.vec2i) -> wp.float64:
-    """How hard the two volumes' fluid presses on one row of a joint: 1 is their mean.
+            ends: wp.vec2i, faces: wp.vec2i) -> wp.float64:
+    """How hard the two volumes `ends` press on one row of their joint: 1 is their mean.
 
     The plus quanta of the two boxes `faces` that face each other across the row, each over
-    its volume's mean box; a volume none of whose boxes faces the row presses by its mean.
+    its volume's mean box.
     """
     press = wp.float64(0.0)
     for end in range(2):
-        share = wp.float64(1.0 / float(box_quanta.shape[1]))
-        if faces[end] >= 0:
-            share = (wp.float64(box_quanta[slot_at(tile_home, tile_slots, ends[end]), faces[end]])
-                     / wp.float64(cell_quanta[ends[end]]))
-        press += share
+        press += (wp.float64(box_quanta[slot_at(tile_home, tile_slots, ends[end]), faces[end]])
+                  / wp.float64(cell_quanta[ends[end]]))
     return wp.float64(0.5 * float(box_quanta.shape[1])) * press

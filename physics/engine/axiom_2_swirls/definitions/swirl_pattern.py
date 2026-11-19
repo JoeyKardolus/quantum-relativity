@@ -8,6 +8,8 @@ three directions, and the phase goes once round each of those lines the same way
 whirl, the same seen along all three. Nothing else of this kind treats the three alike.
 (It is 0 on one long diagonal too, where the phase goes round the other way.)
 A cell is laid as it is (0) or turned half round about direction 0, 1 or 2 (1, 2, 3).
+Two volumes either side of a joint are laid half round about its line from each other, so
+their facing fluid agrees: `laid_at` gives every place its laying by that one rule.
 """
 import numpy as np
 import warp as wp
@@ -36,3 +38,18 @@ def swirl_patterns(across: int) -> np.ndarray:
 def dealt(total: wp.int32, share: wp.float64, boxes: wp.int32) -> wp.int32:
     """A box's whole share of its cell's total, rounded down."""
     return wp.int32(wp.floor(wp.float64(total) * share / wp.float64(boxes)))
+
+
+def half_round(laid: int, way: int) -> int:
+    """How a whirl laid `laid` lies once turned half round about direction `way`."""
+    return way + 1 if laid == 0 else 0 if laid == way + 1 else 5 - laid - way
+
+
+def laid_at(steps) -> int:
+    """How the whirl at a place is laid: half round about each direction along which it
+    lies an odd number of volumes on (a joint is laid as the volume before it)."""
+    laid = 0
+    for way in range(3):
+        if int(steps[way]) // 2 % 2:
+            laid = half_round(laid, way)
+    return laid

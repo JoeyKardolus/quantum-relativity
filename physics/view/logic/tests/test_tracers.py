@@ -4,7 +4,8 @@ import numpy as np
 from physics.engine import one_cell
 from physics.engine.axiom_3_structure.logic.boxes_of import boxes_of
 from physics.engine.axiom_3_structure.logic.give_back import give_back
-from physics.view.logic.tracers import lay_tracers, step_carrying
+from physics.view.logic.lay_tracers import lay_tracers
+from physics.view.logic.tracers import step_carrying
 
 
 def _round(tracers, across: int, axis: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

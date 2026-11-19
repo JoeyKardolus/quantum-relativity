@@ -10,7 +10,8 @@ import warp as wp
 
 from physics.engine.axiom_3_structure.definitions.store import Store
 from physics.engine.axiom_4_crossing.definitions.facing import faced
-from physics.engine.axiom_4_crossing.definitions.passage import row_of, stride_of
+from physics.engine.axiom_3_structure.definitions.places import joint_ends, stride_of
+from physics.engine.axiom_4_crossing.definitions.passage import row_of
 from physics.engine.axiom_5_packing.definitions.pull_push import given, pressed
 
 
@@ -23,8 +24,7 @@ def _turned(phase: wp.float32, turn: float) -> wp.float32:
 
 @wp.kernel
 def _press(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32),
-           tile_slots: wp.array(dtype=wp.int32), joint_ends: wp.array(dtype=wp.vec3i),
-           joint_part: wp.array2d(dtype=wp.vec4), across: wp.int32,
+           tile_slots: wp.array(dtype=wp.int32), side: wp.int32, across: wp.int32,
            a_turn: wp.float64, own_squeeze: wp.array(dtype=wp.vec4d),
            cell_quanta: wp.array(dtype=wp.int32),
            box_quanta: wp.array2d(dtype=wp.int32), box_phase: wp.array2d(dtype=wp.float32)):
@@ -36,8 +36,8 @@ def _press(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int3
     row = row_of(first, third, across, axis)        # the joint's box that faces the volume before
     last = row + (across - 1) * stride_of(across, axis)  # and the one that faces the one after
     turn = float(wp.float64(wp.tau) * gives * pressed(
-        box_quanta, cell_quanta, tile_home, tile_slots, joint_ends[joint],
-        faced(joint_part, joint, first, third, across, axis)))
+        box_quanta, cell_quanta, tile_home, tile_slots, joint_ends(joint, side, axis),
+        faced(row, across, axis)))
     box_phase[slot, row] = _turned(box_phase[slot, row], turn)
     box_phase[slot, last] = _turned(box_phase[slot, last], turn)
 
@@ -47,6 +47,6 @@ def press(store: Store) -> None:
     wp.launch(_press, dim=(store.count, store.across, store.across),
               device=store.box_quanta.device,
               inputs=[store.own_cell, store.tile_home, store.tile_slots,
-                      store.joint_ends, store.joint_part, store.across,
+                      store.side, store.across,
                       wp.float64(store.turn_per_step / (2.0 * wp.pi)), store.own_squeeze,
                       store.cell_quanta, store.box_quanta, store.box_phase])

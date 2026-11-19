@@ -1,10 +1,13 @@
 """Energy crosses a joint in whole quanta with exact books, only through minus, and still moving."""
 import numpy as np
 
-from physics.engine import step, three_cells
+from physics.engine import line_cells, step, three_cells
 from physics.engine.axiom_2_swirls.logic.read_swirl import flow_along
 from physics.engine.axiom_3_structure.logic.boxes_of import swirl_of
 from physics.engine.axiom_4_crossing.logic.cross import cross
+
+
+A, JOINT, B = line_cells()  # the three cells' numbers; their slots are 0, 1 and 2
 
 
 def _still(parts: tuple, a_phase=0.0):
@@ -24,8 +27,8 @@ def test_the_books_are_exact_over_2000_steps():
         step(store)
         held = store.box_quanta.numpy().astype(np.int64).sum(axis=1)
         assert held[0] + held[2] == 1_296_000
-        assert held[1] == -648_000 - store.cell_made.numpy()[1]  # the joint only makes
-        assert (held == store.cell_quanta.numpy()[:3]).all() and store.box_quanta.numpy()[[0, 2]].min() >= 0
+        assert held[1] == -648_000 - store.cell_made.numpy()[JOINT]  # the joint only makes
+        assert (held == store.cell_quanta.numpy()[[A, JOINT, B]]).all() and store.box_quanta.numpy()[[0, 2]].min() >= 0
     assert abs(held[0] - held[2]) < 0.01 * 1_296_000  # A 3 to B 1 has evened out
 
 
@@ -33,7 +36,7 @@ def test_nothing_crosses_where_no_joint_lies_between():
     store = three_cells(parts=(3, 0, 1))
     for _ in range(200):
         step(store)
-    assert store.cell_quanta.numpy().tolist() == [972_000, 0, 324_000]
+    assert store.cell_quanta.numpy()[[A, JOINT, B]].tolist() == [972_000, 0, 324_000]
 
 
 def test_equal_volumes_of_still_fluid_exchange_nothing():
@@ -62,8 +65,8 @@ def test_what_friction_holds_back_stays_in_the_volume_it_came_from():
         store = _still((3, joint, 1))
         cross(store)
         left = (4500 - store.box_quanta.numpy()[0].reshape(6, 6, 6)[:, 5, :]).ravel()
-        assert left.min() > 0 and left.sum() == store.cell_quanta.numpy()[2] - 324_000
-        assert store.cell_quanta.numpy()[[0, 2]].sum() == 1_296_000  # nothing goes anywhere else
+        assert left.min() > 0 and left.sum() == store.cell_quanta.numpy()[B] - 324_000
+        assert store.cell_quanta.numpy()[[A, B]].sum() == 1_296_000  # nothing goes anywhere else
         crossed[joint] = left.sum()
     assert crossed[-8] < 0.5 * crossed[-2]
 
@@ -72,6 +75,6 @@ def test_the_volumes_keep_their_whole_swirls_while_energy_crosses():
     store = three_cells()
     for _ in range(300):
         step(store)
-    left, right = swirl_of(store, 0), swirl_of(store, 2)
+    left, right = swirl_of(store, A), swirl_of(store, B)
     assert left["turns"] == (-1, -1, -1) and right["turns"] == (1, -1, 1)  # B: A half round the line
     assert left["core"] < 0.3 and right["core"] < 0.3

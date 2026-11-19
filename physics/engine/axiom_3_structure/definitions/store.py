@@ -1,10 +1,10 @@
 """Store: where every cell is kept, built so a billion cells fit one graphics card.
 
 A calm cell is a rule, not boxes: its whole signed total, how its ball whirl is laid (0, or
-1 to 3: turned half round about that direction), what it has made and the step it was made
-at, 13 bytes, and for a joint its two volumes (`relations.py`). Only a cell in the own set
-holds boxes, in a slot; slots in use are always `0 .. count - 1`. Two plain arrays find the
-slot. Cells `0 .. cells - 1` are in use; a tear takes the next.
+1 to 3: turned half round about that direction) and what it has made, 9 bytes. Only a cell
+in the own set holds boxes, in a slot; slots in use are always `0 .. count - 1`. Two plain
+arrays find the slot. With `side` above 0 a cell's number is its place (`places.py`); a
+place that holds plus quanta and no slot is leaked energy gathering, not yet a cell.
 """
 from dataclasses import dataclass
 
@@ -21,9 +21,6 @@ class Store:
     cell_quanta: wp.array   # int32 (cells)
     cell_laid: wp.array     # uint8 (cells)
     cell_made: wp.array     # int32 (cells): quanta a joint has made out of itself
-    cell_born: wp.array     # int32 (cells): the step a tear made the cell at
-    joint_ends: wp.array    # vec3i (cells): a joint's volume before, the one after, its axis
-    joint_part: wp.array    # vec4 (cells, 2): the part of each volume's side the joint lies on
     tile_home: wp.array     # int32 (cells / 512): the tile's row in tile_slots, -1: all calm
     tile_slots: wp.array    # int32 (tile rows * 512): the cell's slot, -1: calm
     own_cell: wp.array      # int32 (cap): which cell holds this slot
@@ -31,13 +28,12 @@ class Store:
     box_quanta: wp.array    # int32 (cap, boxes)
     box_phase: wp.array     # float32 (cap, boxes)
     pattern: wp.array       # vec2d (4, boxes): each box's share and phase in the four layings
-    cells: int = 0          # cells in use
+    side: int = 0           # places along a direction; 0: the cells keep no places
+    leaks: bool = False     # whether the volumes leak: only in a universe that grows
     step: int = 0
     count: int = 0          # slots in use
     open_tiles: int = 0     # tile rows in use
     ledger: int = 0         # quanta that changed box when cells went back to calm
-    tears: int = 0          # volumes torn so far, each making one joint
-    cuts: int = 0           # joints cut in two by a tear along their side
 
 
 @wp.func

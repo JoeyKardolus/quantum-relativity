@@ -1,57 +1,42 @@
-"""A tear makes two volumes and one joint with exact books; a joint along the side is cut in two."""
+"""What gathered at a free place tears off as a volume, a seventh flipped to minus for each joint."""
 import numpy as np
 
 from physics.engine import first_volume
-from physics.engine.axiom_3_structure.logic.boxes_of import swirl_of
-from physics.engine.axiom_3_structure.logic.give_back import whole_turns_laid
-from physics.engine.axiom_6_limits.logic.tear import tear_volume
+from physics.engine.axiom_3_structure.definitions.store import put
+from physics.engine.axiom_6_limits.definitions.least_whirl import PARTS, least_whirl
+from physics.engine.axiom_6_limits.logic.tear import tear, torn
 
 
-def _books(store) -> tuple:
-    """The plus and the minus quanta, each cell's total checked against its own boxes."""
-    held = store.cell_quanta.numpy()[:store.cells].astype(np.int64)
-    boxes = store.box_quanta.numpy()[:store.count].astype(np.int64).sum(axis=1)
-    assert (boxes == held[store.own_cell.numpy()[:store.count]]).all() and store.count == store.cells
-    return int(held[held > 0].sum()), int(-held[held < 0].sum())
+def test_a_place_tears_off_only_once_every_part_of_it_could_be_a_whirl():
+    store = first_volume(layers=2)
+    middle, enough = store.side ** 3 // 2, int(PARTS * least_whirl(6)) + 1
+    put(store.cell_quanta, middle + 2, enough - 1)
+    assert torn(store) == {}
+    put(store.cell_quanta, middle + 2, enough)
+    assert set(torn(store)) == {middle + 2, middle + 1}  # the volume, and its joint to the first
 
 
-def _joints_lie_between_two_volumes(store) -> None:
-    held, ends = store.cell_quanta.numpy()[:store.cells], store.joint_ends.numpy()[:store.cells]
-    joints = np.flatnonzero(held < 0)
-    assert len(joints) == store.tears + store.cuts and (held > 0).sum() == 1 + store.tears
-    assert (ends[held > 0] == -1).all() and (ends[joints, 2] >= 0).all()  # only joints name cells
-    assert (held[ends[joints, :2]] > 0).all() and (ends[joints, 0] != ends[joints, 1]).all()
-    parts = store.joint_part.numpy()[joints]
-    assert (parts[:, :, [1, 3]] > 0).all() and (parts[:, :, [0, 2]] + parts[:, :, [1, 3]] <= 1).all()
+def test_each_joint_is_a_seventh_of_the_new_volumes_either_side_and_plus_lost_is_minus_gained():
+    store = first_volume(layers=2)
+    middle, side = store.side ** 3 // 2, store.side
+    beside, corner, alone = middle + 2 * side, middle + 2 * side + 2, middle - 2 * side * side - 2
+    for place, gathered in ((beside, 700_000), (corner, 140_007), (alone, 80_000)):
+        put(store.cell_quanta, place, gathered)
+    made = torn(store)
+    assert made == {beside: 500_000, beside - side: -100_000,          # its joint to the first volume
+                    corner: 120_006, beside + 1: -100_000 - 20_001,    # both give to the joint between
+                    alone: 80_000}                                     # no volume beside it: no joint
+    assert sum(made.values()) + 2 * sum(-held for held in made.values() if held < 0) == 920_007
+    tear(store)
+    assert store.count == 6 and torn(store) == {}
+    boxes = store.box_quanta.numpy()[:6].astype(np.int64).sum(axis=1)
+    assert (boxes == store.cell_quanta.numpy()[store.own_cell.numpy()[:6]]).all()
+    assert store.cell_laid.numpy()[[beside, beside - side, corner, beside + 1]].tolist() == [2, 0, 1, 2]
 
 
-def test_a_tear_makes_two_volumes_and_one_joint_and_plus_lost_is_minus_gained():
-    store = first_volume()
-    plus, _none = _books(store)
-    assert tear_volume(store, 0, 2) and store.cells == 3 and store.tears == 1
-    halves, joint = _books(store)
-    assert plus - halves == joint > 0 and halves + joint == plus == 323_999
-    assert store.joint_ends.numpy()[:3].tolist() == [[-1, -1, -1], [-1, -1, -1], [0, 1, 2]]
-    assert abs(joint / plus - 0.1424) < 0.001  # the two layers at the tear, of a whole whirl
-    for half in (0, 1):  # each half a whole whirl again, the far one turned half round the line
-        laid = whole_turns_laid(int(store.cell_laid.numpy()[half]))
-        assert swirl_of(store, half)["turns"] == laid and swirl_of(store, half)["off_rule"] < 1
-    assert store.cell_laid.numpy()[:3].tolist() == [0, 3, 0]
-
-
-def test_a_joint_along_the_side_is_cut_in_two_keeping_its_minus():
-    store = first_volume()
-    tear_volume(store, 0, 2)
-    minus = _books(store)[1]
-    assert tear_volume(store, 0, 0) and store.cuts == 1 and store.cells == 6
-    _joints_lie_between_two_volumes(store)
-    ends, parts = store.joint_ends.numpy()[:6].tolist(), store.joint_part.numpy()[:6]
-    assert ends[2] == [0, 1, 2] and ends[5] == [3, 1, 2] and ends[4] == [0, 3, 0]  # 3: the far half
-    held = store.cell_quanta.numpy()
-    assert held[2] + held[5] == -minus and abs(held[2] - held[5]) < 0.01 * minus
-    assert parts[2].tolist() == [[0, 1, 0, 1], [0, 0.5, 0, 1]]  # half of the other volume's side
-    assert parts[5].tolist() == [[0, 1, 0, 1], [0.5, 0.5, 0, 1]]
-    assert tear_volume(store, 1, 0) and store.cuts == 1  # each part lies within one half: no cut
-    ends, parts = store.joint_ends.numpy()[:8].tolist(), store.joint_part.numpy()[:8]
-    assert ends[2] == [0, 1, 2] and ends[5] == [3, 6, 2] and (parts[[2, 5]] == [0, 1, 0, 1]).all()
-    _joints_lie_between_two_volumes(store)
+def test_a_volume_that_would_form_on_the_room_s_last_layer_stops_with_a_plain_message():
+    import pytest
+    store = first_volume(layers=1)
+    put(store.cell_quanta, store.side ** 3 // 2 + 2, 700_000)
+    with pytest.raises(RuntimeError, match="no room for another layer"):
+        tear(store)

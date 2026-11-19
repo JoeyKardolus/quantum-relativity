@@ -24,7 +24,7 @@ Everything in the simulation has to follow from these seven sentences, and from 
    with distance; squeezed minus pushes back steeply.
 6. **Limits**: a joint's energy rises only while it is squeezed, so a fresh joint is the fattest it will
    ever be and shrinks as it is squeezed; squeezed too far it collapses, its energy is taken off the
-   rest, and its two volumes merge; an overstretched plus tears, and only that cell splits.
+   rest, and its two volumes merge; a volume's leaking outside tears off as a layer of new volumes.
 7. **Quantum**: each box's fluid also carries a phase, so waves add and cancel. Moving energy can split
    over several routes at once. Every split gets a direct pull between its halves, private to them, and
    its own oscillation. When something reacts with a half, or the energy loses its momentum, it settles
@@ -44,8 +44,10 @@ Early, and started afresh on 2026-11-18: the engine before had grown too big and
 not work. The new one is small, built for a billion cells from the start, and grows in layers, each one
 something to look at. Built so far: one energy volume whose fluid turns as one whole swirl with an
 open core, every quantum counted exactly; energy crossing from volume to volume through a joint, and
-the squeeze; a universe that grows from one energy volume, which tears in two when overstretched, the
-tear becoming the joint, and tears again. Next: the pull spreading through the cells and the first gravity test; then a billion cells on one graphics card. Progress is tracked on
+the squeeze; a universe that grows from one energy volume, whose whirl leaks: what leaks tears off as a
+layer of new volumes all round it, with joints between, and those shed the next layer. Measured: it
+grows fast and then ever slower, not exponentially, and the first flood of energy breaks the whirls
+for a while. Next: the pull spreading through the cells and the first gravity test; then a billion cells on one graphics card. Progress is tracked on
 [issue #1](https://github.com/JoeyKardolus/quantum-relativity/issues/1).
 Misses are reported as misses; nothing is tuned to look good.
 
@@ -55,8 +57,8 @@ Misses are reported as misses; nothing is tuned to look good.
 uv sync --all-packages --all-extras --all-groups
 PYTHONPATH=. .venv/bin/python -m physics.view   # a window; Space starts, R resets, G calm/own, Esc quits
 PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing   # energy crossing from a volume through a joint into the next
-PYTHONPATH=. .venv/bin/python -m physics.view --scene grow       # one volume tears and grows into a cluster; X Y Z look along, C joints as a web
-PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, 25 seconds
+PYTHONPATH=. .venv/bin/python -m physics.view --scene grow       # one volume leaks and sheds layer after layer of new volumes; X Y Z look along, C whole or flat cut
+PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, 11 seconds
 ```
 
 Needs Linux or WSL2, Python 3.12+, [`uv`](https://docs.astral.sh/uv/) . The engine runs on
@@ -66,7 +68,7 @@ to the GPU by itself.
 | Path | What it is |
 |---|---|
 | `physics/engine/` | the engine, one directory per axiom (`axiom_1_energy` to `axiom_7_quantum`), each with its definitions, its logic and its tests; the layers so far fill the first six |
-| `physics/view/` | the window on one red energy volume with its swirl, on a volume, a blue joint and a volume with energy crossing, or on a cluster growing from one volume by tears; it can also save pictures |
+| `physics/view/` | the window on one red energy volume with its swirl, on a volume, a blue joint and a volume with energy crossing, or on a ball of cells growing layer by layer from one volume's leak; it can also save pictures |
 | `docs/bible.md` | how everything works; the theory is the chapter `physics/quantum-relativity` |
 
 ## Built with

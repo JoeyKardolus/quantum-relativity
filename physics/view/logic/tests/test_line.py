@@ -1,10 +1,11 @@
-"""Tracers cross a joint with the fluid; each cell is drawn where the relations put it."""
+"""Tracers cross a joint with the fluid; each cell is drawn where its joints put it."""
 import numpy as np
 
 from physics.engine import three_cells
 from physics.view.logic.line_streaks import AMOUNT, line_streaks
 from physics.view.logic.placed import placed, settle
-from physics.view.logic.tracers import lay_tracers, step_carrying
+from physics.view.logic.lay_tracers import lay_tracers
+from physics.view.logic.tracers import step_carrying
 
 
 def _cells(tracers) -> np.ndarray:
@@ -27,7 +28,7 @@ def test_tracers_go_from_the_fuller_volume_to_the_other_and_the_joint_keeps_its_
 
 def _placed(store):
     """The cells' shapes at their true sizes, settled from nothing."""
-    return placed(store, *settle(store, np.zeros((0, 3))), 1.0)
+    return placed(store, *settle(store, np.zeros((0, 3)))[:3], 1.0)
 
 
 def test_each_cell_is_drawn_at_its_place_the_joint_s_way_below_0():
