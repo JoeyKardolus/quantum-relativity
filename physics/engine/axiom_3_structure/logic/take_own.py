@@ -4,7 +4,8 @@ The cell takes the next free slot. Each box gets its whole share of the total ro
 down, then the left-over quanta go one each from box 0 up, so the boxes sum to the
 total to the quantum. The phase is the pattern's, turned on by the steps so far at the
 calm turn; what its quanta add starts from here (`turn.py`). A minus total is laid as the mirror.
-`lay` deals any number of cells in one launch; `take_all` takes many from the host.
+`lay` deals any number of cells in one launch; `take_all` takes many from the host (a
+scene's start); in a step the card seats what tears off (`seat.py`).
 """
 import warp as wp
 
@@ -14,14 +15,12 @@ from physics.engine.axiom_3_structure.definitions.store import TILE, Store, slot
 wp.set_module_options({"fuse_fp": False})
 
 
-@wp.kernel
-def _lay(own_cell: wp.array(dtype=wp.int32), first: wp.int32, turned: wp.float64,
-         cell_quanta: wp.array(dtype=wp.int64),
-         pattern: wp.array2d(dtype=wp.vec2d),
+@wp.func
+def deal(slot: wp.int32, held: wp.int64, turned: wp.float64, pattern: wp.array2d(dtype=wp.vec2d),
          box_quanta: wp.array2d(dtype=wp.int32), box_phase: wp.array2d(dtype=wp.float32)):
-    slot = first + wp.tid()
-    total = wp.abs(cell_quanta[own_cell[slot]])
-    laid = wp.int32(cell_quanta[own_cell[slot]] < wp.int64(0))  # a joint's whirl is a volume's in a mirror
+    """Deal `held` quanta into the boxes of `slot` as whole ring whirls, turning by their sign."""
+    total = wp.abs(held)
+    laid = wp.int32(held < wp.int64(0))  # a joint's whirl is a volume's in a mirror
     sign = 1 - 2 * laid  # a joint is dealt like a volume, in minus
     boxes = pattern.shape[1]
     left_over = total
@@ -35,6 +34,13 @@ def _lay(own_cell: wp.array(dtype=wp.int32), first: wp.int32, turned: wp.float64
         if wp.int64(box) < left_over:
             share += 1
         box_quanta[slot, box] = sign * share
+
+
+@wp.kernel
+def _lay(own_cell: wp.array(dtype=wp.int32), first: wp.int32, turned: wp.float64,
+         cell_quanta: wp.array(dtype=wp.int64), pattern: wp.array2d(dtype=wp.vec2d),
+         box_quanta: wp.array2d(dtype=wp.int32), box_phase: wp.array2d(dtype=wp.float32)):
+    deal(first + wp.tid(), cell_quanta[own_cell[first + wp.tid()]], turned, pattern, box_quanta, box_phase)
 
 
 def lay(store: Store, own_cell: wp.array, first: int, number: int,

@@ -27,7 +27,7 @@ def kept(path: Path, like: Store) -> Store:
             if isinstance(now, wp.array):
                 now.assign(held[name])
             elif name == "cell_past":
-                like.cell_past = wp.array(held[name], dtype=wp.float32, device="cpu")
+                like.cell_past = wp.array(held[name], dtype=wp.float32, device=like.box_quanta.device)
             else:
                 setattr(like, name, type(now)(held[name]))
     return like

@@ -5,7 +5,7 @@ import pytest
 from physics.engine.axiom_3_structure.definitions.places import steps_of
 from physics.engine.axiom_5_packing.logic.between import between, held_of
 from physics.engine.axiom_5_packing.logic.lumps import fuller
-from physics.engine.axiom_5_packing.logic.pull import pulls
+from physics.engine.axiom_5_packing.logic.pairs import pulls
 from physics.engine.axiom_5_packing.logic.staging import copy_of
 from physics.engine.axiom_6_limits.definitions.collapse_limit import TOP_SPEED
 

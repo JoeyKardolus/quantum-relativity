@@ -102,6 +102,19 @@ cell, not from one ring. The first volume now holds together: 1,651 calm volumes
 40, 1,640 at 108, losing only its leak, and the ball grows by the leak alone (a second layer from 23
 turns, a third at 108). Of its 111 volumes 84 are whole whirls (27 of 91 before).
 
+The engine now runs far forward, with no rule changed. Every part of a step runs on the graphics card
+(the tear, the collapse and the pull were done on the host before), and it is the same run to the
+quantum: 108 turns of growth give every number alike. Far volumes can be read as groups rather than one
+by one (a pull is then off by 1% of itself at most, measured on the run's own universe).
+Measured on the card: the grown ball steps 19 to 26 turns a second where it did 10 to 11, and a block of 4,096 volumes takes 19 to 37 ms a step where it took 1.7 s. A cell costs 3.0 kB, so 4.8 million fit in 14.5 GB. `--scene grow --far DIR` runs the universe with no window and keeps its state;
+`--from FILE` shows a kept state. One run of 38 minutes went 4,918 turns: 4,609 volumes in
+13 layers. What it shows: the first volume does not spread. It loses 0.06 to 0.07 calm volumes a
+turn, steadily, and still holds 1,320 of its 1,657 (91.4% of all plus energy); half would be gone
+at about 12,500 turns. What it gives does not fill the universe: 63% became joints at
+the tears, 25% waits at free places, and 12% is in the volumes round it,
+thousandths of a calm volume each. No lump forms, nothing falls, no joint collapses, about a
+hundred volumes are whole whirls, and nine in ten hold less than a least whirl.
+
 Not right yet: that ball is one packed volume in a thin halo. The first volume holds 1,640 of its 1,646
 calm volumes, the others a fiftieth of a calm volume each in cells 30 calm lengths wide. So in the ball
 (`--scene fall`, `dense`, `coast`) two regions made 4 times fuller do not draw together (3.18 volumes
@@ -122,11 +135,13 @@ uv sync --all-packages --all-extras --all-groups
 PYTHONPATH=. .venv/bin/python -m physics.view   # one cell; Up Down energy, F sign, 1 2 3 0 rings, Space, R, Esc
 PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing   # a volume, a joint, a volume: the leak passes slowly; M sets the first one's fluid going
 PYTHONPATH=. .venv/bin/python -m physics.view --scene grow       # one volume leaks and sheds layer after layer of new volumes; X Y Z look along, C whole or flat cut
+PYTHONPATH=. .venv/bin/python -m physics.view --scene grow --far DIR --minutes 40   # the same universe run far forward with no window: a log and kept states in DIR
+PYTHONPATH=. .venv/bin/python -m physics.view --scene grow --from DIR/last.npz      # watch a kept state of that run and step on from it
 PYTHONPATH=. .venv/bin/python -m physics.view --scene hole       # a packed middle collapses, keeps what it holds and takes in more
 PYTHONPATH=. .venv/bin/python -m physics.view --scene fall       # the grown ball, two regions made fuller (grown once, a minute, then kept)
 PYTHONPATH=. .venv/bin/python -m physics.view --scene dense      # the grown ball, one region made fuller
 PYTHONPATH=. .venv/bin/python -m physics.view --scene coast      # the same region set going
-PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, about 80 seconds
+PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, about two minutes
 ```
 
 Needs Linux or WSL2, Python 3.12+, [`uv`](https://docs.astral.sh/uv/) . The engine runs on

@@ -3,7 +3,10 @@
 A window on one energy volume; `--scene crossing` a volume, a joint and a volume,
 `--scene grow` one volume whose leak tears off layer after
 layer, `--scene hole` a packed middle that collapses, `--scene fall`, `dense` and `coast` a
-grown ball with a region made fuller (grown once, two minutes, then kept); `--pictures DIR` saves pictures (`--along`, `--turned`, `--cut`, `--ring`). One process on the card. `BOXES`, `SPEED`, `FRAMES` only draw.
+grown ball with a region made fuller (grown once, two minutes, then kept); `--pictures DIR`
+saves pictures (`--along`, `--turned`, `--cut`, `--whole`, `--ring`). `--scene grow --far DIR` runs the
+universe far forward with no window, a log and kept states in DIR (`far.py`); `--from FILE`
+shows a kept state and steps on from it. One process on the card. `BOXES`, `SPEED`, `FRAMES` only draw.
 """
 import argparse
 import os
@@ -11,40 +14,14 @@ from pathlib import Path
 
 import warp as wp
 
-from physics.view.definitions.camera import ALONG, PITCH, YAW, eye_distance
-from physics.view.logic.save_png import save_png
-from physics.view.logic.scene import SCENES, Seen, advance, drawn, title, trace
-from physics.view.logic.tracers import MARKS
+from physics.engine.axiom_5_packing.logic.far import MORE, far, resumed
+from physics.view.logic.pictures import save_pictures
+from physics.view.logic.scene import SCENES
 
 BOXES, SPEED = 24, 8
 LINE_BOXES = 12  # the line's course is the same at any boxes, and a swirl's turn is quicker here
 GROW_BOXES, GROW_SPEED = 6, 1  # the least boxes, for many cells; a layer about every second
 FRAMES = 120  # the window is drawn at most this often a second
-
-
-def save_pictures(folder: Path, across: int, steps: int, every: int, device: str,
-                  scene: str, flat: bool, turned: tuple | None, along: int | None, ring: int = -1) -> None:
-    """Run `steps` steps and save a picture every `every` steps, the start included."""
-    import pyglet
-    from physics.view.logic.picture import picture
-    from physics.view.logic.swirl_painter import SwirlPainter
-    hidden = pyglet.window.Window(visible=False)  # the card draws into a picture, not this
-    folder.mkdir(parents=True, exist_ok=True)
-    store = SCENES[scene](across, device=device)
-    seen = Seen(trace(store), whole=False if flat else None, ring=ring)
-    painter = SwirlPainter(MARKS, seen.tracers.tail.shape[1])
-    alone = store.side == 0
-    yaw, pitch = turned or ((YAW, PITCH) if along is None and alone else ALONG[2 if along is None else along])
-    for done in range(steps + 1):
-        marks = drawn(store, seen)  # every step, as the window does: the middles settle
-        if done % every == 0:
-            file = folder / f"step_{done:05d}.png"
-            painter.load(marks)
-            seen_now = picture(painter, across, yaw, pitch, eye_distance(store), 800 if alone else 1000, 800)
-            save_png(file, seen_now)
-            print(f"{file}: {title(store, seen)}", flush=True)
-        advance(store, seen)
-    hidden.close()
 
 
 def main() -> None:
@@ -58,7 +35,11 @@ def main() -> None:
     parser.add_argument("--turned", type=float, nargs=2, help="the view: about the upright, upward")
     parser.add_argument("--along", type=int, choices=(0, 1, 2), help="the direction looked along")
     parser.add_argument("--cut", action="store_true", help="the pictures show the flat cut")
+    parser.add_argument("--whole", action="store_true", help="the pictures show every cell, however many")
     parser.add_argument("--ring", type=int, choices=(0, 1, 2), default=-1, help="one ring's fluid alone")
+    parser.add_argument("--from", dest="start", type=Path, metavar="FILE", help="grow: start from a kept state")
+    parser.add_argument("--far", type=Path, metavar="DIR", help="grow: run far forward, no window")
+    parser.add_argument("--minutes", type=float, default=40, help="how long the far run goes")
     chosen = parser.parse_args()
     grows = chosen.scene not in ("one", "crossing")  # many cells: the least boxes
     chosen.boxes = chosen.boxes or (GROW_BOXES if grows else BOXES if chosen.scene == "one" else LINE_BOXES)
@@ -67,9 +48,15 @@ def main() -> None:
     device = "cuda:0" if wp.is_cuda_available() else "cpu"
     os.environ.setdefault("GALLIUM_DRIVER", "d3d12")  # under WSL2 Mesa draws on the CPU without
     os.environ.setdefault("MESA_D3D12_DEFAULT_ADAPTER_NAME", "NVIDIA")  # these two
+    if chosen.start:
+        SCENES["grow"] = lambda _across, device: resumed(chosen.start, device, MORE)  # room to grow on
+    if chosen.far:
+        far(chosen.far, chosen.minutes, device, start=chosen.start and resumed(chosen.start, device))
+        return
     if chosen.pictures:
         return save_pictures(chosen.pictures, chosen.boxes, chosen.steps, chosen.every, device,
-                             chosen.scene, chosen.cut, chosen.turned, chosen.along, chosen.ring)
+                             chosen.scene, True if chosen.cut else False if chosen.whole else None,
+                             chosen.turned, chosen.along, chosen.ring)
     import pyglet
     from physics.view.logic.cell_window import CellWindow
     CellWindow(chosen.boxes, chosen.speed, device, chosen.scene)

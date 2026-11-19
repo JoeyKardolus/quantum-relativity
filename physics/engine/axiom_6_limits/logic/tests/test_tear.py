@@ -4,7 +4,8 @@ import numpy as np
 from physics.engine import first_volume
 from physics.engine.axiom_3_structure.definitions.store import put
 from physics.engine.axiom_6_limits.definitions.least_whirl import PARTS, least_whirl
-from physics.engine.axiom_6_limits.logic.tear import tear, torn
+from physics.engine.axiom_6_limits.logic.tear import tear
+from physics.engine.axiom_6_limits.logic.torn import torn
 
 
 def test_a_place_tears_off_only_once_every_part_of_it_could_be_a_whirl():
@@ -28,6 +29,7 @@ def test_each_joint_is_a_seventh_of_the_new_volumes_either_side_and_plus_lost_is
                     alone: 80_000}                                     # no volume beside it: no joint
     assert sum(made.values()) + 2 * sum(-held for held in made.values() if held < 0) == 920_007
     tear(store)
+    assert {cell: int(store.cell_quanta.numpy()[cell]) for cell in made} == made  # the card's tear is the law's, to the quantum
     assert store.count == 6 and torn(store) == {}
     boxes = store.box_quanta.numpy()[:6].astype(np.int64).sum(axis=1)
     assert (boxes == store.cell_quanta.numpy()[store.own_cell.numpy()[:6]]).all()

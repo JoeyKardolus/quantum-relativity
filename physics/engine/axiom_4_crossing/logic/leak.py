@@ -14,6 +14,7 @@ from physics.engine.axiom_1_energy.definitions.whole_move import odd_part
 from physics.engine.axiom_3_structure.definitions.kinds import QUANTA_A_BOX
 from physics.engine.axiom_3_structure.definitions.places import beside, joint_axis
 from physics.engine.axiom_3_structure.definitions.store import Store, slot_at
+from physics.engine.axiom_3_structure.logic.spare import copies
 from physics.engine.axiom_4_crossing.definitions.leak_share import leak_share, leaned, pointed, toward
 from physics.engine.axiom_6_limits.definitions.collapse_limit import DEEP
 
@@ -61,11 +62,9 @@ def leak(store: Store) -> None:
     """One step of the leak of every own volume; only in a universe that grows (`leaks`) does it gather at free places."""
     if store.side == 0:
         return  # a store that keeps no places has no sides
+    held, flowed, had = copies(store)
     wp.launch(_leak, dim=(store.count, store.across ** 3), device=store.box_quanta.device,
-              inputs=[store.own_cell, store.tile_home, store.tile_slots,
-                      wp.clone(store.cell_quanta), store.cell_pull, DEEP,
-                      wp.clone(store.box_quanta), store.side, int(store.leaks),
-                      wp.float64(QUANTA_A_BOX * store.across ** 3),
+              inputs=[store.own_cell, store.tile_home, store.tile_slots, held, store.cell_pull, DEEP,
+                      had, store.side, int(store.leaks), wp.float64(QUANTA_A_BOX * store.across ** 3),
                       wp.float64(store.turn_per_step / (2.0 * wp.pi)),
-                      store.cell_quanta, wp.clone(store.cell_flow), store.cell_flow,
-                      store.box_quanta, store.box_phase])
+                      store.cell_quanta, flowed, store.cell_flow, store.box_quanta, store.box_phase])

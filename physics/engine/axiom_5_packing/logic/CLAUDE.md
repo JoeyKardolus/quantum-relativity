@@ -1,10 +1,9 @@
 # Axiom 5, logic
 
-`between.py`: the way between volumes through the cells' sizes. `pull.py`: all pairs on the host; writes `cell_pull`, adds to `cell_flow`. `squeeze.py`, `press.py`: the joints. `lumps.py`, `staging.py`: staging. `ball.py`: the grown ball, kept in tmp, and the window's scenes. `weighed.py`: a staged ball against the plain one. `line.py`: benches, tests only.
+`pull.py`: on the card, over `ways.py` and `groups.py`; writes `cell_pull`, adds to `cell_flow`. `pairs.py`, `between.py`: the law on the host, for checks. `squeeze.py`, `press.py`: the joints. `lumps.py`, `staging.py`: staging. `ball.py`: the grown ball, kept in tmp; the window's scenes. `weighed.py`: a staged ball against the plain. `line.py`: test benches. `far.py`: the long run, its log and kept states. `census.py`: what the log reads.
 
-- Order in a step: `pull`, `squeeze`, then `make` and `press`.
-- `cell_past` lives on the host.
-- A volume must never enter its own sum.
-- A collapsed joint keeps its distance and is not squeezed.
-- `lumps.py` imports the engine's door; the door must not import it.
-- Tests share the kept ball (2,705 steps, grown once).
+- Order in a step: `pull`, `squeeze`, `make`, `press`. `cell_past` is on the card.
+- A volume never enters its own sum.
+- A collapsed joint keeps its distance, unsqueezed.
+- `lumps.py` and `far.py` import the engine's door; never the other way.
+- `ROOM`, `NEAR`, `TWICE`: run and reading numbers, not physics.

@@ -7,6 +7,6 @@ Built: storage, size law, places: a cell's number is its steps along the three d
 Assumed:
 - A volume is round; a joint fills the room between its two.
 - A calm volume holds 3,000 quanta a box.
-- The first volume holds 2 to the power 30 quanta (1,657 calm volumes); the owner has not said how much.
+- The first volume holds 2 to the power 30 quanta (1,657 calm volumes); not ruled.
 - A cell's whole number is 64 bits wide, a box's 32.
-- Past the store's room the growth stops.
+- A full room: `roomier.py` moves it all into a bigger store.

@@ -37,7 +37,8 @@ class Store:
     ledger: int = 0         # quanta that changed box when cells went back to calm
     collapses: int = 0      # joints that have collapsed
     flipped: int = 0        # minus quanta that collapses flipped to plus
-    cell_past: wp.array = None  # float32 (128, cells), on the host: the volumes' energy at the last steps, for the late pull
+    cell_past: wp.array = None  # float32 (128, volumes' places and groups): their energy at the last steps, for the late pull
+    near: int = 0           # groups round a volume the pull reads volume by volume; 0: every volume, all pairs
 
 
 @wp.func

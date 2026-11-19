@@ -17,6 +17,7 @@ from physics.engine.axiom_1_energy.definitions.whole_move import odd_part
 from physics.engine.axiom_3_structure.definitions.kinds import QUANTA_A_BOX
 from physics.engine.axiom_3_structure.definitions.places import joint_axis, joint_ends
 from physics.engine.axiom_3_structure.definitions.store import slot_at
+from physics.engine.axiom_3_structure.logic.spare import copies
 from physics.engine.axiom_4_crossing.definitions.passage import row_minus, rub_share
 from physics.engine.axiom_5_packing.definitions.pull_push import apart_of
 from physics.engine.axiom_6_limits.definitions.collapse_limit import DEEP, TOP_SPEED
@@ -75,6 +76,5 @@ def cross(store) -> None:
     wp.launch(_cross, dim=(store.count, across ** 3, 2), device=store.box_quanta.device,
               inputs=[store.own_cell, store.tile_home, store.tile_slots, store.side, across,
                       wp.float64(store.turn_per_step / (2.0 * wp.pi)),
-                      wp.float64(QUANTA_A_BOX * across ** 3), DEEP, wp.float64(TOP_SPEED), store.cell_pull,
-                      wp.clone(store.cell_quanta), wp.clone(store.cell_flow), wp.clone(store.box_quanta),
+                      wp.float64(QUANTA_A_BOX * across ** 3), DEEP, wp.float64(TOP_SPEED), store.cell_pull, *copies(store),
                       store.cell_quanta, store.cell_flow, store.box_quanta, store.box_phase])

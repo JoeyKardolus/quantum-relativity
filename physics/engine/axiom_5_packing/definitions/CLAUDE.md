@@ -1,6 +1,6 @@
 # Axiom 5, definitions
 
-`pull.py`: the pull's law, what it costs, `REACH`, `steps_late`. `pull_push.py`: `apart_of`, `pull_across`, `push_back`, `given`, `pressed`.
+`pull.py`: the pull's law, `REACH`, `steps_late`. `groups.py`: far volumes as one body (`near`). `pull_push.py`: `apart_of`, `pull_across`, `push_back`, `given`, `pressed`.
 
 - Quanta and pull are counted in calm volumes: a calm volume holds 1, is 1 long, pulls 1 at one calm length.
 - Apart: half a width, the joint's size, half the other width; never less than the widths.
