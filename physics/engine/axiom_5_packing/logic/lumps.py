@@ -47,17 +47,12 @@ def fuller(store: Store, cells: list, times: int = FULLER) -> None:
     store.box_quanta.assign(boxes)
 
 
-def moving(store: Store, cells: list, axis: int, turn: float) -> None:
-    """Set the fluid of the own volumes `cells` going up direction `axis`: in that ring the
-    phase falls `turn` a box from the back cap to the front cap, both ways round the core."""
-    phase, slots = store.box_phase.numpy(), _slots(store, cells)
-    around = np.indices((store.across,) * 3)[1].ravel()
-    back = store.across - 1 - store.across // 6  # the back cap's first box round the core
-    far = np.minimum((around - back) % store.across, (back - around) % store.across)
-    ring = np.indices((store.across,) * 3)[0].ravel() // (store.across // 3) == axis
-    for slot in slots:
-        phase[slot] -= turn * far * ring
-    store.box_phase.assign(((phase + np.pi) % (2 * np.pi) - np.pi).astype(np.float32))
+def moving(store: Store, cells: list, axis: int, speed: float) -> None:
+    """Set the fluid of the volumes `cells` going up direction `axis` at `speed` calm lengths a
+    turn of a calm swirl: each one's flow that way becomes its quanta times that speed."""
+    flow, held = store.cell_flow.numpy(), store.cell_quanta.numpy()
+    flow[cells, axis] = np.floor(held[cells] * speed).astype(np.int64)
+    store.cell_flow.assign(flow)
 
 
 def two_lumps(across: int = ACROSS, device: str = "cpu", layers: int = 4, out: int = 2) -> Store:

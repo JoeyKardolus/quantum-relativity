@@ -2,13 +2,16 @@
 from physics.engine import first_volume, step
 from physics.engine.axiom_3_structure.definitions.store import put
 from physics.engine.axiom_4_crossing.logic.leak import leak
-from physics.engine.axiom_4_crossing.logic.tests.test_cross import FAR, A, B, _still
+from physics.engine import three_cells
+from physics.engine.axiom_4_crossing.logic.tests.test_cross import A, B
+from physics.engine.axiom_5_packing.logic.lumps import moving
 from physics.engine.axiom_6_limits.definitions.collapse_limit import DEEP
 
 
 def _gained(way: int, deep=None) -> int:
     """What A gains in 30 steps, its fluid moving toward B (`way` 1) or away; `deep` is held past the limit."""
-    store = _still((2, -2, 2), a_phase=-way * 0.3 * FAR)
+    store = three_cells(parts=(2, -2, 2))
+    moving(store, [A], 1, way * 1.0)
     for _ in range(30):
         if deep is not None:
             put(store.cell_pull, deep, 2 * DEEP)

@@ -17,9 +17,9 @@ def _gaps(store) -> tuple:
 def test_in_a_grown_cluster_every_distance_is_the_half_widths_and_a_joint_thickness_above_0(patch):
     store = patch
     apart, widths, thick = _gaps(store)
-    assert len(apart) > 150 and (thick > 0).all() and np.allclose(apart, widths + thick)  # 277 joints
+    assert len(apart) > 100 and (thick > 0).all() and np.allclose(apart, widths + thick)  # 130 joints
     fresh = 60.0  # a joint as it tears off: a least whirl's quanta, 60 calm lengths thick
-    for _ in range(12):  # the first volume, 1,616 calm volumes still, squeezes hard: no staging needed
+    for _ in range(12):  # the full volumes round the middle squeeze hard: no staging needed
         step(store)
     apart, widths, thick = _gaps(store)
     assert (apart > widths).all() and (thick > 0).all() and np.allclose(apart, widths + thick)

@@ -35,9 +35,5 @@ def flipped(store: Store, cell: int) -> None:
 
 
 def going(store: Store) -> None:
-    """Set the crossing's fluid going along the line: the first volume's toward the joint, and
-    the phase falling on across it, so the second volume stands a step behind the cap it faces."""
-    moving(store, [0], 1, 0.3)
-    phase = store.box_phase.numpy()
-    phase[2] -= 0.3 * (store.across // 2 + 1)
-    store.box_phase.assign(((phase + np.pi) % (2 * np.pi) - np.pi).astype(np.float32))
+    """Set the crossing's first volume going along the line, a calm length a turn of a calm swirl."""
+    moving(store, [0], 1, 1.0)

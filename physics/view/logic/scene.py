@@ -1,9 +1,8 @@
-"""Scene: what the window shows. `one` is one cell; `crossing` a red volume, a blue joint and a
-red volume in a line; `grow` one volume whose leak tears off layer after layer round it;
-`lumps` a grown patch with two fuller regions; `hole` one whose packed middle collapses.
-Every cell is drawn as wide as its size where its joints put it (`placed.py`). A growing
-cluster above `WHOLE_UP_TO` cells shows only its flat cut, the middle layer (`strays.py`).
-"""
+"""Scene: what the window shows. `one` is one cell; `crossing` a volume, a joint and a volume;
+`grow` one volume whose leak tears off layer after layer; `lumps` a grown patch with two
+fuller regions; `hole` a packed middle collapsing; `gather` and `coast` the line bench. A cell is
+drawn as wide as its size where its joints put it (`placed.py`); a growing cluster above
+`WHOLE_UP_TO` cells shows only its flat cut (`strays.py`)."""
 from dataclasses import dataclass, field
 from functools import partial
 
@@ -14,6 +13,7 @@ from physics.engine import first_volume, one_cell, three_cells
 from physics.engine.axiom_3_structure.definitions.size_law import size_of
 from physics.engine.axiom_3_structure.definitions.store import Store, peek
 from physics.engine.axiom_3_structure.logic.boxes_of import boxes_of
+from physics.engine.axiom_5_packing.logic.line import coasting, gathering
 from physics.engine.axiom_5_packing.logic.lumps import two_lumps
 from physics.engine.axiom_6_limits.logic.hole import hole
 from physics.view.logic.lay_tracers import move_into, shown, trace  # noqa: F401, trace handed on
@@ -23,8 +23,8 @@ from physics.view.logic.strays import bring_back
 from physics.view.logic.title_line import cells_title, squeeze_read, title_line
 from physics.view.logic.tracers import MARK_EVERY, Tracers, step_carrying
 
-SCENES = {"one": one_cell, "crossing": three_cells, "grow": partial(first_volume, layers=12), "lumps": two_lumps,
-          "hole": hole}
+SCENES = {"one": one_cell, "crossing": three_cells, "grow": partial(first_volume, layers=12),
+          "lumps": two_lumps, "hole": hole, "gather": gathering, "coast": coasting}
 FITS, WHOLE_UP_TO = 1.5, 500  # drawing numbers: how far out the window shows; cells drawn whole
 
 

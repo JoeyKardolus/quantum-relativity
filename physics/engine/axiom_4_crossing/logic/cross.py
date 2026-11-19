@@ -1,26 +1,28 @@
 """Cross: one step of plus energy crossing every joint that lies between two volumes.
 
-What moves energy across a joint, two lines. The two facing boxes (`facing.py`) meet as
-equals, at what both hold, and energy goes only the way the fluid there moves: from the
-phase that stands ahead across the joint. The pull turns the two phases toward the deeper
-side (`bent`) and the fluid's own motion carries it; two volumes that only hold different
-amounts exchange nothing here (the leak is its own thing: `leak.py`).
+What moves energy across a joint, two lines. A volume's fluid has one common flow a
+direction (`cell_flow`: its quanta times how fast they go). The fluid that goes toward a
+joint leaves from the outside of the ring whirl that points at it, once round its core,
+takes its share of the flow along and arrives round the core of the next volume's ring,
+box for box in the mirror, still moving the same way: what one volume loses of quanta and
+of flow the other gains, to the whole number.
 
-The pair rotation runs at the joint's `passing_turn`, the first phase turned on by the
-joint's own whirl (`gear`); what crosses arrives with its phase, still moving. Friction
-takes its share of the motion; what it holds back stays in the volume it came from. Out
-of a volume past the limit nothing crosses. One launch an axis.
+How much tries a step: the flow over the distance to the next volume (`apart_of`), never
+more than those boxes hold. The joint's friction holds back the rubbing share
+(`rub_share`); that stays in the volume it came from and stops there, so the flow toward
+the joint is less by its share. Two volumes that only hold different amounts exchange
+nothing here (the leak is its own thing: `leak.py`). Out of a volume past the limit nothing
+crosses. Quanta, flow and boxes are read off copies made before the launch, so a run repeats.
 """
 import warp as wp
 
-from physics.engine.axiom_1_energy.definitions.pair_rotation import pair_rotation, phase_of, wave_of
-from physics.engine.axiom_1_energy.definitions.whole_move import odd_part, whole_move
+from physics.engine.axiom_1_energy.definitions.whole_move import odd_part
+from physics.engine.axiom_3_structure.definitions.kinds import QUANTA_A_BOX
 from physics.engine.axiom_3_structure.definitions.places import joint_axis, joint_ends
 from physics.engine.axiom_3_structure.definitions.store import slot_at
-from physics.engine.axiom_4_crossing.definitions.facing import faced, gear
-from physics.engine.axiom_4_crossing.definitions.passage import (
-    layer_part, less_step, passing_turn, row_minus, rub_share)
-from physics.engine.axiom_5_packing.definitions.pull import bent, differing
+from physics.engine.axiom_2_swirls.definitions.ring_boxes import box_at
+from physics.engine.axiom_4_crossing.definitions.passage import row_minus, rub_share
+from physics.engine.axiom_5_packing.definitions.pull_push import apart_of
 from physics.engine.axiom_6_limits.definitions.collapse_limit import DEEP
 
 wp.set_module_options({"fuse_fp": False})
@@ -28,53 +30,51 @@ wp.set_module_options({"fuse_fp": False})
 
 @wp.kernel
 def _cross(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32),
-           tile_slots: wp.array(dtype=wp.int32), side: wp.int32, axis: wp.int32,
-           across: wp.int32, a_turn: wp.float64, deep: wp.float32,
-           cell_pull: wp.array(dtype=wp.float32), own_turned: wp.array(dtype=wp.float32),
-           cell_quanta: wp.array(dtype=wp.int64),
+           tile_slots: wp.array(dtype=wp.int32), side: wp.int32, across: wp.int32,
+           a_turn: wp.float64, calm: wp.float64, deep: wp.float32,
+           cell_pull: wp.array(dtype=wp.float32), held: wp.array(dtype=wp.int64),
+           flowed: wp.array2d(dtype=wp.int64), had: wp.array2d(dtype=wp.int32),
+           cell_quanta: wp.array(dtype=wp.int64), cell_flow: wp.array2d(dtype=wp.int64),
            box_quanta: wp.array2d(dtype=wp.int32), box_phase: wp.array2d(dtype=wp.float32)):
-    slot, first, third = wp.tid()
-    joint, row = own_cell[slot], first * across + third
-    if cell_quanta[joint] >= wp.int64(0) or joint_axis(joint, side) != axis:
-        return  # only a joint that lies along this axis lets energy cross
-    ends = joint_ends(joint, side, axis)
-    before, after, faces = ends[0], ends[1], faced(row, across, axis)
-    left, right = slot_at(tile_home, tile_slots, before), slot_at(tile_home, tile_slots, after)
-    minus = row_minus(box_quanta, slot, row, across, axis)
-    if left < 0 or right < 0 or minus <= wp.float64(0.0):
-        return  # no volume either side, or no minus between: nothing passes
-    low, high = faces[0], faces[1]  # the two volumes' boxes that face this row
-    low_has, high_has = box_quanta[left, low], box_quanta[right, high]
-    met = wp.min(low_has, high_has)  # what the two facing boxes hold in common
-    rub = rub_share(minus, met, met)
-    geared = gear(box_phase, slot, faces) + own_turned[right] - own_turned[left]  # see `turn.py`
-    turned = bent(box_phase[left, low] + geared, box_phase[right, high],
-                  differing(cell_pull[before], cell_pull[after]), a_turn / layer_part(across))
-    low_wave, high_wave = pair_rotation(wave_of(met, turned[0]), wave_of(met, turned[1]),
-                                        passing_turn(rub, across))
-    flow = wp.dot(high_wave, high_wave) - wp.float64(met)  # what the second volume gains
-    moved = whole_move(flow, odd_part(box_phase[left, low], across), low_has, high_has)
-    if cell_pull[before] >= deep:
-        moved = wp.min(moved, 0)  # past the limit: nothing leaves the volume before,
-    if cell_pull[after] >= deep:
-        moved = wp.max(moved, 0)  # nor the volume after
-    step_across = less_step(phase_of(low_wave, turned[0]), phase_of(high_wave, turned[1]),
-                            rub * layer_part(across))
-    box_quanta[left, low] = low_has - moved
-    box_quanta[right, high] = high_has + moved
-    box_phase[left, low] = less_step(step_across[0] - geared, 0.0, wp.float64(0.0))[0]
-    box_phase[right, high] = step_across[1]
-    wp.atomic_add(cell_quanta, before, wp.int64(-moved))
-    wp.atomic_add(cell_quanta, after, wp.int64(moved))
+    slot, row, around, way = wp.tid()  # way 0: from the volume before to the one after; 1: back
+    joint, axis = own_cell[slot], joint_axis(own_cell[slot], side)
+    if axis < 0 or held[joint] >= wp.int64(0):
+        return  # only a joint lets energy cross
+    ends, last = joint_ends(joint, side, axis), across / 3 - 1  # the rings' outside layer
+    out, back = box_at(across, axis, last, around, row), box_at(across, axis, last, across - 1 - around, row)
+    giver, taker = ends[way], ends[1 - way]
+    gives, takes = slot_at(tile_home, tile_slots, giver), slot_at(tile_home, tile_slots, taker)
+    minus = row_minus(had, slot, row, across, axis)
+    if gives < 0 or takes < 0 or minus <= wp.float64(0.0) or cell_pull[giver] >= deep:
+        return  # no volume either side, no minus between, or past the limit: nothing passes
+    toward = wp.float64(flowed[giver, axis]) * wp.float64(1 - 2 * way)  # the flow toward this joint
+    if toward <= wp.float64(0.0) or held[giver] <= wp.int64(0) or held[taker] <= wp.int64(0):
+        return  # only fluid that goes this way crosses
+    has = had[gives, out]
+    apart = apart_of(wp.float64(held[ends[0]]) / calm, wp.float64(held[ends[1]]) / calm,
+                     -wp.float64(held[joint]) / calm)
+    reach = wp.min(toward * a_turn / apart, wp.float64(held[giver])) / wp.float64(across * across)
+    rub, part = rub_share(minus, has, has), odd_part(box_phase[gives, out], across)
+    moved = wp.clamp(wp.int32(wp.floor(reach * (wp.float64(1.0) - rub) + part)), 0, has)
+    wp.atomic_sub(box_quanta, gives, out, moved)
+    wp.atomic_add(box_quanta, takes, back, moved)
+    wp.atomic_sub(cell_quanta, giver, wp.int64(moved))
+    wp.atomic_add(cell_quanta, taker, wp.int64(moved))
+    for along in range(3):  # what crosses takes its share of the flow, every direction of it
+        share = wp.float64(flowed[giver, along]) / wp.float64(held[giver])
+        carried = wp.int64(share * wp.float64(moved))
+        if along == axis:  # what is held back presses on the joint: its flow goes on, it stays
+            carried = wp.int64(share * wp.max(reach, wp.float64(moved)))
+        wp.atomic_sub(cell_flow, giver, along, carried)
+        wp.atomic_add(cell_flow, taker, along, carried)
 
 
-def cross(store, before=None) -> None:
-    """One step of crossing at every own joint; `before(axis)` lets a watcher look first."""
-    for axis in range(3):
-        if before:
-            before(axis)
-        wp.launch(_cross, dim=(store.count, store.across // 6, store.across), device=store.box_quanta.device,
-                  inputs=[store.own_cell, store.tile_home, store.tile_slots, store.side, axis,
-                          store.across, wp.float64(store.turn_per_step / (2.0 * wp.pi)), DEEP,
-                          store.cell_pull, store.own_turned, store.cell_quanta, store.box_quanta,
-                          store.box_phase])
+def cross(store) -> None:
+    """One step of crossing at every own joint, both ways."""
+    across = store.across
+    wp.launch(_cross, dim=(store.count, across, across, 2), device=store.box_quanta.device,
+              inputs=[store.own_cell, store.tile_home, store.tile_slots, store.side, across,
+                      wp.float64(store.turn_per_step / (2.0 * wp.pi)),
+                      wp.float64(QUANTA_A_BOX * across ** 3), DEEP, store.cell_pull,
+                      wp.clone(store.cell_quanta), wp.clone(store.cell_flow), wp.clone(store.box_quanta),
+                      store.cell_quanta, store.cell_flow, store.box_quanta, store.box_phase])

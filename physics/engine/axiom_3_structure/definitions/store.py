@@ -20,6 +20,7 @@ class Store:
     cell_quanta: wp.array   # int64 (cells): no squeeze and no merge can run it over; a box's stays int32
     cell_made: wp.array     # int64 (cells): quanta a joint has made out of itself
     cell_pull: wp.array     # float32 (cells): the pull there, handed on from cell to cell
+    cell_flow: wp.array     # int64 (cells, 3): the fluid's common flow a direction, quanta times calm lengths a turn
     tile_home: wp.array     # int32 (cells / 512): the tile's row in tile_slots, -1: all calm
     tile_slots: wp.array    # int32 (tile rows * 512): the cell's slot, -1: calm
     own_cell: wp.array      # int32 (cap): which cell holds this slot

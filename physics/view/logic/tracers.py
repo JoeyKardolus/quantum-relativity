@@ -16,7 +16,6 @@ from physics.engine import step
 from physics.engine.axiom_1_energy.definitions.pair_rotation import pair_rotation, wave_of
 from physics.engine.axiom_3_structure.logic.boxes_of import boxes_of
 from physics.view.definitions.carried import carried
-from physics.view.logic.tracers_across import carry_across
 
 COUNT = 8000  # tracers a cell, a drawing number
 MARKS, MARK_EVERY = 32, 4  # places a tracer remembers (now and 31 behind); steps a mark
@@ -71,4 +70,4 @@ def step_carrying(store, tracers: Tracers, cell: int, mark: bool, boxes: tuple =
         wp.launch(_carry, dim=tracers.tail.shape[1], device=tracers.tail.device,
                   inputs=[*line, axis, parity, wp.float64(turn), tracers.head, new, tracers.tail])
         tracers.head = new
-    step(store, carry, lambda axis: carry_across(store, axis, cells, tracers.tail, tracers.head))
+    step(store, carry)

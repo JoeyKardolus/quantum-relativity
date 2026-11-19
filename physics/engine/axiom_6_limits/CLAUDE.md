@@ -8,4 +8,4 @@ Assumed:
 - A joint is past the limit when both its volumes are.
 - A merged volume's cells stay at their places, each with its own number.
 
-Not right: nothing grown is as deep as the first volume, so only a staged region collapses; a merged volume's cells do not mix their fluid.
+Not right: nothing grown is that deep; a packed middle loses two of six joints; merged cells do not mix their fluid.

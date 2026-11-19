@@ -1,4 +1,4 @@
-"""The bench, a volume of 3 parts and one of 1 with a joint between: different amounts alone move nothing; the leak does, slowly."""
+"""The bench, a volume of 3 parts and one of 1 with a joint between: different amounts alone move nothing; the leak does, slowly; their pull evens them."""
 import numpy as np
 import pytest
 
@@ -51,8 +51,10 @@ def uneven():
     return store, held
 
 
-def test_over_80_turns_the_fuller_volume_loses_slowly_by_its_leak_and_all_three_stay_whole_whirls(uneven):
+def test_over_80_turns_the_two_fall_toward_each_other_until_they_hold_alike_and_all_three_stay_whole_whirls(uneven):
     store, held = uneven
-    assert 50_000 < 972_000 - held[0] == held[2] - 324_000 < 120_000  # measured: 84,118, a tenth of a percent a turn
+    # each is pulled by what the other holds and the fuller rubs less, so more crosses from it: 1.5 and
+    # 0.5 calm volumes are 1.04 and 0.96 at 16 turns and 1.005 and 0.995 from 40 on, pressed on the joint
+    assert 972_000 - held[0] == held[2] - 324_000 and 0 < held[0] - held[2] < 13_000
     for cell, turns in ((A, -1), (JOINT, 1), (B, -1)):
         assert swirl_of(store, cell)["turns"] == (turns,) * 3

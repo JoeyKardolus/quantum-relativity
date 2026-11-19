@@ -6,7 +6,7 @@ neighbours hold. At a free place the quanta gather, as that place's total, until
 off (in a bench, a store whose `leaks` is off, nothing gathers and that part stays). Where a volume stands they pass through the joint between (toward an edge or a corner:
 by one of the sides that way, `leaned`) and arrive spread once round a core of that
 volume's whirl, so it keeps its turn; with no joint between, nothing passes. What leaves one cell arrives in the other, to the
-quantum. Shares and boxes are read off copies made before the launch, so a run repeats.
+quantum, and takes its share of the volume's flow along. Shares and boxes are read off copies made before the launch, so a run repeats.
 """
 import warp as wp
 
@@ -24,6 +24,7 @@ def _leak(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32
           cell_pull: wp.array(dtype=wp.float32), deep: wp.float32,
           had: wp.array2d(dtype=wp.int32), side: wp.int32, gathers: wp.int32, calm: wp.float64,
           a_turn: wp.float64, cell_quanta: wp.array(dtype=wp.int64),
+          flowed: wp.array2d(dtype=wp.int64), cell_flow: wp.array2d(dtype=wp.int64),
           box_quanta: wp.array2d(dtype=wp.int32), box_phase: wp.array2d(dtype=wp.float32)):
     slot, box = wp.tid()
     cell = own_cell[slot]
@@ -50,6 +51,10 @@ def _leak(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32
     wp.atomic_sub(box_quanta, slot, box, moved)
     wp.atomic_add(cell_quanta, cell, wp.int64(-moved))
     wp.atomic_add(cell_quanta, place, wp.int64(moved))
+    for along in range(3):  # what leaks takes its share of the volume's flow along
+        carried = wp.int64(wp.float64(flowed[cell, along]) * wp.float64(moved) / wp.float64(held[cell]))
+        wp.atomic_sub(cell_flow, cell, along, carried)
+        wp.atomic_add(cell_flow, place, along, carried)
 
 
 def leak(store: Store) -> None:
@@ -62,4 +67,5 @@ def leak(store: Store) -> None:
                       wp.clone(store.box_quanta), store.side, int(store.leaks),
                       wp.float64(QUANTA_A_BOX * store.across ** 3),
                       wp.float64(store.turn_per_step / (2.0 * wp.pi)),
-                      store.cell_quanta, store.box_quanta, store.box_phase])
+                      store.cell_quanta, wp.clone(store.cell_flow), store.cell_flow,
+                      store.box_quanta, store.box_phase])

@@ -2,12 +2,12 @@
 
 > Energy diffuses between plus swirls only through minus; that is the only friction.
 
-The leak always happens. Energy crosses only where the pull or its own motion drives it.
+The leak always happens. Energy crosses only where its own flow carries it.
 
 Assumed:
-- The facing boxes meet at the lesser of their amounts.
-- Rubbing share: the joint's minus over that and the plus that meets.
-- Leak a turn: `size / (1 + 7 size)`; friction does not cut it; it arrives at rest, round a core.
-- Toward an edge or corner where a volume stands, the leak takes a side's joint.
+- A volume's fluid has one flow a direction, a whole number; what crosses or leaks takes its share.
+- Crossing goes round the core of the ring pointing at the joint.
+- Rubbing share: the joint's minus over that and the giver's plus. What is held back stays; its flow goes on.
+- Leak a turn: `size / (1 + 7 size)`; friction does not cut it.
 
-Not right: the leak favours some directions (a tenth); a region set going does not travel; thin outer volumes are no whole whirls.
+Not right: half the volumes are no whole whirls; the window's tracers do not cross joints.

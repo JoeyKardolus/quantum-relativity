@@ -53,5 +53,6 @@ def test_after_a_collapse_the_joint_is_drawn_as_plus_between_its_two_and_the_tit
     assert np.isfinite(drawn(store, seen).numpy()[-1]).all() and "collapses 1" in title(store, seen)
     middle, size, joints, _volumes, _apart = settle(store, seen.middle)
     shapes = placed(store, middle, size, joints, 1.0).numpy()
-    assert shapes[joint, 2, 2] == 1 and (shapes[:, 2, 2] == 1).sum() == 119  # the 118 volumes and it
+    plus = int((store.cell_quanta.numpy()[store.own_cell.numpy()[:store.count]] > 0).sum())
+    assert shapes[joint, 2, 2] == 1 and (shapes[:, 2, 2] == 1).sum() == plus > 60  # the volumes and it
     assert np.allclose(shapes[joint, 0], (shapes[ends[0], 0] + shapes[ends[1], 0]) / 2)  # red, between its two

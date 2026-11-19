@@ -80,11 +80,20 @@ grown universe nothing is as deep as the first volume, and that is under the lim
 layers. `--scene hole` stages one: a packed middle gives way in under a turn, six joints, thirteen cells,
 and holds its energy for 20 turns (12,425 calm volumes, then 12,429); fed, it grows to 49 cells.
 
-Not right yet: a fuller region holds but does not gain, two do not draw together and one set going
-does not travel, so no gravity between bodies; the outer volumes get too thin to be whirls, and at nine
-layers the inner ones have lost their whole turns too; the hole's size grows with its energy in jumps,
-not in step; and by the limit as built no black hole can form in a grown universe at all, which the
-owner must rule on. Progress is tracked on
+Since later that day energy carries its motion with it when it crosses a joint, and meets the joint's
+resistance at each crossing: a volume's fluid has one flow a direction, what crosses takes its share
+along and arrives still going, what friction holds back stays where it was, and the pull adds to the
+flow toward the deeper side. In a calm line of eleven volumes (`--scene gather`, `--scene coast`) a
+volume 4 times fuller gathers from its neighbours (4.0 to 6.29 calm volumes in 8 turns) and one set
+going travels six volumes in 8 turns as a body.
+
+Not right yet: that holds in a hand-laid line only. In a grown universe the first volume is set going
+by its own pull handed back through its lopsided surroundings and pours out (1,632 calm volumes at 10.9
+turns, 332 at 13.8), so no region made fuller there holds, two do not draw together, half the volumes
+are no whole whirls any more and of the hole scene's six joints only two fall; two lumps in the line
+do not draw each other either, because there the pull fades to a tenth with every volume; the fall
+fades as distance to the power -0.87, not -2; and by the limit as built no black hole forms in a grown
+universe, which the owner must rule on. Progress is tracked on
 [issue #1](https://github.com/JoeyKardolus/quantum-relativity/issues/1).
 Misses are reported as misses; nothing is tuned to look good.
 
@@ -93,10 +102,12 @@ Misses are reported as misses; nothing is tuned to look good.
 ```bash
 uv sync --all-packages --all-extras --all-groups
 PYTHONPATH=. .venv/bin/python -m physics.view   # one cell; Up Down energy, F sign, 1 2 3 0 rings, Space, R, Esc
-PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing   # a volume, a joint, a volume: the leak passes slowly; M sets the fuller one's fluid going
+PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing   # a volume, a joint, a volume: the leak passes slowly; M sets the first one's fluid going
 PYTHONPATH=. .venv/bin/python -m physics.view --scene grow       # one volume leaks and sheds layer after layer of new volumes; X Y Z look along, C whole or flat cut
 PYTHONPATH=. .venv/bin/python -m physics.view --scene hole       # a packed middle collapses, keeps what it holds and takes in more
 PYTHONPATH=. .venv/bin/python -m physics.view --scene lumps      # two regions made fuller by hand in a small grown patch
+PYTHONPATH=. .venv/bin/python -m physics.view --scene gather     # a line of volumes: the fuller one gains from its neighbours
+PYTHONPATH=. .venv/bin/python -m physics.view --scene coast      # a line of volumes: a fuller one set going travels down it
 PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, about 40 seconds
 ```
 

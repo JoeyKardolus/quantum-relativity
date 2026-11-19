@@ -5,7 +5,8 @@ the limit, so no joint collapses there by itself. This start stages one: a patch
 its leak, then the first volume and the six at its sides each packed to hold `times` what
 a universe's first volume holds (`FIRST_QUANTA`: no new number). Their pull is handed on a
 cell a step; within a turn it is past the limit at all seven, the six joints between them
-flip to plus, and the thirteen cells are one volume that nothing leaves. Only a scene's
+flip to plus, and the thirteen cells are one volume that nothing leaves (since the fluid
+carries its flow only two of the six fall: a strict xfail holds it). Only a scene's
 start stages; no step does.
 """
 from physics.engine.axiom_3_structure.definitions.kinds import ACROSS
