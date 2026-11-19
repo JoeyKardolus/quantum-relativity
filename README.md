@@ -95,8 +95,7 @@ to the GPU by itself.
 ## Built with
 
 Written with Claude Code on [babon-harness](https://github.com/Babon-Innovations-b-v/babon-harness), a
-Claude Code setup whose skills, hooks and code index live in `.claude/`. The other folders (`apps/`,
-`infra/`, `business/` and so on) come from that harness template and are not part of the simulation.
+Claude Code setup whose skills, hooks and code index live in `.claude/`. 
 
 ## Licence
 
