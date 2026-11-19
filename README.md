@@ -64,13 +64,14 @@ the run, the collapsed region does not grow in step with its energy, hardly any 
 turns, and a region made fuller by hand still spreads, does not fall and does not coast; so no gravity
 between bodies yet. Next: why a packed volume does not hold its energy. Progress is tracked on
 [issue #1](https://github.com/JoeyKardolus/quantum-relativity/issues/1).
+The whirl was rebuilt on 2026-11-19: a cell is now three ring whirls, one for each direction, round an empty core that is a ring closed inside the cell; it turns in step with its energy, a joint turns the other way and meshes with its volumes like a gear, and nothing is drawn by chance. A lone cell holds its whole turns for 10,000 steps. Still not right: in the grown cluster few volumes are whole whirls (52 of 195 at six layers), because the crossing floods thin new volumes; with the crossing off every one stays whole.
 Misses are reported as misses; nothing is tuned to look good.
 
 ## Run it
 
 ```bash
 uv sync --all-packages --all-extras --all-groups
-PYTHONPATH=. .venv/bin/python -m physics.view   # a window; Space starts, R resets, G calm/own, Esc quits
+PYTHONPATH=. .venv/bin/python -m physics.view   # one cell; Up Down energy, F sign, 1 2 3 0 rings, Space, R, Esc
 PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing   # energy crossing from a volume through a joint into the next
 PYTHONPATH=. .venv/bin/python -m physics.view --scene grow       # one volume leaks and sheds layer after layer of new volumes; X Y Z look along, C whole or flat cut
 PYTHONPATH=. .venv/bin/python -m physics.view --scene lumps      # two regions made fuller by hand in a small grown patch
