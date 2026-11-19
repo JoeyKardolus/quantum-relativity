@@ -1,11 +1,11 @@
 # Axiom 6: limits
 
-> A fresh joint is the fattest it will ever be and shrinks as it is squeezed; a volume's leaking outside tears off as a layer of new volumes.
+> A joint collapses only past a limit, where nothing at the top speed could climb out; leaking outside tears off as new volumes.
 
 Assumed:
-- A place tears off once seven least whirls have gathered.
-- What gathered is shared in seven: the volume, and a part toward each side. Toward a volume the part flips to minus: the joint.
-- Joints only between volumes that share a side: six of a layer's 26 have one to the first volume.
-- No floor: a volume may leak below a whirl's least.
+- A place tears off once seven least whirls have gathered, shared in seven.
+- Limit: twice the pull at a joint is at least the top speed squared, the joint's distance in two steps. A pull of 1 is read as a speed squared of 1: the owner must rule.
+- The merged volume stands at the fuller one's place, a fresh whirl.
+- Two joints to one neighbour both stay; one inside a volume flips into it.
 
-Not right: at three layers no whirl is whole (strict xfail). Not built: collapse.
+Not right: the merged volume floods out again; at 2 to the power 31 quanta the run stops.

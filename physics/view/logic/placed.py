@@ -12,6 +12,7 @@ import numpy as np
 import warp as wp
 
 from physics.engine.axiom_3_structure.definitions.kinds import QUANTA_A_BOX
+from physics.engine.axiom_3_structure.definitions.merged import slots_of
 from physics.engine.axiom_3_structure.definitions.places import steps_of
 from physics.engine.axiom_5_packing.logic.squeeze import squeeze
 from physics.view.logic.fit import begun, fitted
@@ -24,11 +25,12 @@ def joined(store) -> tuple:
     the own volumes, and how far apart each joint's two volumes stand."""
     squeeze(store)
     held, own = store.cell_quanta.numpy(), store.own_cell.numpy()[:store.count]
-    size = QUANTA_A_BOX * store.across ** 3 / np.maximum(np.abs(held), 1)
+    size = np.where(held == 0, 0.0, QUANTA_A_BOX * store.across ** 3 / np.maximum(np.abs(held), 1))
     felt = store.own_squeeze.numpy()[:store.count]
     lies = felt[:, 2] > 0
     joints, axis = own[lies], felt[lies, 3].astype(int)
-    ends = [joints - store.side ** (2 - axis), joints + store.side ** (2 - axis)]
+    whole = store.own_whole.numpy()  # a merged volume is drawn where it stands
+    ends = [own[whole[slots_of(store, joints + way * store.side ** (2 - axis))]] for way in (-1, 1)]
     return size, np.column_stack([joints, *ends, axis]), own[held[own] > 0], felt[lies, 2]
 
 
@@ -69,5 +71,6 @@ def placed(store, middle: np.ndarray, size: np.ndarray, joints: np.ndarray, span
     shapes[cell, 2] = np.column_stack([lean, -1.0 - axis])
     own = store.own_cell.numpy()[:store.count]
     shapes = shapes[own]
+    shapes[:, 0] = shapes[store.own_whole.numpy()[:store.count], 0]  # a merged part: at its volume
     shapes[:, 2, 2] *= np.ravel(shown)
     return wp.array(shapes, dtype=wp.mat33, device=store.cell_quanta.device)

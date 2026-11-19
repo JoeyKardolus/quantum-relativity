@@ -47,6 +47,7 @@ def _grown(seed: int = 1, layers: int = 3, laid: int = 0):
         lay(store, store.own_cell, 0, 1, store.box_quanta, store.box_phase)
     while store.step < 400:
         volumes, joints = _checked_step(store)
+        seen["least"] = min(seen.get("least", 2 ** 31), int(store.cell_quanta.numpy()[volumes].min()))
         if len(volumes) == 27 and "layer" not in seen:
             seen["layer"] = (store.step, volumes, joints, _layers(store, volumes))
         if _layers(store, volumes).max() == layers:

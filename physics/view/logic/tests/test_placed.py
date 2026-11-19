@@ -19,7 +19,7 @@ def _grown(steps: int) -> tuple:
 
 
 def test_centre_and_rim_joints_are_drawn_at_the_engine_s_distance_and_volumes_at_one_scale():
-    store, middle, size, joints, volumes, apart = _grown(190)
+    store, middle, size, joints, volumes, apart = _grown(215)
     cell, before, after, _axis = joints.T
     drawn = np.linalg.norm(middle[after] - middle[before], axis=1) / apart
     out = np.abs(steps_of(cell, store.side) - store.side // 2).max(axis=1)
@@ -36,7 +36,7 @@ def test_centre_and_rim_joints_are_drawn_at_the_engine_s_distance_and_volumes_at
 
 
 def test_a_joint_s_block_leans_from_the_one_of_its_volumes_to_the_other():
-    store, middle, size, joints, _volumes, _apart = _grown(150)
+    store, middle, size, joints, _volumes, _apart = _grown(215)
     shapes = placed(store, middle, size, joints, 1.0).numpy()
     slot = np.full(len(size), -1)
     slot[store.own_cell.numpy()[:store.count]] = np.arange(store.count)

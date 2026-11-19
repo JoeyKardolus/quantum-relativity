@@ -1,4 +1,4 @@
-"""A lone volume leaks whole quanta toward the free places round it; a bigger one a bigger share."""
+"""A lone volume leaks whole quanta toward the free places round it; a thinner one a bigger share."""
 import numpy as np
 
 from physics.engine import first_volume, step, three_cells
@@ -18,9 +18,10 @@ def _leaked(quanta: int, steps: int = 46):
     return store, np.delete(held, middle)[np.delete(held, middle) > 0]
 
 
-def test_a_bigger_volume_leaks_a_bigger_share_of_itself_in_a_turn():
+def test_a_thinner_volume_leaks_a_bigger_share_of_itself_in_a_turn_than_a_fuller_one():
     shares = [_leaked(calms * CALM)[1].sum() / (calms * CALM) for calms in (4, 1)]
-    assert shares[1] > 2 * shares[0] > 0.3  # measured: 0.19 and 0.47 of itself (the law: 1/5, 1/2)
+    assert shares[1] > 1.25 * shares[0] > 0.1  # measured: 0.088 and 0.118 (the law: 1/11, 1/8)
+    assert shares[1] < 1 / 7  # and never a seventh: the volume is left standing
 
 
 def test_the_leak_gathers_alike_at_the_26_places_and_nowhere_else():

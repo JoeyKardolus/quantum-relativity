@@ -9,7 +9,7 @@ from physics.engine.axiom_5_packing.logic.spread import spread
 from physics.engine.axiom_5_packing.logic.squeeze import pull_push
 
 JOINT = line_cells()[1]
-EVEN = (3 + np.pi / 6) ** (2 / 3)  # two calm volumes' distance squared across a fresh joint
+EVEN = (0.5 + 1 + 0.5) ** 2  # two calm volumes' distance squared across a fresh joint
 
 
 def _felt(store) -> np.ndarray:
@@ -20,7 +20,7 @@ def _felt(store) -> np.ndarray:
 
 
 def test_the_squeeze_is_the_pull_felt_at_the_two_volumes_and_the_push_back_of_the_joint():
-    uneven = (3 + np.pi / 12 * (1.5 ** -3 + 0.5 ** -3)) ** (2 / 3)  # the distance squared
+    uneven = (0.5 / 1.5 + 1 + 0.5 / 0.5) ** 2  # the distance squared: half widths and the joint
     assert np.allclose(pull_push(three_cells(), JOINT), [0, 1])  # no pull has arrived yet
     assert np.allclose(_felt(three_cells()), [PULL * 1.7 * 0.7 / uneven, 1])  # 1.5 and 0.5, and a
     assert np.allclose(_felt(three_cells(parts=(2, -2, 2))), [PULL * 1.44 / EVEN, 1])  # fifth back
@@ -43,10 +43,10 @@ def test_one_press_turns_only_the_joint_s_facing_phases_by_what_it_gives():
 
 
 def test_a_squeezed_joint_s_swirl_goes_irregular_and_one_not_squeezed_stays_as_laid():
-    squeezed, held = three_cells(), three_cells(parts=(2, -6, 2))  # 3 calm: push 81, pull 6
+    squeezed, held = three_cells(parts=(6, -2, 2)), three_cells(parts=(2, -6, 2))  # push 81, pull 2.4
     for _ in range(300):
         step(squeezed)
         step(held)
-    assert swirl_of(squeezed, JOINT)["off_rule"] > 100  # measured: 549
+    assert swirl_of(squeezed, JOINT)["off_rule"] > 100  # measured: 21,873
     calm = swirl_of(held, JOINT)  # plain counting noise is 1 (measured: 1.07)
     assert calm["off_rule"] < 2 and calm["turns"] == (-1, -1, -1)

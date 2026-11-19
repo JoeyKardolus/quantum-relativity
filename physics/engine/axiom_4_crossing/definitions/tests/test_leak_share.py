@@ -1,4 +1,5 @@
-"""The bigger a volume, the bigger the share it leaks; it leaks alike toward all 26 directions."""
+"""The bigger a volume, the bigger the share it leaks, never more than a seventh; it leaks alike
+toward all 26 directions."""
 import numpy as np
 import warp as wp
 
@@ -11,14 +12,15 @@ def _shares(calms: wp.array(dtype=wp.float64), found: wp.array(dtype=wp.float64)
     found[wp.tid()] = leak_share(calms[wp.tid()] * wp.float64(648000.0), wp.float64(648000.0))
 
 
-def test_the_share_grows_with_the_size_and_never_passes_the_whole():
-    found = wp.zeros(5, dtype=wp.float64, device="cpu")
-    wp.launch(_shares, dim=5, device="cpu",
-              inputs=[wp.array([100, 2, 1, 0.5, 0.01], dtype=wp.float64, device="cpu"), found])
+def test_a_thinner_volume_leaks_a_bigger_share_and_none_more_than_a_seventh():
+    found = wp.zeros(6, dtype=wp.float64, device="cpu")
+    wp.launch(_shares, dim=6, device="cpu",
+              inputs=[wp.array([1000, 2, 1, 0.5, 1 / 60, 1e-6], dtype=wp.float64, device="cpu"), found])
     shares = found.numpy()
-    assert shares[2] == 0.5 and np.isclose(shares[1], 1 / 3)  # a calm volume: half a turn
-    assert (np.diff(shares) > 0).all() and shares[-1] < 1  # the bigger, the more; never the whole
-    assert np.isclose(shares[0], 0.01, rtol=0.01)  # packed: in step with its size, 1/100
+    assert shares[2] == 1 / 8 and np.isclose(shares[1], 1 / 9)  # a calm volume: an eighth a turn
+    assert (np.diff(shares) > 0).all() and shares[-1] < 1 / 7  # the bigger, the more; never a seventh
+    assert np.isclose(shares[0], 0.001, rtol=0.01)  # packed: in step with its size, 1/1000
+    assert shares[4] < 1 / 7  # the thinnest whirl keeps more than six sevenths of itself a turn
 
 
 @wp.kernel

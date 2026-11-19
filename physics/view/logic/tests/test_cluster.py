@@ -42,3 +42,15 @@ def test_tracers_the_fluid_carries_off_the_flat_cut_are_laid_in_it_again_before_
     assert 0 < (~in_cut()).sum()  # some crossed a joint out of the layer (measured: 8,896 of 32,000)
     marks = drawn(store, seen).numpy()
     assert in_cut().all() and (marks[:, :, 3] != 0).all()  # none is drawn off the cut, tail and all
+
+
+def test_after_a_collapse_the_emptied_cells_are_not_drawn_and_the_title_counts_it():
+    from physics.engine.axiom_6_limits.logic.tests.test_merged import _staged
+    from physics.view.logic.lay_tracers import shown
+    from physics.view.logic.scene import title
+    store = _staged()[0]
+    seen = Seen(trace(store))
+    marks = drawn(store, seen).numpy()[-1]
+    assert np.isfinite(marks).all() and (shown(store, False) == 0).sum() == 2  # the joint, a volume
+    assert not (shown(store, False) == 0)[_slots(seen)].any()  # no tracer is left in them
+    assert "collapses 1" in title(store, seen)

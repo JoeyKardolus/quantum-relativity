@@ -48,13 +48,17 @@ open core, every quantum counted exactly; energy crossing from volume to volume 
 the squeeze; a universe that grows from one energy volume, whose whirl leaks: what leaks tears off as a
 layer of new volumes all round it, with joints between, and those shed the next layer; and one pull,
 a number a cell that every energy volume feeds and every cell hands on to its neighbours a step at a
-time, which squeezes the joints and bends crossing energy toward where it is deeper. Measured: the
-grid no longer stays even. Energy gathers at the middle of the cluster (its fullest volume holds 3.4
-calm volumes' energy at 16 turns against 0.3 with the pull off), the joints there are squeezed 200
-times thinner than at the rim, and the red volumes there touch from 14 turns on; the cluster still
-grows layer by layer, slower. Not yet: a region made fuller by hand spreads out within half a turn,
-two such regions do not fall toward each other, and one set going does not keep going; so no
-gravity between bodies yet. Next: joint collapse where the reds touch, then why lumps do not hold. Progress is tracked on
+time, which squeezes the joints and bends crossing energy toward where it is deeper. Layer 5 (2026-11-19): a
+volume's leak never takes more than a seventh of it in a turn, two joined volumes stand their half widths and the
+joint's thickness apart so they cannot overlap, and a joint collapses where the pull at it is so deep
+that nothing at the grid's top speed could climb out: its minus energy flips to plus and it merges
+with its two volumes into one. Measured: every volume keeps at least 2.9 least whirls; the first joint
+falls at 13.9 turns at the centre and in 1.6 turns 3,346 joints fall, the inner six layers becoming one
+volume; the outer layers stand. Not yet: the merged volume does not hold (its energy crosses back out
+and the cluster grows again), a second collapse at 23.7 turns overflows a cell's whole number and stops
+the run, the collapsed region does not grow in step with its energy, hardly any volume winds whole
+turns, and a region made fuller by hand still spreads, does not fall and does not coast; so no gravity
+between bodies yet. Next: why a packed volume does not hold its energy. Progress is tracked on
 [issue #1](https://github.com/JoeyKardolus/quantum-relativity/issues/1).
 Misses are reported as misses; nothing is tuned to look good.
 
@@ -66,7 +70,7 @@ PYTHONPATH=. .venv/bin/python -m physics.view   # a window; Space starts, R rese
 PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing   # energy crossing from a volume through a joint into the next
 PYTHONPATH=. .venv/bin/python -m physics.view --scene grow       # one volume leaks and sheds layer after layer of new volumes; X Y Z look along, C whole or flat cut
 PYTHONPATH=. .venv/bin/python -m physics.view --scene lumps      # two regions made fuller by hand in a small grown patch
-PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, 27 seconds
+PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, about 30 seconds
 ```
 
 Needs Linux or WSL2, Python 3.12+, [`uv`](https://docs.astral.sh/uv/) . The engine runs on

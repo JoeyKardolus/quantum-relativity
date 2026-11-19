@@ -7,14 +7,15 @@ arrives with its phase, so it is still moving. The pull turns the two phases fir
 so more crosses toward the deeper pull. Friction then takes its share of the motion
 across; what it holds back stays in the volume it came from. What one volume loses the
 other gains; the joint's quanta stay. One launch an axis, so a volume's corner box is never
-in two pairs of one launch.
+in two pairs of one launch; joints that share a merged volume's side take its rows in turn.
 """
 import warp as wp
 
 from physics.engine.axiom_1_energy.definitions.draw_uniform import draw_uniform
 from physics.engine.axiom_1_energy.definitions.pair_rotation import pair_rotation, phase_of, wave_of
 from physics.engine.axiom_1_energy.definitions.whole_move import whole_move
-from physics.engine.axiom_3_structure.definitions.places import joint_axis, joint_ends, stride_of
+from physics.engine.axiom_3_structure.definitions.merged import allotted, joint_volumes
+from physics.engine.axiom_3_structure.definitions.places import joint_axis, stride_of
 from physics.engine.axiom_3_structure.definitions.store import slot_at
 from physics.engine.axiom_4_crossing.definitions.facing import faced
 from physics.engine.axiom_4_crossing.definitions.passage import (
@@ -26,7 +27,8 @@ wp.set_module_options({"fuse_fp": False})
 
 @wp.kernel
 def _cross(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32),
-           tile_slots: wp.array(dtype=wp.int32), side: wp.int32, axis: wp.int32,
+           tile_slots: wp.array(dtype=wp.int32), own_whole: wp.array(dtype=wp.int32),
+           own_part: wp.array(dtype=wp.vec4i), side: wp.int32, axis: wp.int32,
            across: wp.int32, seed: wp.uint32, step: wp.uint32, a_turn: wp.float64,
            cell_pull: wp.array(dtype=wp.float32),
            cell_quanta: wp.array(dtype=wp.int32),
@@ -35,9 +37,11 @@ def _cross(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int3
     joint, stride = own_cell[slot], stride_of(across, axis)
     if cell_quanta[joint] >= 0 or joint_axis(joint, side) != axis:
         return  # only a joint that lies along this axis lets energy cross
+    if not allotted(own_part[slot], first * across + third):
+        return  # this row of the side is another joint's
     row = row_of(first, third, across, axis)  # the row's first box, facing the volume before
-    before, after = joint_ends(joint, side, axis)[0], joint_ends(joint, side, axis)[1]
-    faces = faced(row, across, axis)
+    ends = joint_volumes(joint, side, axis, tile_home, tile_slots, own_whole, own_cell)
+    before, after, faces = ends[0], ends[1], faced(row, across, axis)
     left, right = slot_at(tile_home, tile_slots, before), slot_at(tile_home, tile_slots, after)
     minus = row_minus(box_quanta, slot, row, stride, across)
     if left < 0 or right < 0 or minus <= wp.float64(0.0):
@@ -71,6 +75,6 @@ def cross(store, before=None) -> None:
         wp.launch(_cross, dim=(store.count, store.across, store.across),
                   device=store.box_quanta.device,
                   inputs=[store.own_cell, store.tile_home, store.tile_slots,
-                          store.side, axis, store.across, store.seed,
+                          store.own_whole, store.own_part, store.side, axis, store.across, store.seed,
                           store.step, wp.float64(store.turn_per_step / (2.0 * wp.pi)),
                           store.cell_pull, store.cell_quanta, store.box_quanta, store.box_phase])

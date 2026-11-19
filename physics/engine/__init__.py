@@ -11,18 +11,20 @@ from physics.engine.axiom_4_crossing.logic.leak import leak
 from physics.engine.axiom_5_packing.logic.press import press
 from physics.engine.axiom_5_packing.logic.spread import spread
 from physics.engine.axiom_5_packing.logic.squeeze import squeeze
+from physics.engine.axiom_6_limits.logic.collapse import collapse
 from physics.engine.axiom_6_limits.logic.make import make
 from physics.engine.axiom_6_limits.logic.tear import tear
 
 
 def step(store: Store, before_pass=None, before_cross=None) -> None:
-    """One step: gathered leak tears off; the fluid moves, crosses and leaks; the pull is handed on;
-    squeezed joints make quanta.
+    """One step: gathered leak tears off; joints past their limit collapse; the fluid moves,
+    crosses and leaks; the pull is handed on; squeezed joints make quanta.
 
     `before_pass(axis, parity)` lets a watcher look before each of the six passes inside,
     `before_cross(axis)` before each direction's crossing. A calm cell's step is the count.
     """
     tear(store)
+    collapse(store)
     flow_inside(store, before_pass)
     cross(store, before_cross)
     leak(store)

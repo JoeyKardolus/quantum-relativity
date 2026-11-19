@@ -8,7 +8,8 @@ import numpy as np
 import warp as wp
 
 from physics.engine.axiom_3_structure.definitions.kinds import QUANTA_A_BOX
-from physics.engine.axiom_3_structure.definitions.places import joint_axis, joint_ends
+from physics.engine.axiom_3_structure.definitions.merged import joint_volumes
+from physics.engine.axiom_3_structure.definitions.places import joint_axis
 from physics.engine.axiom_3_structure.definitions.store import Store, slot_at, slot_of
 from physics.engine.axiom_5_packing.definitions.pull_push import (
     apart_of, pull_across, push_back)
@@ -18,8 +19,8 @@ wp.set_module_options({"enable_backward": False})  # nothing here is ever run ba
 
 @wp.kernel
 def _squeeze(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32),
-             tile_slots: wp.array(dtype=wp.int32), side: wp.int32,
-             calm: wp.float64,
+             tile_slots: wp.array(dtype=wp.int32), own_whole: wp.array(dtype=wp.int32),
+             side: wp.int32, calm: wp.float64,
              cell_quanta: wp.array(dtype=wp.int32), cell_pull: wp.array(dtype=wp.float32),
              own_squeeze: wp.array(dtype=wp.vec4d)):
     joint = own_cell[wp.tid()]
@@ -28,7 +29,8 @@ def _squeeze(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.in
     axis = joint_axis(joint, side)
     if axis < 0 or cell_quanta[joint] >= 0:
         return  # not a joint
-    before, after = joint_ends(joint, side, axis)[0], joint_ends(joint, side, axis)[1]
+    ends = joint_volumes(joint, side, axis, tile_home, tile_slots, own_whole, own_cell)
+    before, after = ends[0], ends[1]
     if cell_quanta[before] <= 0 or cell_quanta[after] <= 0:
         return  # only a joint between two volumes is pulled across
     if slot_at(tile_home, tile_slots, before) < 0 or slot_at(tile_home, tile_slots, after) < 0:
@@ -44,7 +46,7 @@ def _squeeze(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.in
 def squeeze(store: Store) -> None:
     """Write each own joint's pull and push into `own_squeeze`."""
     wp.launch(_squeeze, dim=store.count, device=store.box_quanta.device,
-              inputs=[store.own_cell, store.tile_home, store.tile_slots, store.side,
+              inputs=[store.own_cell, store.tile_home, store.tile_slots, store.own_whole, store.side,
                       wp.float64(QUANTA_A_BOX * store.across ** 3), store.cell_quanta,
                       store.cell_pull, store.own_squeeze])
 

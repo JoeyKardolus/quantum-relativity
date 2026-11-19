@@ -27,7 +27,7 @@ def _sizes(held: np.ndarray, calm: int) -> str:
 
 
 def cells_title(store: Store) -> str:
-    """Layers, volumes and joints with their sizes; plus and minus to the quantum; what joints made; the step."""
+    """Layers, collapses, volumes and joints with their sizes; plus and minus to the quantum; what joints made; the step."""
     held = store.cell_quanta.numpy().astype(np.int64)
     own = store.own_cell.numpy()[:store.count]
     calm, has = QUANTA_A_BOX * store.across ** 3, held[own]
@@ -35,7 +35,8 @@ def cells_title(store: Store) -> str:
     out = np.abs(steps_of(own[has > 0], store.side) - store.side // 2).max() // 2
     layers = f"{out} layers  " if store.leaks else ""
     blue = f"  {joints.size} joints {_sizes(joints, calm)}" if joints.size else "  no joint"
-    return (f"{layers}{volumes.size} volumes {_sizes(volumes, calm)}{blue}  "
+    fell = f"collapses {store.collapses}  " if store.leaks else ""
+    return (f"{layers}{fell}{volumes.size} volumes {_sizes(volumes, calm)}{blue}  "
             f"plus {held[held > 0].sum():,}  minus {joints.sum():,}  "
             f"made {store.cell_made.numpy().sum():,}  step {store.step}")
 
@@ -51,7 +52,7 @@ def squeeze_read(store: Store, middle: np.ndarray) -> str:
     out = np.abs(steps_of(cell, store.side) - store.side // 2).max(axis=1)  # steps from the first
     thick = apart - (size[before] + size[after]) / 2
     drawn = np.linalg.norm(middle[after] - middle[before], axis=1) / apart
-    centre, rim = out <= 2, out >= out.max() - 1
+    centre, rim = out <= max(2, out.min()), out >= out.max() - 1  # the innermost joints that stand
     return (f"  red to red: centre {np.median(apart[centre]):.2g} rim {np.median(apart[rim]):.2g}"
             f"  joint thick: centre {np.median(thick[centre]):.2g} rim {np.median(thick[rim]):.2g}"
             f"  drawn off {100 * np.sqrt(np.nanmean((drawn - 1) ** 2)):.0f}%")

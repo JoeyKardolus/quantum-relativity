@@ -2,12 +2,11 @@
 
 > More packed is smaller, slower and pulls harder; pull spreads at a finite speed, weaker with distance; squeezed minus pushes back steeply.
 
-Built: one pull a cell, handed on a neighbour a step.
-
 Assumed:
-- A volume's pull: its energy and a sixth of each side's joint's. A joint's: its volumes' mean. Past the rim it is lost.
-- Squeeze: `PULL` times the pulls at a joint's two volumes, over their distance squared.
-- Bend: `BEND` times `d / (1 + d)`, `d` the pull's difference across the joint.
-- Push: quanta to the power 4. `GIVE`: a quarter a turn.
+- A volume's pull: its energy and a sixth of each side's joints' mean. A joint's: its volumes' mean.
+- Distance: half a width, the joint's size, half the other width.
+- Squeeze: `PULL` times the two pulls over the distance squared. `PULL` is kept from the old distance law: the owner must rule.
+- Bend: `BEND` times `d / (1 + d)`.
+- Push: quanta to the power 4.
 
 Not right (strict xfails): lumps spread, nothing falls or coasts. Not built: slower clocks.

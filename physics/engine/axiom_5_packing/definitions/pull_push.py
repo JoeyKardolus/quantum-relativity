@@ -1,10 +1,10 @@
 """Pull and push: the two forces on a joint, from the pull at its two volumes and its own quanta.
 
 Quanta are counted in calm volumes' quanta: a calm volume holds 1 and is 1 long.
-Apart: an energy volume is round, a ball as wide as its size, and a joint fills the room
-between its two. The cube on the distance between two volumes' middles holds one ball (half
-of each of the two) and three joints' room: a joint's room, its size to the power 3, sets
-how far apart its two volumes stand. More quanta, less room, closer together.
+Apart: an energy volume is round, a ball as wide as its size, and the joint lies between
+its two, as thick as its own size (the one size law). The distance between two volumes'
+middles is half the one's width, the joint's thickness and half the other's: never less
+than their widths allow. The squeeze makes the joint's quanta rise, so it thins, never to 0.
 
 Pull across: `PULL` times the pull at the one volume (`pull.py`: its own energy and what
 all the others hand on) times the pull at the other, over that distance squared. Push back: how packed the joint is, its quanta over its room: quanta to the
@@ -17,23 +17,20 @@ from physics.engine.axiom_3_structure.definitions.store import slot_at
 # The push's one setting, chosen before any run: 4, which is 1 for the quanta and 3 for the
 # room (a size in three directions). It is what the size law gives; nothing was fitted.
 STEEP = 4.0
-# The squeeze's one setting, restated before any run of the spreading pull (2026-11-19): two
-# calm volumes alone hold their joint a quarter of their own size thin where it is thinnest.
-# They are 1.25 apart, the joint holds 1.28, and each feels a pull of 1.2 (its own 1 and
-# what comes back through the joint): 1.28 ** 4 * 1.25 ** 2 / 1.2 ** 2.
+# The squeeze's one setting, kept as layer 4 chose it (under the distance law of then: 1.28
+# ** 4 * 1.25 ** 2 / 1.2 ** 2) and not moved when the distance became the plain sum: by that
+# sum two calm volumes alone hold their joint as thick as they are wide (it holds 1.02).
 PULL = 2.92
 # How fast a joint gives way, chosen before any run: to a wholly unanswered pull, a quarter
 # in one turn of a calm swirl.
 GIVE = 0.25
-BALL = 0.5235987755982988  # the room of a ball 1 wide: pi over 6
 
 
 @wp.func
 def apart_of(left: wp.float64, right: wp.float64, joint: wp.float64) -> wp.float64:
     """How far apart the middles of two volumes stand that hold a joint of `joint` quanta."""
-    cube = wp.float64(-3.0)
-    balls = wp.float64(0.5 * BALL) * (wp.pow(left, cube) + wp.pow(right, cube))
-    return wp.cbrt(wp.float64(3.0) * wp.pow(joint, cube) + balls)
+    half = wp.float64(0.5)
+    return half / left + wp.float64(1.0) / joint + half / right
 
 
 @wp.func

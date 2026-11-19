@@ -38,9 +38,11 @@ def lay_tracers(store, cell: int, count: int = COUNT, seed: int = 1, cells: int 
 
 
 def shown(store, flat: bool) -> np.ndarray:
-    """1 for each own slot whose cell is drawn (count, 1): all, or the middle layer's."""
-    third = steps_of(store.own_cell.numpy()[:store.count], max(store.side, 1))[:, 2:]
-    return (third == store.side // 2) | (not flat)
+    """1 for each own slot whose cell is drawn (count, 1): all, or the middle layer's; never a
+    slot a collapse emptied."""
+    own = store.own_cell.numpy()[:store.count]
+    third = steps_of(own, max(store.side, 1))[:, 2:]
+    return ((third == store.side // 2) | (not flat)) & (store.cell_quanta.numpy()[own, None] != 0)
 
 
 def trace(store, flat: bool = False) -> Tracers:

@@ -34,7 +34,7 @@ def _placed(store):
 def test_each_cell_is_drawn_at_its_place_the_joint_s_way_below_0():
     store = three_cells()
     shapes = _placed(store).numpy()
-    apart = (3 + np.pi / 12 * (1.5 ** -3 + 0.5 ** -3)) ** (1 / 3)
+    apart = 0.5 / 1.5 + 1 + 0.5 / 0.5  # half a width, the joint's thickness, half the other width
     assert np.allclose(shapes[[0, 2], 0, 0], [-apart / 2, apart / 2]) and np.allclose(shapes[[0, 2], 1, 0], [2 / 3, 2])
     assert np.allclose(shapes[1, 1], [apart, 1 / 3, 1]) and shapes[1, 0, 0] == 0  # midway
     tracers = lay_tracers(store, 0, 600, cells=3)

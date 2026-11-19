@@ -5,8 +5,9 @@
 Built: plus crosses a joint between facing boxes; a whirl leaks toward free places.
 
 Assumed:
-- Rubbing share: minus over minus and plus in the passage; friction takes it off the phase step.
-- Crossing takes one step at any joint's size.
-- Leak a turn: the share `size / (1 + size)`, size in calm volumes (`LEAK` 1).
-- It leaks alike toward 26 directions.
-- Toward a volume the leak is the crossing, bent by the pull; toward a free place nothing bends it.
+- Rubbing share: minus over minus and plus in the passage.
+- Leak a turn: the share `size / (1 + 7 size)`, never a seventh. The owner has not ruled the seventh.
+- It leaks alike toward 26 directions; toward a volume the leak is the crossing.
+- Joints on one side of a merged volume take its rows in turn.
+
+Not right: a volume no longer fed leaks below a whirl.

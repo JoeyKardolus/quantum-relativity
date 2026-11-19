@@ -4,11 +4,13 @@
 crossing bench's volume, joint and volume (nothing leaks there); `first_volume.py` has the
 one volume a universe grows from.
 """
+import numpy as np
 import warp as wp
 
 from physics.engine.axiom_2_swirls.definitions.standing_mode import standing_mode
 from physics.engine.axiom_2_swirls.definitions.swirl_pattern import laid_at, swirl_patterns
 from physics.engine.axiom_3_structure.definitions.kinds import ACROSS, QUANTA_A_BOX
+from physics.engine.axiom_3_structure.definitions.merged import ALONE
 from physics.engine.axiom_3_structure.definitions.places import steps_of
 from physics.engine.axiom_3_structure.definitions.store import TILE, Store, put
 from physics.engine.axiom_3_structure.logic.take_own import take_own
@@ -34,6 +36,9 @@ def calm_cells(cells: int, own_cap: int, across: int = ACROSS, laid: int = 0, se
             tile_slots=wp.full(rows * TILE, -1, dtype=wp.int32),
             own_cell=wp.full(own_cap, -1, dtype=wp.int32),
             own_squeeze=wp.zeros(own_cap, dtype=wp.vec4d),
+            own_whole=wp.array(np.arange(own_cap), dtype=wp.int32),
+            own_ring=wp.array(np.arange(own_cap), dtype=wp.int32),
+            own_part=wp.array(np.tile(ALONE, (own_cap, 1)), dtype=wp.vec4i),
             box_quanta=wp.zeros((own_cap, boxes), dtype=wp.int32),
             box_phase=wp.zeros((own_cap, boxes), dtype=wp.float32),
             pattern=wp.array(swirl_patterns(across), dtype=wp.vec2d))

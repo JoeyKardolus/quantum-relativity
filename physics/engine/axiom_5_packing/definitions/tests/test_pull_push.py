@@ -1,5 +1,5 @@
-"""Round volumes stand apart by their joint's room; the pull across falls with it and grows with
-the pull felt at the two volumes; the push rises steeply."""
+"""Two volumes stand their half widths and their joint's thickness apart, never closer; the pull
+across falls with it and grows with the pull felt at the two volumes; the push rises steeply."""
 import numpy as np
 import warp as wp
 
@@ -25,16 +25,23 @@ def _forces(*held: tuple, felt: float = 1.0) -> np.ndarray:
     return found.numpy()
 
 
-def test_the_cube_on_the_distance_holds_one_round_volume_and_three_joints_room():
+def test_the_distance_is_half_a_width_the_joint_s_thickness_and_half_the_other_width():
     fresh, squeezed, uneven = _forces((1, 1, 1), (1, 1, 2), (2, 0.5, 1))[:, 3]
-    assert np.isclose(fresh ** 3, 3 + np.pi / 6)                # a ball 1 wide and three rooms of 1
-    assert np.isclose(squeezed ** 3, 3 / 8 + np.pi / 6)         # twice the quanta: an eighth the room
-    assert np.isclose(uneven ** 3, 3 + np.pi / 12 * (1 / 8 + 8))  # half of each of the two balls
+    assert np.isclose(fresh, 0.5 + 1 + 0.5) and np.isclose(squeezed, 0.5 + 0.5 + 0.5)
+    assert np.isclose(uneven, 0.25 + 1 + 1)  # sizes 0.5 and 2, a joint 1 thick
 
 
-def test_two_calm_volumes_hold_their_joint_a_quarter_thin():
-    pull, push, gives, apart = _forces((1, 1, 1.2803), felt=1.2)[0]  # alone, each feels 1.2
-    assert abs(apart - 1.25) < 0.001 and abs(pull - push) < 0.01 * push  # 1.25 less two radii
+def test_two_joined_volumes_never_stand_closer_than_their_widths_however_squeezed():
+    held = [(left, right, joint) for left in (0.02, 1, 50) for right in (0.02, 1, 50)
+            for joint in (0.01, 1, 1e6)]  # joints from fresh and fat to squeezed a million times
+    apart = _forces(*held)[:, 3]
+    widths = np.array([0.5 / left + 0.5 / right for left, right, _joint in held])
+    assert (apart > widths).all() and np.allclose(apart - widths, [1 / one[2] for one in held])
+
+
+def test_two_calm_volumes_hold_their_joint_as_thick_as_they_are_wide():
+    pull, push, gives, apart = _forces((1, 1, 1.017), felt=1.2)[0]  # alone, each feels 1.2
+    assert abs(apart - 1.983) < 0.001 and abs(pull - push) < 0.01 * push
 
 
 def test_the_pull_grows_with_both_volumes_and_falls_with_the_distance():
@@ -46,7 +53,7 @@ def test_the_pull_grows_with_both_volumes_and_falls_with_the_distance():
 
 
 def test_the_push_rises_steeply_and_what_is_given_is_the_unanswered_share():
-    calm, twice = _forces((1, 1, 1), (1, 1, 2))
+    calm, twice = _forces((1, 1, 1), (1, 1, 2), felt=2.0)
     assert calm[1] == 1 and twice[1] == 16  # twice the quanta: 16 times the push
-    assert np.isclose(calm[2], GIVE * 0.01 * (calm[0] - 1) / calm[0])
+    assert calm[0] > 1 and np.isclose(calm[2], GIVE * 0.01 * (calm[0] - 1) / calm[0])
     assert twice[2] == 0  # the push is the bigger: nothing gives

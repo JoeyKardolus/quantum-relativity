@@ -26,6 +26,9 @@ class Store:
     tile_slots: wp.array    # int32 (tile rows * 512): the cell's slot, -1: calm
     own_cell: wp.array      # int32 (cap): which cell holds this slot
     own_squeeze: wp.array   # vec4d (cap): a joint's pull, push, volumes' distance, axis
+    own_whole: wp.array     # int32 (cap): the slot of the volume this slot is part of (`merged.py`)
+    own_ring: wp.array      # int32 (cap): the next slot of the same volume, round to itself
+    own_part: wp.array      # vec4i (cap): a joint's rank and count on its two volumes' sides
     box_quanta: wp.array    # int32 (cap, boxes)
     box_phase: wp.array     # float32 (cap, boxes)
     pattern: wp.array       # vec2d (4, boxes): each box's share and phase in the four layings
@@ -35,6 +38,8 @@ class Store:
     count: int = 0          # slots in use
     open_tiles: int = 0     # tile rows in use
     ledger: int = 0         # quanta that changed box when cells went back to calm
+    collapses: int = 0      # joints that have collapsed
+    flipped: int = 0        # minus quanta that collapses flipped to plus
 
 
 @wp.func

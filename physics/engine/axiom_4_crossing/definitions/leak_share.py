@@ -2,16 +2,19 @@
 
 A volume is a whirl, and the whirl leaks: the bigger the volume (the lower its energy), the
 more. The one law: in a turn of its swirl a volume `size` calm volumes big leaks the share
-`LEAK * size / (1 + LEAK * size)` of its quanta: in step with its size while it is small,
-and never more than it holds. It leaks alike toward the 26 directions round it (6 sides,
-12 edges, 8 corners): each box's leak of a step goes one of them, by the draw.
+`LEAK * size / (1 + PARTS * LEAK * size)` of its quanta: in step with its size while it is
+small, and never more than one of its seven parts (itself and its six sides), so a leak
+always leaves the volume standing and what comes from further in can keep it a whirl. No
+floor: nothing stops a volume that is not fed. It leaks alike toward the 26 directions
+round it (6 sides, 12 edges, 8 corners): each box's leak of a step goes one of them, by the draw.
 """
 import warp as wp
 
 from physics.engine.axiom_3_structure.definitions.places import beside
+from physics.engine.axiom_6_limits.definitions.least_whirl import PARTS
 
 # The leak's one setting, chosen before any run: 1, so the calm volume is the mark and no
-# new size comes in: a calm volume with nothing round it leaks half of itself in a turn.
+# new size comes in: a packed volume leaks its size's share of itself in a turn.
 LEAK = 1.0
 
 
@@ -19,7 +22,7 @@ LEAK = 1.0
 def leak_share(quanta: wp.float64, calm: wp.float64) -> wp.float64:
     """The share of itself a volume that holds `quanta` leaks in a turn of its swirl."""
     size = wp.float64(LEAK) * calm / quanta
-    return size / (wp.float64(1.0) + size)
+    return size / (wp.float64(1.0) + wp.float64(PARTS) * size)
 
 
 @wp.func

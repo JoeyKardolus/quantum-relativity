@@ -4,6 +4,6 @@
 
 - Order in a step: `spread`, `squeeze`, then `make` and `press`.
 - A fresh store's pull is 0: nothing is squeezed until the pull arrives.
-- `squeeze` reads the pull; the distance still reads the quanta.
+- `squeeze` reads the pull; the distance reads the quanta. A joint's volumes are found by `joint_volumes`.
 - `lumps.py` imports the engine's door; the door must not import it.
 - Only a check or a scene's start stages; no step does.
