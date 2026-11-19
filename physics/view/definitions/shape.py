@@ -8,9 +8,8 @@ fat where four or eight volumes meet, and the joints that meet there fill it bet
 Each half of a joint's block fans out from the volume it faces, from that ball's rim to
 the base, equal parts of the block along a ray getting equal room. A cell's `shape` holds
 its middle, then for a joint (how far apart its volumes' middles stand, the radius of the
-one before, of the one after) and (how far its second half is moved where the grid wraps,
-its axis, -1); for a volume (its size, 0, 0), (0, 0, 1).
-Picture: the grid's second direction runs right, its first down, its third toward the eye.
+one before, of the one after) and (0, its axis, -1); for a volume (its size, 0, 0), (0, 0, 1).
+Picture: the cells' second direction runs right, its first down, its third toward the eye.
 """
 import warp as wp
 
@@ -36,7 +35,7 @@ def drawn_place(inside: wp.vec3, shape: wp.mat33) -> wp.vec3:
         part = 1.0 - 2.0 * wp.abs(inside[axis])  # 0 at the ball's rim, 1 at the base
         rim = wp.min(radius, reach)
         out = wp.cbrt(rim * rim * rim * (1.0 - part) + reach * reach * reach * part)
-        spot = middle + ray * (out / reach) + along * (wp.max(side, 0.0) * shape[2][0])
+        spot = middle + ray * (out / reach)
     return shape[0] + wp.vec3(spot[1], -spot[0], spot[2])
 
 

@@ -4,7 +4,7 @@ import pytest
 
 from physics.engine import one_cell
 from physics.view.definitions.camera import FARTHEST, NEAREST
-from physics.view.logic.scene import drawn as marks
+from physics.view.logic.scene import Seen, drawn as marks
 from physics.view.logic.tracers import MARK_EVERY, MARKS, lay_tracers, step_carrying
 
 pyglet = pytest.importorskip("pyglet")
@@ -22,7 +22,7 @@ def drawn():
     tracers = lay_tracers(store, 0, 4000)
     for done in range(160):
         step_carrying(store, tracers, 0, mark=done % MARK_EVERY == 0)
-    painter.load(marks(store, tracers))
+    painter.load(marks(store, Seen(tracers)))
     yield painter, store.across
     window.close()
 
@@ -59,7 +59,7 @@ def test_along_each_direction_the_one_cell_is_the_same_round_disc_with_a_dark_mi
     tracers = lay_tracers(store, 0, 4000)
     for done in range(120):
         step_carrying(store, tracers, 0, mark=done % MARK_EVERY == 0)
-    painter.load(marks(store, tracers))
+    painter.load(marks(store, Seen(tracers)))
     for yaw, pitch in ALONG:
         red = picture(painter, 12, yaw, pitch, 2.6, 400, 400).astype(int)[..., 0]
         rows, columns = np.indices(red.shape) - 199.5

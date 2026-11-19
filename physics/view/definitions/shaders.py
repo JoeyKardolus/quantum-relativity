@@ -10,7 +10,6 @@ drawn anywhere. `THICK`, `DOT` and `STILL` only draw; they were set by eye once.
 from physics.view.definitions.camera import FOCAL, NEAREST
 
 THICK = 0.002  # a streak's thickness in cell edges; thinner than a picture dot, it is clearer.
-# A grid's eye stands further off by its volumes along, and its streaks are that much thicker.
 DOT = 0.07     # a dot's width in cell edges: wide enough that a cell's dots lie over each other
 STILL = 0.3    # how solid a dot's middle is beside a streak
 

@@ -19,31 +19,28 @@ def _still(parts: tuple, a_phase=0.0):
 
 
 def test_the_books_are_exact_over_2000_steps():
-    store, heat = three_cells(), np.zeros(4)  # the ring's fourth place is empty
+    store = three_cells()
     for _ in range(2000):
         step(store)
         held = store.box_quanta.numpy().astype(np.int64).sum(axis=1)
         assert held[0] + held[2] == 1_296_000
         assert held[1] == -648_000 - store.cell_made.numpy()[1]  # the joint only makes
         assert (held == store.cell_quanta.numpy()[:3]).all() and store.box_quanta.numpy()[[0, 2]].min() >= 0
-        assert (store.cell_heat.numpy() >= heat).all() and store.cell_heat.numpy()[1] == 0
-        heat = store.cell_heat.numpy()
-    assert abs(held[0] - held[2]) < 0.01 * 1_296_000 and heat[2] > 0  # A 3 to B 1 has evened out
+    assert abs(held[0] - held[2]) < 0.01 * 1_296_000  # A 3 to B 1 has evened out
 
 
 def test_nothing_crosses_where_no_joint_lies_between():
     store = three_cells(parts=(3, 0, 1))
     for _ in range(200):
         step(store)
-    assert store.cell_quanta.numpy().tolist() == [972_000, 0, 324_000, 0]
-    assert store.cell_heat.numpy().max() == 0
+    assert store.cell_quanta.numpy().tolist() == [972_000, 0, 324_000]
 
 
 def test_equal_volumes_of_still_fluid_exchange_nothing():
     store = _still((2, -2, 2))
     for _ in range(50):
         step(store)
-    assert (store.box_quanta.numpy()[[0, 2]] == 3000).all() and store.cell_heat.numpy().max() == 0
+    assert (store.box_quanta.numpy()[[0, 2]] == 3000).all()
 
 
 def test_energy_arrives_still_moving_the_way_it_went():
@@ -59,15 +56,16 @@ def test_energy_arrives_still_moving_the_way_it_went():
     assert arrived[1] > 0.5 * sent  # more arrived than friction's half took (measured: 0.69)
 
 
-def test_friction_books_its_stated_share_of_what_crosses():
-    store = _still((3, -2, 1))
-    joint = -store.box_quanta.numpy()[1].reshape(6, 6, 6).mean(axis=1).ravel()  # minus, a row's box
-    share = joint / (joint + 3000)  # the two facing boxes hold 4,500 and 1,500: 3,000 a box
-    cross(store)
-    crossed = (4500 - store.box_quanta.numpy()[0].reshape(6, 6, 6)[:, 5, :]).ravel()
-    assert crossed.min() > 0 and crossed.sum() == store.cell_quanta.numpy()[2] - 324_000
-    assert abs(store.cell_heat.numpy()[2] - (share * crossed).sum()) < 12  # 36 whole draws
-    assert store.cell_heat.numpy()[0] == 0
+def test_what_friction_holds_back_stays_in_the_volume_it_came_from():
+    crossed = {}
+    for joint in (-2, -8):  # the fuller joint rubs more: less crosses, the rest stays in A
+        store = _still((3, joint, 1))
+        cross(store)
+        left = (4500 - store.box_quanta.numpy()[0].reshape(6, 6, 6)[:, 5, :]).ravel()
+        assert left.min() > 0 and left.sum() == store.cell_quanta.numpy()[2] - 324_000
+        assert store.cell_quanta.numpy()[[0, 2]].sum() == 1_296_000  # nothing goes anywhere else
+        crossed[joint] = left.sum()
+    assert crossed[-8] < 0.5 * crossed[-2]
 
 
 def test_the_volumes_keep_their_whole_swirls_while_energy_crosses():

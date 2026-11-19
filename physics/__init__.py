@@ -1,1 +1,1 @@
-"""Quantum-relativity theory simulation: `engine/` (layer 1: one cell) and `view/` (its window)."""
+"""Quantum-relativity theory simulation: `engine/` (one directory an axiom) and `view/` (its window)."""

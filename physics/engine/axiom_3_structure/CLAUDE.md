@@ -1,12 +1,14 @@
 # Axiom 3: structure
 
-> Planck boxes are not space: they sit inside each cell only to compute its fluid.
+> A cell has no geometry of its own, only relations to its neighbours and a size set by its energy alone.
 
-Built: the storage, the size law, the grid: a cell's number is its place, neighbours follow by arithmetic, and it wraps round in three directions.
+Built: storage, size law, relations: a joint names its two volumes, its axis and its part of each one's side. Only a tear adds one.
 
 Assumed (the owner has not ruled):
-- A volume is round. The joints fill all the room the volumes leave; no cell stands where joints meet.
-- A volume is its neighbour turned half round about the line between them. The three directions are alike: their joints are squeezed on one course, within 0.0005.
-- A calm volume holds 3,000 quanta a box, a fresh joint the same in minus.
+- A volume is round; a joint fills the room between its two.
+- A tear's halves keep their parent's frame.
+- A joint cut by a tear keeps half of the other volume's side.
+- A calm volume holds 3,000 quanta a box.
+- The first volume holds half a calm volume's quanta less one: the least overstretched.
 
-Measured (8 volumes): balance after 500 steps; to 3,000 volumes within 0.0003, whirls whole.
+Not right: a relation takes 44 bytes a cell.

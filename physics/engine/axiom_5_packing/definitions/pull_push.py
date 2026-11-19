@@ -1,11 +1,9 @@
 """Pull and push: the two forces on a joint, each from the cells' quanta alone.
 
-Every quanta here is counted in calm volumes' quanta, so a calm volume holds 1 and is 1 long.
-
-Apart: an energy volume is round, a ball as wide as its size, and a joint fills what the
-round volumes leave between them. In the grid every volume has six joints, each shared by
-two, so the cube on the distance between two volumes' middles holds one ball (half of
-each of the two) and three joints' room: a joint's room, its size to the power 3, sets
+Quanta are counted in calm volumes' quanta: a calm volume holds 1 and is 1 long.
+Apart: an energy volume is round, a ball as wide as its size, and a joint fills the room
+between its two. The cube on the distance between two volumes' middles holds one ball (half
+of each of the two) and three joints' room: a joint's room, its size to the power 3, sets
 how far apart its two volumes stand. More quanta, less room, closer together.
 
 Pull across: `PULL` times the one volume's quanta times the other's, over that distance
@@ -66,14 +64,17 @@ def given(squeeze: wp.vec4d, a_turn: wp.float64) -> wp.float64:
 @wp.func
 def pressed(box_quanta: wp.array2d(dtype=wp.int32), cell_quanta: wp.array(dtype=wp.int32),
             tile_home: wp.array(dtype=wp.int32), tile_slots: wp.array(dtype=wp.int32),
-            before: wp.int32, after: wp.int32, row: wp.int32, last: wp.int32) -> wp.float64:
+            ends: wp.vec3i, faces: wp.vec2i) -> wp.float64:
     """How hard the two volumes' fluid presses on one row of a joint: 1 is their mean.
 
-    The plus quanta of the two boxes that face each other across the row, each over its
-    volume's mean box: box `last` of the volume `before` and box `row` of the one `after`.
+    The plus quanta of the two boxes `faces` that face each other across the row, each over
+    its volume's mean box; a volume none of whose boxes faces the row presses by its mean.
     """
-    first = box_quanta[slot_at(tile_home, tile_slots, before), last]
-    second = box_quanta[slot_at(tile_home, tile_slots, after), row]
-    return wp.float64(0.5 * float(box_quanta.shape[1])) * (
-        wp.float64(first) / wp.float64(cell_quanta[before])
-        + wp.float64(second) / wp.float64(cell_quanta[after]))
+    press = wp.float64(0.0)
+    for end in range(2):
+        share = wp.float64(1.0 / float(box_quanta.shape[1]))
+        if faces[end] >= 0:
+            share = (wp.float64(box_quanta[slot_at(tile_home, tile_slots, ends[end]), faces[end]])
+                     / wp.float64(cell_quanta[ends[end]]))
+        press += share
+    return wp.float64(0.5 * float(box_quanta.shape[1])) * press

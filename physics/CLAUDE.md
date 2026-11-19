@@ -1,11 +1,11 @@
 # physics/
 
-A fresh start (2026-11-18), built in layers, each something to look at. Rules: the seven axioms in `docs/bible.md#physicsquantum-relativity`. Built: one ball whirl (1), crossing and the squeeze (2), a small grid that wraps round and stands calm (3a). `engine/`: a directory per axiom; `view/`: the window.
+A fresh start (2026-11-18), built in layers, each something to look at. Rules: the seven axioms in `docs/bible.md#physicsquantum-relativity`. Built: one ball whirl (1), crossing and the squeeze (2), the universe growing from one volume by tears (3b). Nothing lays a grid. `engine/`: a directory per axiom; `view/`: the window.
 
 ```
 PYTHONPATH=. .venv/bin/python -m physics.view                   # one ball: X, Y, Z, Space, R, G
 PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing  # volume, joint, volume
-PYTHONPATH=. .venv/bin/python -m physics.view --scene calm      # 4 x 4 x 4: X Y Z, L, C in 3D
+PYTHONPATH=. .venv/bin/python -m physics.view --scene grow      # one volume tears and grows: X Y Z, C
 PYTHONPATH=. .venv/bin/pytest -q physics                        # 25 seconds, on the CPU
 ```
 

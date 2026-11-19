@@ -4,7 +4,6 @@ import numpy as np
 from physics.engine.axiom_3_structure.definitions.kinds import QUANTA_A_BOX
 from physics.engine.axiom_3_structure.definitions.store import Store, peek, slot_of
 from physics.engine.axiom_3_structure.logic.boxes_of import swirl_of
-from physics.engine.axiom_5_packing.logic.squeeze import squeeze
 
 
 def title_line(store: Store) -> str:
@@ -17,22 +16,20 @@ def title_line(store: Store) -> str:
             f"ledger {store.ledger:,}  {kept}")
 
 
-def _each(held: np.ndarray) -> str:
-    """A few cells' quanta one by one; of many, how many and the least and the most."""
-    if held.size > 4:
-        return f"{held.size} from {held.min():.3f} to {held.max():.3f}"
-    return " ".join(f"{one:.2f}" for one in held)
+def _sizes(held: np.ndarray, calm: int) -> str:
+    """The cells' sizes in calm volumes: one by one when few, else the least and the most."""
+    sizes = calm / held
+    if sizes.size > 3:
+        return f"sizes {sizes.min():.1f} to {sizes.max():.1f}"
+    return "size " + " ".join(f"{one:.2f}" for one in sizes)
 
 
 def cells_title(store: Store) -> str:
-    """The volumes' and joints' quanta, the joints' thinnest place, what they made, heat, step."""
-    held = store.cell_quanta.numpy()
+    """How many volumes, joints and tears; plus and minus to the quantum; sizes; what joints made; the step."""
+    held = store.cell_quanta.numpy()[:store.cells].astype(np.int64)
     calm = QUANTA_A_BOX * store.across ** 3
-    squeeze(store)
-    apart = store.own_squeeze.numpy()[:store.count, 2].max()  # the scenes' joints all agree
     volumes, joints = held[held > 0], -held[held < 0]
-    thin = apart - calm * (1 / volumes).mean()  # less two radii: every joint has one of each
-    return (f"volumes {_each(volumes / calm)}  joints {_each(joints / calm)}  "
-            f"{apart:.2f} apart, joint {thin:.2f} thin  made {store.cell_made.numpy().sum():,}  "
-            f"heat {store.cell_heat.numpy().sum():,}  all {volumes.sum() + joints.sum():,}  "
-            f"step {store.step}")
+    blue = f"  {joints.size} joints {_sizes(joints, calm)}" if joints.size else "  no joint"
+    return (f"{volumes.size} volumes {_sizes(volumes, calm)}{blue}  {store.tears} tears  "
+            f"plus {volumes.sum():,}  minus {joints.sum():,}  "
+            f"made {store.cell_made.numpy().sum():,}  step {store.step}")

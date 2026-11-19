@@ -1,7 +1,7 @@
 [project]
 name = "physics"
 version = "0"
-description = "Quantum-relativity theory simulation, layers 1 to 3a: energy volumes whose fluid turns as whole swirls in their Planck boxes and crosses the joints between them, kept in storage built for a billion cells, and its viewer."
+description = "Quantum-relativity theory simulation, layers 1 to 3b: energy volumes whose fluid turns as whole swirls in their Planck boxes, tear when overstretched and cross the joints the tears make, kept in storage built for a billion cells, and its viewer."
 requires-python = ">=3.12"
 dependencies = ["numpy>=2.0", "warp-lang>=1.9", "pyglet>=2.0"]
 

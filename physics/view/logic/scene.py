@@ -1,67 +1,71 @@
-"""Scene: what the window shows. One cell is layer 1's energy volume; `crossing` a red
-volume, a blue joint and a red volume in a line; `calm` a small full grid that wraps round.
+"""Scene: what the window shows. `one` is layer 1's energy volume; `crossing` a red volume,
+a blue joint and a red volume in a line; `grow` one overstretched volume that tears, and
+tears again: red balls with blue joints between them, a cluster growing outward.
 
-A grid is shown looking along one of its three directions at one layer of its volumes and
-the joints between them, whole: balls with the blue all round them. Or in three
-dimensions, a slab `slab` layers thick from `layer` on, the joints from layer to layer
-too, each joint cut both ways along its length as it is drawn (`line_streaks`): balls in
-a web. A slab of all the layers is the whole grid.
+Every cell is drawn where the relations put it and as wide as its size (`placed.py`), so a
+volume that gains energy is seen to shrink and one that loses it to grow. `Seen` keeps what
+the picture needs from frame to frame: the tracers, the middles, how much smaller it is drawn.
 """
+from dataclasses import dataclass, field
+
 import numpy as np
 import warp as wp
 
-from physics.engine import one_cell, three_cells
-from physics.engine.axiom_3_structure.definitions.store import Store
-from physics.engine.axiom_3_structure.logic.lay_grid import calm_grid
+from physics.engine import first_volume, one_cell, three_cells
+from physics.engine.axiom_3_structure.definitions.size_law import size_of
+from physics.engine.axiom_3_structure.definitions.store import Store, peek
 from physics.view.definitions.camera import DISTANCE, LINE_DISTANCE
 from physics.view.logic.line_streaks import line_streaks
-from physics.view.logic.placed import placed
+from physics.view.logic.placed import placed, settle
 from physics.view.logic.title_line import cells_title, title_line
-from physics.view.logic.tracers import COUNT, Tracers, lay_tracers
+from physics.view.logic.tracers import COUNT, MARK_EVERY, Tracers, lay_tracers, step_carrying
 
-SCENES = {"one": one_cell, "crossing": three_cells, "calm": calm_grid}
-
-
-def layers(store: Store, along: int = 2) -> int:
-    """How many layers of volumes lie along a direction: 0 when the scene is no grid."""
-    return store.grid[along] // 2
+SCENES = {"one": one_cell, "crossing": three_cells, "grow": first_volume}
+FITS = 1.5  # how far from the middle the window shows at the cells' true sizes; only draws
 
 
-def in_cut(store: Store, layer: int | None, slab: int = 0, along: int = 2) -> np.ndarray | int:
-    """1 for each own cell that is shown: those of `layer` along `along`, or of the slab."""
-    if not layers(store):
-        return 1
-    deep = np.unravel_index(store.own_cell.numpy()[:store.count], store.grid)[along]
-    last = 2 * layer if not slab else 2 * (layer + slab - 1)
-    if slab == layers(store, along):
-        last = store.grid[along]  # all the layers: the joints round the wrap too
-    return ((deep >= 2 * layer) & (deep <= last))[:, None]
+@dataclass
+class Seen:
+    tracers: Tracers
+    middle: np.ndarray = field(default_factory=lambda: np.zeros((0, 3)))
+    span: float = 1.0  # the picture is drawn this many times smaller than the cells are
 
 
-def trace(store: Store, layer: int | None, slab: int = 0, along: int = 2) -> Tracers:
-    """Fresh tracers in what is shown: `COUNT` a cell, shared out past four cells."""
-    cells = max(store.count, 1)  # a calm cell alone is drawn too
-    return lay_tracers(store, 0, COUNT * min(cells, 4), cells=cells,
-                       shown=in_cut(store, layer, slab, along))
+def trace(store: Store) -> Tracers:
+    """Fresh tracers in every own cell, laid by the quanta: `COUNT` a cell, shared out past four."""
+    return lay_tracers(store, 0, COUNT * min(store.cell_quanta.shape[0], 4),
+                       cells=max(store.count, 1))  # a calm cell alone is drawn too
 
 
-def drawn(store: Store, tracers: Tracers, layer: int | None = None, slab: int = 0,
-          along: int = 2) -> wp.array:
-    """The tracers' tails as the card draws them now, what is shown at the picture's middle."""
-    if store.grid == (1, 1, 1):  # one volume, calm or own: a ball 1 wide at the middle
-        return line_streaks(tracers, store.across, wp.array(
-            [[[0, 0, 0], [1, 0, 0], [0, 0, 1]]], dtype=wp.mat33, device=tracers.tail.device))
-    if layer is None:
-        return line_streaks(tracers, store.across, placed(store))
-    middle = layer + max(slab - 1, 0) / 2
-    return line_streaks(tracers, store.across, placed(store, middle, along), slab > 0)
+def advance(store: Store, seen: Seen, boxes: tuple = None) -> None:
+    """One step with the tracers carried along; after a tear they are laid anew in the new cells."""
+    cells = store.count
+    step_carrying(store, seen.tracers, 0, store.step % MARK_EVERY == 0, boxes, max(cells, 1))
+    if store.count != cells:
+        seen.tracers = trace(store)
 
 
-def title(store: Store) -> str:
+def drawn(store: Store, seen: Seen, web: bool = False) -> wp.array:
+    """The tracers' tails as the card draws them now; `web`: the joints cut along their length."""
+    if store.cells == 1:  # one volume, calm or own: a ball as wide as its size at the middle
+        wide = size_of(peek(store.cell_quanta, 0), store.across)
+        return line_streaks(seen.tracers, store.across, wp.array(
+            [[[0, 0, 0], [wide, 0, 0], [0, 0, 1]]], dtype=wp.mat33, device=seen.tracers.tail.device))
+    seen.middle, size, joints = settle(store, seen.middle)
+    volumes = np.setdiff1d(np.arange(store.cells), joints[:, 0])
+    reach = (np.abs(seen.middle[volumes]) + size[volumes, None] / 2).max()
+    seen.span = max(1.0, reach / FITS)
+    return line_streaks(seen.tracers, store.across,
+                        placed(store, seen.middle, size, joints, seen.span), web)
+
+
+def title(store: Store, seen: Seen = None) -> str:
     """The scene's numbers in words."""
-    return title_line(store) if store.grid == (1, 1, 1) else cells_title(store)
+    if store.cell_quanta.shape[0] == 1:
+        return title_line(store)
+    return cells_title(store) + (f"  drawn 1 : {seen.span:.1f}" if seen else "")
 
 
 def eye_distance(store: Store) -> float:
-    """How far the eye starts from the middle of the scene: a grid's by its volumes along."""
-    return DISTANCE * layers(store) if layers(store) else (DISTANCE, LINE_DISTANCE)[store.count > 1]
+    """How far the eye starts from the middle of the scene."""
+    return DISTANCE if store.cell_quanta.shape[0] == 1 else LINE_DISTANCE

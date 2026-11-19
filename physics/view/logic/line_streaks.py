@@ -8,8 +8,9 @@ energy, and every mark is drawn as solid as every other (`AMOUNT`, by its even s
 its cell's room). Colour so gathers where energy is packed, moving or still: a still
 tracer is a dot, a moving one a streak. A joint's marks count below 0: blue.
 
-Every mark is drawn. In three dimensions (`web`) a joint's are drawn only where it is cut
-(`in_the_web`): the blue is then a web between the balls and not a fog before them.
+Every mark is drawn. With `web` a joint's are drawn only where it is cut (`in_the_web`):
+the blue is then a web between the balls and not a fog before them. A tracer that crossed
+a joint leaves its streak from the one volume to the other, through the blue.
 """
 import warp as wp
 
@@ -42,23 +43,9 @@ def _spots(tail: wp.array2d(dtype=wp.vec3), head: wp.int32, across: wp.int32, we
     drawn[age, tracer] = wp.vec4(spot[0], spot[1], spot[2], counts)
 
 
-@wp.kernel
-def _not_round_the_wrap(across: wp.int32, drawn: wp.array2d(dtype=wp.vec4)):
-    age, tracer = wp.tid()
-    spot = drawn[age, tracer]
-    # a mark a cell's edge or more from the next is the same place the other way round the
-    # grid, where it wraps: that way is not drawn
-    after = drawn[wp.min(age + 1, drawn.shape[0] - 1), tracer] - spot
-    before = drawn[wp.max(age - 1, 0), tracer] - spot
-    if wp.max(wp.length(wp.vec3(after[0], after[1], after[2])),
-              wp.length(wp.vec3(before[0], before[1], before[2]))) > float(across):
-        drawn[age, tracer] = wp.vec4(spot[0], spot[1], spot[2], 0.0)
-
-
 def line_streaks(tracers: Tracers, across: int, placed: wp.array, web: bool = False) -> wp.array:
     """(marks, tracers) of four floats: the place in the picture, how solid (below 0: blue)."""
     drawn = wp.empty(tracers.tail.shape, dtype=wp.vec4, device=tracers.tail.device)
     wp.launch(_spots, dim=drawn.shape, device=drawn.device,
               inputs=[tracers.tail, tracers.head, across, int(web), placed, drawn])
-    wp.launch(_not_round_the_wrap, dim=drawn.shape, device=drawn.device, inputs=[across, drawn])
     return drawn

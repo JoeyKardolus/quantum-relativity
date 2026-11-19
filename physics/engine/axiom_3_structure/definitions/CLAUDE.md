@@ -1,8 +1,9 @@
 # Axiom 3, definitions
 
-`store.py`: the plain arrays every cell lives in, `slot_of`, and `slot_at` (the same on the card). `size_law.py`: a cell's length from its quanta. `grid.py`: the cell beside a cell and a joint's axis, from place, round the grid. `kinds.py`: boxes across a cell, quanta a box (a chosen scene number, not moved).
+`store.py`: the arrays, `slot_of`, `slot_at`. `size_law.py`. `relations.py`: `joint_ends`, `joint_part`, `box_along` (the box a joint's row faces), `join`, `joints_of`. `kinds.py`: boxes across a cell, quanta a box.
 
 - A box belongs to its cell and has no place in space.
-- Warp arrays cannot grow: they are made once at their full size. A full own set or full tile rows (`tile_cap`) stop with a plain message.
-- A tile is 512 cells that follow each other. Its row, once opened, stays open.
-- `put` and `peek` touch one number from the host. They are for single cells, not for loops over many.
+- Warp arrays cannot grow: they are made once at their full size. A full own set, full tile rows or no free cell stop with a plain message.
+- Cells `0 .. cells - 1` are in use; a tear takes the next.
+- A part thinner than a box's width may hold no box's middle: nothing crosses there.
+- `put` and `peek` are for single cells, not loops.
