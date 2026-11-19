@@ -1,38 +1,40 @@
-"""The tracers go round the whirl's three lines with the fluid, and stand still when the fluid does."""
+"""The tracers go round the core of each ring with the fluid, and stand still when the fluid does."""
 import numpy as np
 
 from physics.engine import one_cell
+from physics.engine.axiom_2_swirls.logic.flip import flip
 from physics.engine.axiom_3_structure.logic.boxes_of import boxes_of
 from physics.engine.axiom_3_structure.logic.give_back import give_back
 from physics.view.logic.lay_tracers import lay_tracers
 from physics.view.logic.tracers import step_carrying
 
 
-def _round(tracers, across: int, axis: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Each tracer's angle round the line along `axis`, its distance from it, its place along it."""
-    place = tracers.tail.numpy()[tracers.head] - across / 2
-    first, second = place[:, (axis + 1) % 3], place[:, (axis + 2) % 3]
-    return np.arctan2(second, first), np.hypot(first, second), place[:, axis]
-
-
-def test_the_tracers_go_round_the_line_along_each_direction_the_same_way():
-    store = one_cell()
+def _turned(store, steps: int = 30) -> tuple[np.ndarray, np.ndarray, object]:
+    """How far each of 2,000 tracers went round its ring's core in `steps` steps (boxes), and its ring."""
     tracers = lay_tracers(store, 0, 2000)
-    start = [_round(tracers, store.across, axis) for axis in range(3)]
-    angle, turned = [one[0] for one in start], np.zeros((3, 2000))
-    for done in range(30):
+    start = tracers.tail.numpy()[tracers.head].copy()
+    around, turned = start[:, 1].copy(), np.zeros(2000)
+    for done in range(steps):
         step_carrying(store, tracers, 0, mark=done % 5 == 0)
-        for axis in range(3):
-            now = _round(tracers, store.across, axis)[0]
-            turned[axis] += (now - angle[axis] + np.pi) % (2 * np.pi) - np.pi
-            angle[axis] = now
-    for axis in range(3):  # those that started near the line, away from the middle where the three cross
-        near = (start[axis][1] < 1.5) & (np.abs(start[axis][2]) > 1.5)
-        assert near.sum() > 50 and (turned[axis][near] > 0).mean() > 0.95, (axis, near.sum())
-        assert np.median(turned[axis][near]) > 1.5                      # a good part of a round
+        now = tracers.tail.numpy()[tracers.head][:, 1]
+        turned += (now - around + store.across / 2) % store.across - store.across / 2
+        around = now
+    return turned, start[:, 0].astype(int) // (store.across // 3), tracers
+
+
+def test_the_tracers_go_round_the_core_of_each_ring_the_way_the_whirl_turns():
+    store = one_cell()
+    turned, ring, tracers = _turned(store)
+    for one in range(3):  # the three rings alike: every tracer goes on round its core
+        assert (turned[ring == one] > 0).mean() > 0.95 and (ring == one).sum() > 500
+        assert abs(np.median(turned[ring == one]) - np.median(turned)) < 0.1 * np.median(turned)
+    assert np.median(turned) > 2                                   # measured: 2.59 boxes of the 6 round
     place = tracers.tail.numpy()[tracers.head]
     assert place.min() >= 0 and place.max() <= store.across
     assert tracers.head == 6 and not np.array_equal(*tracers.tail.numpy()[[5, 6]])  # tails kept
+    other = one_cell()
+    flip(other, 0)                                                 # the sign is the way of the turn
+    assert abs(np.median(_turned(other)[0]) + np.median(turned)) < 0.01
 
 
 def test_fluid_that_stands_still_moves_no_tracer():

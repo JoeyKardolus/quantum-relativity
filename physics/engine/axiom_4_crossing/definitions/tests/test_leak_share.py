@@ -1,10 +1,9 @@
-"""The bigger a volume, the bigger the share it leaks, never more than a seventh; it leaks alike
-toward all 26 directions."""
+"""The bigger a volume, the bigger the share it leaks, never a seventh; a phase points to each of the 26 directions alike."""
 import numpy as np
 import warp as wp
 
 from physics.engine.axiom_3_structure.definitions.places import steps_of
-from physics.engine.axiom_4_crossing.definitions.leak_share import leak_share, toward
+from physics.engine.axiom_4_crossing.definitions.leak_share import leak_share, pointed, toward
 
 
 @wp.kernel
@@ -25,10 +24,13 @@ def test_a_thinner_volume_leaks_a_bigger_share_and_none_more_than_a_seventh():
 
 @wp.kernel
 def _picks(cell: wp.int32, side: wp.int32, found: wp.array(dtype=wp.int32)):
-    found[wp.tid()] = toward(cell, side, (wp.float64(wp.tid()) + wp.float64(0.5)) / wp.float64(2600.0))
+    points = pointed((wp.float64(wp.tid()) + wp.float64(0.5)) / wp.float64(2600.0))  # through a turn
+    found[wp.tid()] = toward(cell, side, wp.int32(points[0]))
+    if points[1] < wp.float64(0.0) or points[1] >= wp.float64(1.0):
+        found[wp.tid()] = -7  # the rest of the turn's share must lie from 0 up to 1
 
 
-def test_the_draw_picks_each_of_the_26_places_round_a_volume_alike():
+def test_a_phase_going_round_points_to_each_of_the_26_places_round_a_volume_alike():
     side, middle, corner = 5, 62, 0
     found = wp.zeros(2600, dtype=wp.int32, device="cpu")
     wp.launch(_picks, dim=2600, inputs=[middle, side, found], device="cpu")

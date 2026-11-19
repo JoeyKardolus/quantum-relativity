@@ -7,12 +7,11 @@ own and one toward each of its six sides. Toward a side where a volume stands, o
 the same step, that part flips from plus to minus and is the joint between the two: the
 place that tore, holding the least it ever will. Toward a side with no volume the part
 stays in the new volume. Two volumes that form side by side both give their part to the
-joint between them. Plus lost is minus gained, to the quantum. Every new cell is laid as a
-whole ball whirl, by its place (`laid_at`). Found on the host, before the fluid moves.
+joint between them. Plus lost is minus gained, to the quantum. Every new cell is laid as
+whole ring whirls, turning by its sign. Found on the host, before the fluid moves.
 """
 import numpy as np
 
-from physics.engine.axiom_2_swirls.definitions.swirl_pattern import laid_at
 from physics.engine.axiom_3_structure.definitions.places import steps_of
 from physics.engine.axiom_3_structure.definitions.store import Store
 from physics.engine.axiom_3_structure.logic.take_own import take_all
@@ -42,9 +41,7 @@ def tear(store: Store) -> None:
     """Make every cell the leak tears off in this step, each with its own boxes."""
     made = dict(sorted(torn(store).items())) if store.leaks else {}
     if made:
-        held, laid, cells = store.cell_quanta.numpy(), store.cell_laid.numpy(), list(made)
+        held, cells = store.cell_quanta.numpy(), list(made)
         held[cells] = list(made.values())
-        laid[cells] = [laid_at(steps) for steps in steps_of(cells, store.side)]
         store.cell_quanta.assign(held)
-        store.cell_laid.assign(laid)
         take_all(store, cells)

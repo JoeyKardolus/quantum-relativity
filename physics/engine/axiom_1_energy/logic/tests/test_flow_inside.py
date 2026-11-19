@@ -25,5 +25,5 @@ def test_a_cell_s_run_does_not_depend_on_the_slot_it_sits_in():
         step(alone)
         step(pair)
     assert np.array_equal(alone.box_quanta.numpy()[0], pair.box_quanta.numpy()[1])
-    assert not np.array_equal(pair.box_quanta.numpy()[0], pair.box_quanta.numpy()[1])   # each cell has its own draws
+    assert np.array_equal(pair.box_quanta.numpy()[0], pair.box_quanta.numpy()[1])  # no chance: alike cells run alike
     assert alone.box_quanta.numpy()[1].max() == 0  # a slot not in use is never visited

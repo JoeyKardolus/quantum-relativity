@@ -3,7 +3,7 @@ import numpy as np
 
 from physics.engine import step
 from physics.engine.axiom_3_structure.logic.shared_sides import joints_of
-from physics.engine.axiom_5_packing.logic.lumps import fuller, grown, region
+from physics.engine.axiom_5_packing.logic.lumps import grown
 from physics.engine.axiom_5_packing.logic.squeeze import squeeze
 
 
@@ -18,11 +18,10 @@ def _gaps(store) -> tuple:
 def test_in_a_grown_cluster_every_distance_is_the_half_widths_and_a_joint_thickness_above_0():
     store = grown(3, 6)
     apart, widths, thick = _gaps(store)
-    assert len(apart) > 200 and (thick > 0).all() and np.allclose(apart, widths + thick)
-    fresh = thick.min()
-    fuller(store, region(store, (0, 0, 0)), 40)  # a hard squeeze at the middle, staged
-    for _ in range(23):
+    assert len(apart) > 150 and (thick > 0).all() and np.allclose(apart, widths + thick)  # 187 joints
+    fresh = 60.0  # a joint as it tears off: a least whirl's quanta, 60 calm lengths thick
+    for _ in range(12):  # the first volume, 1,044 calm volumes still, squeezes hard: no staging needed
         step(store)
     apart, widths, thick = _gaps(store)
     assert (apart > widths).all() and (thick > 0).all() and np.allclose(apart, widths + thick)
-    assert 0 < thick.min() < fresh  # squeezed thinner (measured: 15.4 calm lengths), never to nothing
+    assert 0 < thick.min() < fresh / 5  # squeezed thinner (measured: 5.3 calm lengths), never to nothing

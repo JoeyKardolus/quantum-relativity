@@ -1,8 +1,8 @@
 # physics/view
 
-The window, `python -m physics.view`: one ball whirl; `--scene crossing`; `--scene grow` (X, Y, Z; C: whole or flat cut); `--scene lumps`.
+The window, `python -m physics.view`: one cell (Up, Down: energy; F: sign; 1 2 3 0: one ring or all; X Y Z, Space, R, G); `--scene crossing`; `--scene grow` (C: whole or flat cut); `--scene lumps`.
 
-- A cell is drawn as its fluid's tracers: a streak the way one came, a dot where it stands. No box.
-- Cells are drawn at their sizes, joined volumes the engine's distance apart; the title reads collapses, the squeeze, centre and rim, and how far the drawing is off.
-- Above 500 cells the flat cut is drawn; a tracer that leaves it is laid in it again.
-- Measured frames a second: 75 to 84 up to 1,000 cells, 63 at 3,200, 37 at 5,600, 6 to 9 from 6,800 (`strays.py`).
+- A cell is drawn as its fluid's tracers: a streak the way one came, a dot where it stands, brighter where the phase's crest is. No box.
+- All three rings together are one solid red ball: the cores show only with one ring alone.
+- Cells are drawn at their sizes, the engine's distance apart; the title says how far off.
+- Measured frames a second: 186 for one cell, 61 at 1,000 to 1,400 cells.

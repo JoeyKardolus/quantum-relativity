@@ -5,7 +5,7 @@ A calm cell has none, so the rule's boxes are dealt into one spare slot, as `tak
 import warp as wp
 
 from physics.engine.axiom_2_swirls.logic.read_swirl import (
-    core_share, off_rule, round_flow, whole_turns)
+    off_rule, round_flow, still_share, whole_turns)
 from physics.engine.axiom_3_structure.definitions.store import Store, slot_of
 from physics.engine.axiom_3_structure.logic.take_own import lay
 
@@ -26,11 +26,11 @@ def boxes_of(store: Store, cell: int) -> tuple[wp.array, wp.array, int]:
 
 
 def swirl_of(store: Store, cell: int) -> dict:
-    """What the cell's fluid is doing now, read on the host: `read_swirl`'s measures, each direction's."""
+    """What the cell's fluid is doing now, read on the host: `read_swirl`'s measures, each ring's."""
     box_quanta, box_phase, slot = boxes_of(store, cell)
     quanta, phase = box_quanta[slot].numpy(), box_phase[slot].numpy()
     rule = rule_boxes(store, cell)[0][0].numpy()
-    return {"turns": tuple(whole_turns(phase, axis) for axis in range(3)),
-            "round_flow": tuple(round_flow(quanta, phase, axis) for axis in range(3)),
-            "core": max(core_share(quanta, axis) for axis in range(3)),
+    return {"turns": tuple(whole_turns(phase, ring) for ring in range(3)),
+            "round_flow": tuple(round_flow(quanta, phase, ring) for ring in range(3)),
+            "still": still_share(quanta, phase),
             "off_rule": off_rule(quanta, rule)}

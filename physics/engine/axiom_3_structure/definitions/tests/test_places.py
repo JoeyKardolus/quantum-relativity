@@ -1,8 +1,6 @@
 """A cell's number is its place: volumes at even steps, a joint at the odd step between its two."""
-import numpy as np
 import warp as wp
 
-from physics.engine.axiom_2_swirls.definitions.swirl_pattern import half_round, laid_at
 from physics.engine.axiom_3_structure.definitions.places import (
     beside, joint_axis, joint_ends, steps_of)
 
@@ -37,13 +35,3 @@ def test_past_the_room_s_end_there_is_no_cell():
                                         (0, 5, 2, -2), (4, 5, 2, 2), (124, 5, 0, 2))]
     assert on == [2, 10, 100, -1, -1, -1]
 
-
-def test_two_volumes_either_side_of_a_joint_lie_half_round_about_its_line():
-    assert [half_round(0, way) for way in range(3)] == [1, 2, 3]
-    assert half_round(1, 0) == 0 and half_round(1, 1) == 3 and half_round(3, 0) == 2
-    for steps in np.ndindex(3, 3, 3):  # volumes at the even steps 0, 2, 4 a direction
-        here = laid_at(2 * np.array(steps))
-        for way in range(3):
-            on = 2 * np.array(steps) + 2 * np.eye(3, dtype=int)[way]
-            assert laid_at(on) == half_round(here, way)
-            assert laid_at(on - np.eye(3, dtype=int)[way]) == here  # the joint: as the volume before

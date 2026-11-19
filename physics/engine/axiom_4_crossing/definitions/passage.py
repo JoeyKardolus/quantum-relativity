@@ -1,15 +1,14 @@
 """Passage: how freely plus energy passes a joint, read off the joint's own fluid.
 
-A joint stands between two volumes along one of the boxes' three directions, its axis.
-A box of the one volume that faces the joint and the box of the other facing it are
-joined by the row of the joint's boxes between them (`row_of`, `stride_of`). `row_minus`
-is the minus quanta of that row, a box. Crossing energy rubs against them: `rub_share` is
+A joint stands between two volumes along one direction, its axis. A box of the one volume
+that faces the joint and the box of the other facing it (`facing.py`) are joined by the
+joint's boxes once round its core there. `row_minus` is the minus quanta of that row, a box. Crossing energy rubs against them: `rub_share` is
 the minus share of all the energy met in the passage. The two facing boxes move by the
 fluid's own law, the pair rotation, with the turn cut to the share that does not rub
 (`passing_turn`); friction then takes the rubbing share of the motion across, the step in
 phase between the two boxes (`less_step`). No number is set here: the joint's quanta decide.
 
-Stated a cell, not a box: the facing boxes are 1 in `across` of their cell and a step is 1
+Stated a cell, not a box: the facing boxes are 1 in 6 `across` of their cell and a step is 1
 in `across` squared of a swirl's turn, so the turn and the friction of one step are cut by
 `layer_part`. The same share of a cell then crosses in a turn of its swirl at any boxes.
 """
@@ -17,23 +16,16 @@ import warp as wp
 
 from physics.engine.axiom_1_energy.definitions.pair_rotation import TURN
 from physics.engine.axiom_3_structure.definitions.kinds import ACROSS
-from physics.engine.axiom_3_structure.definitions.places import stride_of  # noqa: F401, handed on
-
-
-@wp.func
-def row_of(first: wp.int32, third: wp.int32, across: wp.int32, axis: wp.int32) -> wp.int32:
-    """The first box of the row along `axis`: `first`, `third` along the two directions after it."""
-    return (first * stride_of(across, (axis + 1) % 3)
-            + third * stride_of(across, (axis + 2) % 3))
+from physics.engine.axiom_2_swirls.definitions.ring_boxes import box_at
 
 
 @wp.func
 def row_minus(box_quanta: wp.array2d(dtype=wp.int32), slot: wp.int32, row: wp.int32,
-              stride: wp.int32, across: wp.int32) -> wp.float64:
-    """The minus quanta a box in the joint's row from box `row` on (0 or less: no joint)."""
+              across: wp.int32, axis: wp.int32) -> wp.float64:
+    """The minus quanta a box in the joint's outside boxes once round its core at row `row` (0 or less: no joint)."""
     held = wp.int32(0)
-    for along in range(across):
-        held -= box_quanta[slot, row + along * stride]
+    for around in range(across):
+        held -= box_quanta[slot, box_at(across, axis, across / 3 - 1, around, row % across)]
     return wp.float64(held) / wp.float64(across)
 
 

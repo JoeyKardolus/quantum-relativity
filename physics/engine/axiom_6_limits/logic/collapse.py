@@ -3,7 +3,7 @@
 Found on the host, after the tear and before the fluid moves, from the pull of the step
 before and the distances as they are now (`past_limit`). The joint's minus quanta flip to plus, the
 same amount, and the joint and its two volumes are one volume that holds all three: it
-stands at the place of the fuller of the two, laid as one whole ball whirl, and by the
+stands at the place of the fuller of the two, laid as whole ring whirls, and by the
 size law it is smaller and pulls harder, so its other joints are squeezed more and may
 follow in the steps after. It keeps every joint its two volumes had (`shared_sides.py`);
 a joint that so comes to lie inside one volume has nothing to hold apart and flips into

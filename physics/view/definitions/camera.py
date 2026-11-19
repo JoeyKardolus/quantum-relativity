@@ -28,3 +28,8 @@ def camera(yaw: float, pitch: float, distance: float) -> tuple:
 def zoomed(distance: float, notches: float) -> float:
     """The eye's distance after the wheel turned `notches`, kept in its range."""
     return float(np.clip(distance * 0.9 ** np.clip(notches, -50.0, 50.0), NEAREST, FARTHEST))
+
+
+def eye_distance(store) -> float:
+    """How far the eye starts from the middle of the scene: one cell, or cells in a pattern."""
+    return DISTANCE if store.side == 0 else LINE_DISTANCE

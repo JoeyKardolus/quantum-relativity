@@ -29,23 +29,31 @@ def test_taking_a_second_cell_own_leaves_the_first_one_s_boxes():
 
 def test_after_one_round_the_cell_goes_back_and_the_calm_swirl_has_turned_with_it():
     store = one_cell()
-    for _ in range(46):                            # one round of the whirl's phase at 6 across
+    for _ in range(25):                            # one round of the whirl's phase at 6 across
         step(store)
     stepped, stepped_phase = store.box_quanta.numpy()[0].astype(int), store.box_phase.numpy()[0].copy()
     assert give_back(store, 0) and peek(store.cell_quanta, 0) == 648_000
     assert store.ledger == np.abs(stepped - boxes_of(store, 0)[0].numpy()[0]).sum() // 2 > 0
     take_own(store, 0)
     assert int(store.box_quanta.numpy()[0].sum()) == 648_000
-    apart = np.angle(np.exp(1j * (store.box_phase.numpy()[0] - stepped_phase)))[stepped > 300]  # fluid enough
+    apart = np.angle(np.exp(1j * (store.box_phase.numpy()[0] - stepped_phase)))
     print(f"largest phase difference between the rule and the stepped fluid: {np.abs(apart).max():.4f} rad")
-    assert np.abs(apart).max() < 0.1               # the rule's phase is where the stepped fluid's is
+    assert np.abs(apart).max() < 0.01              # the rule's phase is where the stepped fluid's is (0.0012)
 
 
-def test_a_cell_that_walked_too_far_from_the_rule_stays_own():
-    store, passed = one_cell(), None
-    while store.step < 6000 and passed is None:
+def test_a_cell_left_alone_stays_within_counting_noise_of_its_rule_and_can_go_back():
+    store, most = one_cell(), 0.0
+    while store.step < 6000:
         step(store)
-        if store.step % 100 == 0 and swirl_of(store, 0)["off_rule"] >= 1.0:
-            passed = store.step
-    print(f"off_rule passes 1 at step {passed} (seed 1, 6 across, 3,000 quanta a box)")
-    assert passed is None or (not give_back(store, 0) and store.count == 1)
+        if store.step % 500 == 0:
+            most = max(most, swirl_of(store, 0)["off_rule"])
+    print(f"off_rule at most {most:.2f} in 6,000 steps (6 across, 3,000 quanta a box)")
+    assert most < 1.0 and give_back(store, 0) and store.count == 0  # measured: 0.38
+
+
+def test_a_cell_knocked_far_from_the_rule_stays_own():
+    store = one_cell()
+    quanta = store.box_quanta.numpy()
+    quanta[0, :6], quanta[0, 6:12] = quanta[0, :6] + 1000, quanta[0, 6:12] - 1000  # books kept
+    store.box_quanta.assign(quanta)
+    assert swirl_of(store, 0)["off_rule"] > 1.0 and not give_back(store, 0) and store.count == 1

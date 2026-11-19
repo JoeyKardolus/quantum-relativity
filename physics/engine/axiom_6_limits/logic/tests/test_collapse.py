@@ -3,7 +3,6 @@ import numpy as np
 
 from physics.engine import line_cells, step, three_cells
 from physics.engine.axiom_3_structure.logic.boxes_of import swirl_of
-from physics.engine.axiom_3_structure.logic.give_back import whole_turns_laid
 
 CALM, CELLS = 648_000, list(line_cells())
 
@@ -16,9 +15,9 @@ def _books(store, start: int) -> np.ndarray:
     return held
 
 
-def _fallen(seed: int = 1, steps: int = 30):
+def _fallen(steps: int = 30):
     """Two volumes of 400 calm volumes' quanta and a joint of 1: past the limit once the pull has arrived."""
-    store, seen = three_cells(seed=seed, parts=(800, -2, 800)), []
+    store, seen = three_cells(parts=(800, -2, 800)), []
     for _ in range(steps):
         before = store.cell_quanta.numpy().astype(np.int64)
         step(store)
@@ -37,11 +36,12 @@ def test_a_joint_below_the_limit_stands_and_one_past_it_flips_to_plus_and_merges
     assert at == 2  # the pull reaches the joint in the second step; the third finds it past
     assert store.flipped == -before[CELLS[1]] > 0  # minus lost
     assert after[after > 0].sum() - before[before > 0].sum() == store.flipped  # is plus gained
-    assert after[CELLS].tolist() == [before[CELLS[0]] + before[CELLS[2]] - before[CELLS[1]], 0, 0]
-    assert store.collapses == 1 and after[CELLS[0]] == seen[-1][2][CELLS[0]]  # and it stays one
+    assert sorted(after[CELLS]) == [0, 0, before[CELLS[0]] + before[CELLS[2]] - before[CELLS[1]]]
+    assert store.collapses == 1 and (after[CELLS] == seen[-1][2][CELLS]).all()  # and it stays one
 
 
 def test_the_merged_volume_is_one_whole_whirl():
     store, _seen = _fallen(steps=3)
-    assert swirl_of(store, CELLS[0])["turns"] == whole_turns_laid(int(store.cell_laid.numpy()[CELLS[0]]))
-    assert (store.box_quanta.numpy()[1:] == 0).all()  # the joint's and the other volume's boxes are empty
+    stands = int(np.argmax(store.cell_quanta.numpy()[CELLS]))  # where the fuller of the two stood
+    assert swirl_of(store, CELLS[stands])["turns"] == (-1, -1, -1)
+    assert (np.delete(store.box_quanta.numpy(), stands, axis=0) == 0).all()  # the other two slots: empty

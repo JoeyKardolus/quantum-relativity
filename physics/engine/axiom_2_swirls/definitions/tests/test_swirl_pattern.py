@@ -1,40 +1,50 @@
-"""The ball whirl is the step's own standing wave: a step only turns it; it winds once about each direction."""
+"""The ring whirl is the step's own standing wave: a step only turns it; one whole turn in each ring, all alike."""
 import numpy as np
 import pytest
 
-from physics.engine.axiom_2_swirls.definitions.standing_mode import row_step, standing_mode
+from physics.engine.axiom_2_swirls.definitions.ring_boxes import cap_boxes
+from physics.engine.axiom_2_swirls.definitions.standing_mode import ring_step, standing_mode
 from physics.engine.axiom_2_swirls.definitions.swirl_pattern import swirl_patterns
-from physics.engine.axiom_2_swirls.logic.read_swirl import core_share, round_flow, whole_turns
+from physics.engine.axiom_2_swirls.logic.read_swirl import round_flow, whole_turns
+
+
+@pytest.mark.parametrize("across", [6, 12, 24])
+def test_one_unrounded_step_turns_every_box_of_the_ring_by_one_common_angle(across):
+    mode, turn_per_step = standing_mode(across)
+    stepped = ring_step(across) @ mode
+    assert np.abs(stepped - np.exp(1j * turn_per_step) * mode).max() < 1e-12
+    assert np.allclose(np.abs(mode), 1.0)  # every box holds the same
+    falls = np.angle(mode / np.roll(mode, -1))
+    assert (falls > 0).all() and falls.sum() == pytest.approx(2 * np.pi)  # one whole turn, falling
+    mirror = mode[::-1]  # the other way round: a standing wave of the same step, the same turn
+    assert np.abs(ring_step(across) @ mirror - np.exp(1j * turn_per_step) * mirror).max() < 1e-12
+    assert turn_per_step * across ** 2 == pytest.approx(9.5, abs=0.6)  # a turn: across squared steps
+
+
+def test_a_turn_is_25_steps_at_6_boxes_across():
+    assert 2 * np.pi / standing_mode(6)[1] == pytest.approx(24.94, abs=0.01)
+
+
+def test_the_whirl_winds_once_in_each_ring_the_three_alike_and_a_joint_s_is_its_mirror():
+    patterns = swirl_patterns(6)
+    assert np.allclose(patterns[..., 0], 1.0)  # every box an even share: no empty box, no empty line
+    share, phase = patterns[0, :, 0], patterns[0, :, 1]
+    assert [whole_turns(phase, ring) for ring in range(3)] == [-1, -1, -1]  # the phase falls
+    flows = [round_flow(share, phase, ring) for ring in range(3)]
+    assert flows[0] > 0 and flows[0] == flows[1] == flows[2]
+    rings = phase.reshape(3, 72)
+    assert np.array_equal(rings[0], rings[1]) and np.array_equal(rings[0], rings[2])  # box for box
+    minus = patterns[1, :, 1]
+    assert [whole_turns(minus, ring) for ring in range(3)] == [1, 1, 1]
+    assert np.array_equal(minus.reshape(6, 6, 6), phase.reshape(6, 6, 6)[:, ::-1, :])
 
 
 @pytest.mark.parametrize("across", [6, 12])
-def test_one_unrounded_step_turns_every_box_by_one_common_angle(across):
-    mode, turn_per_step = standing_mode(across)
-    row, third = row_step(across), np.exp(2j * np.pi / 3)
-
-    def whirl(first, second, last):
-        pairs = (np.einsum("i,j,k->ijk", first, second, np.ones(across)),
-                 np.einsum("i,j,k->ijk", np.ones(across), second, last),
-                 np.einsum("i,j,k->ijk", first, np.ones(across), last))
-        return pairs[0] + third * pairs[1] + third ** 2 * pairs[2]
-    stepped = np.einsum("ia,jb,kc,abc->ijk", row, row, row, whirl(mode, mode, mode))
-    assert np.abs(stepped - np.exp(2j * turn_per_step) * whirl(mode, mode, mode)).max() < 1e-12
-    assert 0.0 < abs(turn_per_step) < 0.1
-    shares = swirl_patterns(across)[0, :, 0]
-    assert np.allclose(shares * np.mean(np.abs(stepped) ** 2), np.abs(stepped.ravel()) ** 2)
-
-
-def test_the_whirl_winds_once_about_each_direction_and_is_the_same_along_all_three():
-    patterns = swirl_patterns(6)
-    assert patterns[..., 0].mean() == pytest.approx(1.0)
-    share, phase = patterns[0, :, 0].reshape(6, 6, 6), patterns[0, :, 1]
-    assert [whole_turns(phase, axis) for axis in range(3)] == [-1, -1, -1]  # the phase falls
-    assert all(round_flow(share.ravel(), phase, axis) > 0 for axis in range(3))
-    assert np.allclose(share, share.transpose(1, 2, 0)) and np.allclose(share, share[::-1, ::-1, ::-1])
-    for axis in range(3):  # dark on the line along each direction, and seen along it round it
-        assert core_share(share.ravel(), axis) == pytest.approx(0.101, abs=0.001)
-        assert share.sum(axis=axis)[2:4, 2:4].max() < 0.2 * share.sum(axis=axis).mean()
-    for laid in (1, 2, 3):  # half round about a direction: the same turn about it, the others back
-        turns = [whole_turns(patterns[laid, :, 1], axis) for axis in range(3)]
-        assert turns == [-1 if axis == laid - 1 else 1 for axis in range(3)]
-        assert np.allclose(patterns[laid, :, 0].reshape(6, 6, 6), np.flip(share, axis=laid - 1))
+def test_a_joint_s_caps_hold_the_very_phases_of_the_volumes_caps_they_face(across):
+    volume, joint = swirl_patterns(across)[:, :, 1]
+    for axis in range(3):
+        front, back = cap_boxes(across, axis, 1), cap_boxes(across, axis, 0)
+        assert len(front) == len(set(front)) == across * (across // 6) and not set(front) & set(back)
+        assert np.array_equal(volume[front], joint[back]) and np.array_equal(joint[front], volume[back])
+        apart = np.exp(1j * (volume[front] - volume[back])).mean()  # two bare volumes: half a turn
+        assert abs(np.angle(-apart)) < 0.02 and apart.real < -0.85  # (-0.9999 at 6 across, -0.859 at 12)

@@ -1,12 +1,11 @@
 # Axiom 2: cells are swirls
 
-> Plus only pulls, minus only pushes, both oscillate in whole steps.
+> Energy is how fast a swirl turns; the sign is its direction; joints mesh like gears; the core is a ring closed inside.
 
-Built: the ball whirl, for volumes and joints alike. Its fluid is nothing on the line through the middle along each of the three directions and turns once round each, the same way. A step only turns it: once round in 46 steps at 6 boxes across.
+Assumed:
+- One ring has an axis and meshes only at its two ends: a cell holds three, alike, joined where their jets meet.
+- The core is where no box is: the boxes close round it.
+- Turn a step: the calm turn times the quanta in calm volumes.
+- Where cells touch, each one's turn past calm is left out: faster is smaller by as much.
 
-Assumed (the owner has not ruled):
-- No axiom names a direction, so the whirl is the same along all three.
-- It is the simplest standing wave of the step that is: the three pairs of directions, a third of a turn apart.
-- It is nothing on one long diagonal too. One swirl about that diagonal shows no dark middle.
-
-Measured: after 3,000 steps it still winds once about each direction.
+Not right: only the picture and the leak's direction read the turn speed; a flipped cell's run is not the exact mirror.

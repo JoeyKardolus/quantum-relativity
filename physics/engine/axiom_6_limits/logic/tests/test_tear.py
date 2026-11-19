@@ -9,7 +9,7 @@ from physics.engine.axiom_6_limits.logic.tear import tear, torn
 
 def test_a_place_tears_off_only_once_every_part_of_it_could_be_a_whirl():
     store = first_volume(layers=2)
-    middle, enough = store.side ** 3 // 2, int(PARTS * least_whirl(6)) + 1
+    middle, enough = store.side ** 3 // 2, int(PARTS * least_whirl(6))
     put(store.cell_quanta, middle + 2, enough - 1)
     assert torn(store) == {}
     put(store.cell_quanta, middle + 2, enough)
@@ -31,7 +31,9 @@ def test_each_joint_is_a_seventh_of_the_new_volumes_either_side_and_plus_lost_is
     assert store.count == 6 and torn(store) == {}
     boxes = store.box_quanta.numpy()[:6].astype(np.int64).sum(axis=1)
     assert (boxes == store.cell_quanta.numpy()[store.own_cell.numpy()[:6]]).all()
-    assert store.cell_laid.numpy()[[beside, beside - side, corner, beside + 1]].tolist() == [2, 0, 1, 2]
+    phase, plus = store.box_phase.numpy()[:6], boxes > 0
+    assert plus.sum() == 4 and (phase[plus] == phase[0]).all()  # every volume laid alike, by no place
+    assert (phase[~plus] == phase[~plus][0]).all() and (phase[~plus][0] != phase[0]).any()  # joints: the mirror
 
 
 def test_a_volume_that_would_form_on_the_room_s_last_layer_stops_with_a_plain_message():

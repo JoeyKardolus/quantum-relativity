@@ -2,7 +2,8 @@
 
 The cell takes the next free slot. Each box gets its whole share of the total rounded
 down, then the left-over quanta go one each from box 0 up, so the boxes sum to the
-total to the quantum. The phase is the pattern's, turned on by the steps so far.
+total to the quantum. The phase is the pattern's, turned on by the steps so far at the
+calm turn; what its quanta add starts from here (`turn.py`). A minus total is laid as the mirror.
 `lay` deals any number of cells in one launch; `take_all` takes many from the host.
 """
 import warp as wp
@@ -15,13 +16,13 @@ wp.set_module_options({"fuse_fp": False})
 
 @wp.kernel
 def _lay(own_cell: wp.array(dtype=wp.int32), first: wp.int32, turned: wp.float64,
-         cell_quanta: wp.array(dtype=wp.int32), cell_laid: wp.array(dtype=wp.uint8),
+         cell_quanta: wp.array(dtype=wp.int32),
          pattern: wp.array2d(dtype=wp.vec2d),
          box_quanta: wp.array2d(dtype=wp.int32), box_phase: wp.array2d(dtype=wp.float32)):
     slot = first + wp.tid()
     sign = wp.sign(cell_quanta[own_cell[slot]])  # a joint is dealt like a volume, in minus
     total = wp.abs(cell_quanta[own_cell[slot]])
-    laid = wp.int32(cell_laid[own_cell[slot]])
+    laid = wp.int32(sign < 0)  # a joint's whirl is a volume's in a mirror
     boxes = pattern.shape[1]
     left_over = total
     for box in range(boxes):
@@ -41,7 +42,9 @@ def lay(store: Store, own_cell: wp.array, first: int, number: int,
     """Deal the rule's boxes of `number` cells, named by `own_cell` from `first` on."""
     wp.launch(_lay, dim=number, device=box_quanta.device,
               inputs=[own_cell, first, wp.float64(store.turn_per_step * store.step),
-                      store.cell_quanta, store.cell_laid, store.pattern, box_quanta, box_phase])
+                      store.cell_quanta, store.pattern, box_quanta, box_phase])
+    if box_phase is store.box_phase:
+        store.own_turned[first:first + number].zero_()  # laid fresh: nothing turned past calm yet
 
 
 def take_all(store: Store, cells: list) -> None:

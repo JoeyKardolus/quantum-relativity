@@ -1,9 +1,11 @@
 """Tracers: dots of fluid that the cells' own flow carries, each with the way it came.
 
-A tracer starts in a box drawn by its quanta (`lay_tracers.py`). Before
-each of a step's six passes it moves with the fluid of its box and that box's partner:
-the engine's own pair rotation says how much crosses between the two, and the tracer
-keeps as much of their fluid behind it as it had. Fluid that stands still moves no dot.
+A tracer starts in a box drawn by its quanta (`lay_tracers.py`); its place is (layer,
+around the core, along the ring) in boxes. Before each of a step's passes it moves with
+the fluid of its box and that box's partner in that pass, the engine's own pairs: rows
+closed on themselves, and from one ring to the next only in the jet. The engine's pair
+rotation says how much crosses between the two, and the tracer keeps as much of their
+fluid behind it as it had. Fluid that stands still moves no dot.
 With several cells a place's second number says which slot's cell: `across` a slot.
 """
 from dataclasses import dataclass
@@ -11,7 +13,7 @@ from dataclasses import dataclass
 import warp as wp
 
 from physics.engine import step
-from physics.engine.axiom_1_energy.definitions.pair_rotation import TURN, pair_rotation, wave_of
+from physics.engine.axiom_1_energy.definitions.pair_rotation import pair_rotation, wave_of
 from physics.engine.axiom_3_structure.logic.boxes_of import boxes_of
 from physics.view.definitions.carried import carried
 from physics.view.logic.tracers_across import carry_across
@@ -29,6 +31,7 @@ class Tracers:
 @wp.kernel
 def _carry(quanta: wp.array2d(dtype=wp.int32), phase: wp.array2d(dtype=wp.float32),
            slot: wp.int32, cells: wp.int32, across: wp.int32, axis: wp.int32, parity: wp.int32,
+           turn: wp.float64,
            read_row: wp.int32, write_row: wp.int32, tail: wp.array2d(dtype=wp.vec3)):
     tracer = wp.tid()
     place = tail[read_row, tracer]
@@ -38,17 +41,22 @@ def _carry(quanta: wp.array2d(dtype=wp.int32), phase: wp.array2d(dtype=wp.float3
     inside = wp.vec3i(wp.clamp(int(place[0]), 0, across - 1),
                       wp.clamp(int(place[1]), 0, across - 1),
                       wp.clamp(int(place[2]), 0, across - 1))
-    first = inside[axis] - (inside[axis] + parity) % 2  # the low box of this pass's pair
-    if first >= 0 and first + 1 < across:
+    first = (inside[axis] - (inside[axis] + parity) % 2 + across) % across  # the pair's low box
+    last = (first + 1) % across
+    jet = inside[1] == 0 or inside[1] == across - 1  # where one ring's fluid meets the next's
+    if axis != 0 or (first + 1) % (across / 3) != 0 or jet:
         low = wp.dot(inside, strides) + (first - inside[axis]) * strides[axis]
-        high = low + strides[axis]
+        high = low + (last - first) * strides[axis]
         own = slot + cell  # the cells' slots follow each other
         low_has, high_has = wp.abs(quanta[own, low]), wp.abs(quanta[own, high])  # minus too
         low_wave, high_wave = pair_rotation(wave_of(low_has, phase[own, low]),
-                                            wave_of(high_has, phase[own, high]), wp.float64(TURN))
+                                            wave_of(high_has, phase[own, high]), turn)
         stays = float(low_has + high_has) - float(wp.dot(high_wave, high_wave))  # low, after
-        place[axis] = float(first) + carried(place[axis] - float(first), float(low_has),
-                                             float(high_has), stays)
+        line = place[axis] - float(inside[axis]) + float(inside[axis] == last)  # along the pair
+        line = carried(line, float(low_has), float(high_has), stays)
+        place[axis] = line + float(first)
+        if line >= 1.0:
+            place[axis] = line - 1.0 + float(last)
     place[1] += float(cell * across)
     tail[write_row, tracer] = place
 
@@ -59,8 +67,8 @@ def step_carrying(store, tracers: Tracers, cell: int, mark: bool, boxes: tuple =
     # `boxes` saves asking again: a calm cell's stay good, its flow is the same every step
     new = (tracers.head + 1) % MARKS if mark else tracers.head
     line = (*(boxes or boxes_of(store, cell)), cells, store.across)
-    def carry(axis: int, parity: int) -> None:
+    def carry(axis: int, parity: int, turn: float) -> None:
         wp.launch(_carry, dim=tracers.tail.shape[1], device=tracers.tail.device,
-                  inputs=[*line, axis, parity, tracers.head, new, tracers.tail])
+                  inputs=[*line, axis, parity, wp.float64(turn), tracers.head, new, tracers.tail])
         tracers.head = new
     step(store, carry, lambda axis: carry_across(store, axis, cells, tracers.tail, tracers.head))

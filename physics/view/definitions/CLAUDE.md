@@ -1,9 +1,8 @@
 # View, definitions
 
-`camera.py`: the eye, the wheel's range, `ALONG`. `carried.py`: a tracer's place along two boxes after fluid moved. `shape.py`: a block's place in the picture. `shaders.py`: the programs that draw a streak and a dot.
+`camera.py`: the eye. `carried.py`: a tracer along two boxes. `ring_place.py`: a ring's box in a ball. `shape.py`: a block in the picture. `shaders.py`: streak and dot.
 
-- A volume's block is drawn as a ball as wide as its size; `even_share` keeps the red round.
-- A joint's block is two fans, each from the rim of the volume it faces to the square midway, leaning as its volumes lie: its room as the engine's distance law counts it.
-- Blue is minus fluid: its marks count below 0.
-- Many marks go to solid red, never white.
-- `THICK`, `DOT` and `STILL` only draw; do not move them.
+- A volume is a ball as wide as its size holding three ring whirls, ring r about direction r. A ring's core is the circle at R over root 2 (Hill's ball vortex); the empty core takes 3 / (3 + 2 pi) of the way to the rim.
+- A joint's ball is spread to a cube and fanned from each volume's rim to the square midway.
+- `room` weighs a mark by its box's room; it replaced the cube-to-ball share.
+- Blue: minus. `THICK`, `DOT`, `STILL` only draw.

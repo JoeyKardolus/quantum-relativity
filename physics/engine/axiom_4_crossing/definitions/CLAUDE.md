@@ -1,6 +1,6 @@
 # Axiom 4, definitions
 
-`passage.py`: `row_of`, `row_minus`, `rub_share`, `passing_turn`, `less_step` (friction on the phase step), `layer_part`. `facing.py`: `faced` (the two volumes' boxes a joint's row lies between). `leak_share.py`: `LEAK`, `leak_share`, `toward`.
+`facing.py`: `faced` (the two volumes' cap boxes a joint's row lies between), `gear`. `passage.py`: `row_minus`, `rub_share`, `passing_turn`, `less_step` (friction on the phase step), `layer_part`. `leak_share.py`: `LEAK`, `leak_share`, `pointed`, `toward`.
 
 - No number is set in the passage. The joint's quanta decide how freely energy passes.
 - `layer_part` (6 over the boxes across) cuts one step's turn and friction; without it the course depends on the boxes.

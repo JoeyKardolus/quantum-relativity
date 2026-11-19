@@ -52,7 +52,10 @@ def test_any_view_draws_and_harms_nothing(drawn):
     assert np.array_equal(_down_the_axis(drawn), first)
 
 
-def test_along_each_direction_the_one_cell_is_the_same_round_disc_with_a_dark_middle(drawn):
+ROUND = 1.5  # the stated tolerance: no quarter of the disc more than this times another
+
+
+def test_along_each_direction_the_one_cell_is_the_same_round_disc(drawn):
     from physics.view.definitions.camera import ALONG
     from physics.view.logic.picture import picture
     from physics.view.logic.swirl_painter import SwirlPainter
@@ -61,13 +64,16 @@ def test_along_each_direction_the_one_cell_is_the_same_round_disc_with_a_dark_mi
     for done in range(120):
         step_carrying(store, tracers, 0, mark=done % MARK_EVERY == 0)
     painter.load(marks(store, Seen(tracers)))
+    means = []
     for yaw, pitch in ALONG:
         red = picture(painter, 12, yaw, pitch, 2.6, 400, 400).astype(int)[..., 0]
         rows, columns = np.indices(red.shape) - 199.5
         far = np.hypot(rows, columns)  # the ball is 1 wide: 0.5 is 106 picture dots at this distance
         disc = (far > 30) & (far < 95)
         assert red[far > 120].max() == 0 and red[disc].mean() > 25  # a round disc
-        assert red[far < 6].mean() < 0.5 * red[disc].mean()         # its middle dark
         quarters = [red[disc & (rows * up > 0) & (columns * right > 0)].mean()
                     for up in (-1, 1) for right in (-1, 1)]
-        assert max(quarters) < 1.5 * min(quarters)                  # round
+        assert max(quarters) < ROUND * min(quarters)                # round
+        means.append(red[disc].mean())
+    assert max(means) < 1.2 * min(means)                            # the three directions alike
+

@@ -19,9 +19,10 @@ def _handed(store, steps: int) -> list:
 
 @pytest.fixture(scope="module")
 def felt():
-    """A grown patch held still: the pull as it stands, then with the middle volume made fuller."""
+    """A grown patch held still: the pull as it stands, then with one volume made fuller (the
+    one beside the first: the first holds too much to be made four times fuller)."""
     store = grown(3)
-    row = [region(store, (0, out, 0))[0] for out in range(3)]  # the middle volume and two on
+    row = [region(store, (0, out, 0))[0] for out in range(1, 4)]  # that volume and two on
     plain = _handed(store, 150)
     fuller(store, row[:1])
     return np.array(plain)[:, row], np.array(_handed(store, 150))[:, row], store

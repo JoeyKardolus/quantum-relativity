@@ -1,10 +1,9 @@
 """Cell window: the window on a scene and its keys.
 
-Space stops and starts, R lays a fresh start, drag turns the view, the wheel zooms, Esc
-quits; X, Y and Z look along the first, second and third direction. A growing cluster: C
-goes from the whole cluster to its flat cut through the middle and back. One cell: G sends
-it to calm or takes it own again. The fluid steps `TICKS` times a second; a cluster that
-has filled its store's room stops, and R starts it again.
+Space stops and starts, R lays a fresh start, drag turns, the wheel zooms, Esc quits; X, Y
+and Z look along a direction; 1, 2, 3 show one ring's fluid alone, 0 all three. A growing
+cluster: C, whole or flat cut. One cell: Up and Down double and halve its energy, F flips
+its sign, G sends it to calm or takes it own. `TICKS` steps a second.
 """
 import pyglet
 from pyglet.window import key
@@ -13,8 +12,9 @@ from physics.engine.axiom_3_structure.definitions.store import slot_of
 from physics.engine.axiom_3_structure.logic.boxes_of import boxes_of
 from physics.engine.axiom_3_structure.logic.give_back import give_back
 from physics.engine.axiom_3_structure.logic.take_own import take_own
-from physics.view.definitions.camera import ALONG, PITCH, YAW, zoomed
-from physics.view.logic.scene import SCENES, Seen, advance, cut, drawn, eye_distance, title, trace
+from physics.view.definitions.camera import ALONG, PITCH, YAW, eye_distance, zoomed
+from physics.view.logic.cell_keys import flipped, scaled
+from physics.view.logic.scene import SCENES, Seen, advance, cut, drawn, title, trace
 from physics.view.logic.swirl_painter import SwirlPainter
 from physics.view.logic.tracers import MARKS
 
@@ -28,8 +28,7 @@ class CellWindow(pyglet.window.Window):
         self.speed, self.running = speed, True
         self.lay()
         self.painter = SwirlPainter(MARKS, self.seen.tracers.tail.shape[1])
-        self.alone = self.store.side == 0
-        self.yaw, self.pitch = (YAW, PITCH) if self.alone else ALONG[2]
+        self.alone, (self.yaw, self.pitch) = self.store.side == 0, (YAW, PITCH) if self.store.side == 0 else ALONG[2]
         self.distance = eye_distance(self.store)
         pyglet.clock.schedule_interval(self.tick, 1 / TICKS)
         pyglet.clock.schedule_interval(self.retitle, 0.5)
@@ -56,14 +55,17 @@ class CellWindow(pyglet.window.Window):
                           *self.get_framebuffer_size())
 
     def on_key_press(self, symbol: int, _modifiers: int) -> None:
+        self.running ^= symbol == key.SPACE
         if symbol in (key.X, key.Y, key.Z):
             self.yaw, self.pitch = ALONG[symbol - key.X]
-        elif symbol == key.SPACE:
-            self.running = not self.running
         elif symbol == key.ESCAPE:
             return self.close()
         elif symbol == key.G and self.alone:
             (take_own if slot_of(self.store, 0) < 0 else give_back)(self.store, 0)
+        elif symbol in (key.UP, key.DOWN, key.F) and self.alone:
+            flipped(self.store, 0) if symbol == key.F else scaled(self.store, 0, symbol == key.UP)
+        elif symbol in (key._0, key._1, key._2, key._3):
+            self.seen.ring = symbol - key._1
         elif symbol == key.C:
             self.seen.whole = cut(self.store, self.seen)
         elif symbol == key.R:

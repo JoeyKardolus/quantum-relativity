@@ -16,10 +16,9 @@ from physics.engine.axiom_3_structure.definitions.store import Store
 FULLER = 4  # how many times fuller a staged region is: clearly, chosen before any run
 
 
-def grown(layers: int = 3, room: int = 0, across: int = ACROSS, seed: int = 1,
-          device: str = "cpu") -> Store:
+def grown(layers: int = 3, room: int = 0, across: int = ACROSS, device: str = "cpu") -> Store:
     """A universe grown by its leak until a volume stands `layers` layers out."""
-    store = first_volume(across, seed, device, room or layers + 1)
+    store = first_volume(across, device, room or layers + 1)
     middle = store.side // 2
     while np.abs(steps_of(store.own_cell.numpy()[:store.count], store.side) - middle).max() < 2 * layers:
         step(store)
@@ -49,18 +48,21 @@ def fuller(store: Store, cells: list, times: int = FULLER) -> None:
 
 
 def moving(store: Store, cells: list, axis: int, turn: float) -> None:
-    """Set the fluid of the own volumes `cells` going up direction `axis`: its phase falls `turn` a box."""
+    """Set the fluid of the own volumes `cells` going up direction `axis`: in that ring the
+    phase falls `turn` a box from the back cap to the front cap, both ways round the core."""
     phase, slots = store.box_phase.numpy(), _slots(store, cells)
-    along = np.indices((store.across,) * 3)[axis].ravel()
-    for slot, cell in zip(slots, cells):
-        phase[slot] -= turn * (along + steps_of(cell, store.side)[axis] // 2 * store.across)
+    around = np.indices((store.across,) * 3)[1].ravel()
+    back = store.across - 1 - store.across // 6  # the back cap's first box round the core
+    far = np.minimum((around - back) % store.across, (back - around) % store.across)
+    ring = np.indices((store.across,) * 3)[0].ravel() // (store.across // 3) == axis
+    for slot in slots:
+        phase[slot] -= turn * far * ring
     store.box_phase.assign(((phase + np.pi) % (2 * np.pi) - np.pi).astype(np.float32))
 
 
-def two_lumps(across: int = ACROSS, seed: int = 1, device: str = "cpu", layers: int = 4,
-              out: int = 2) -> Store:
+def two_lumps(across: int = ACROSS, device: str = "cpu", layers: int = 4, out: int = 2) -> Store:
     """A patch grown `layers` layers out with two fuller regions, `out` volumes either side of the middle."""
-    store = grown(layers, layers + 4, across, seed, device)
+    store = grown(layers, layers + 4, across, device)
     for way in (-out, out):
         fuller(store, region(store, (0, way, 0)))
     return store

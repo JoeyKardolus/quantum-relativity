@@ -38,5 +38,7 @@ def test_a_joint_is_dealt_like_a_volume_in_minus_to_the_quantum():
     take_own(store, 0)
     take_own(volume, 0)
     boxes = store.box_quanta.numpy()
-    assert int(boxes.sum()) == -648_001 and boxes.max() <= 0  # 0: on a line of the whirl
+    assert int(boxes.sum()) == -648_001 and boxes.max() <= -3000  # every box holds its share
     assert (boxes == -volume.box_quanta.numpy()).all()
+    mirror = volume.box_phase.numpy().reshape(6, 6, 6)[:, ::-1, :]  # turning the other way
+    assert (store.box_phase.numpy().reshape(6, 6, 6) == mirror).all()

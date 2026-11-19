@@ -1,7 +1,7 @@
 """Store: where every cell is kept, built so a billion cells fit one graphics card.
 
-A calm cell is a rule, not boxes: its whole signed total, how its ball whirl is laid (0, or
-1 to 3: turned half round about that direction) and what it has made, 9 bytes. Only a cell
+A calm cell is a rule, not boxes: its whole signed total (the sign is the way its whirl
+turns) and what it has made, 8 bytes. Only a cell
 in the own set holds boxes, in a slot; slots in use are always `0 .. count - 1`. Two plain
 arrays find the slot. With `side` above 0 a cell's number is its place (`places.py`); a
 place that holds plus quanta and no slot is leaked energy gathering, not yet a cell.
@@ -16,10 +16,8 @@ TILE = 512  # cells in a tile: 512 cells that follow each other
 @dataclass
 class Store:
     across: int             # boxes along a cell's edge
-    seed: int
     turn_per_step: float    # how far a calm swirl's phase turns in one step
     cell_quanta: wp.array   # int32 (cells)
-    cell_laid: wp.array     # uint8 (cells)
     cell_made: wp.array     # int32 (cells): quanta a joint has made out of itself
     cell_pull: wp.array     # float32 (cells): the pull there, handed on from cell to cell
     tile_home: wp.array     # int32 (cells / 512): the tile's row in tile_slots, -1: all calm
@@ -29,9 +27,10 @@ class Store:
     own_whole: wp.array     # int32 (cap): the slot of the volume this slot is part of (`merged.py`)
     own_ring: wp.array      # int32 (cap): the next slot of the same volume, round to itself
     own_part: wp.array      # vec4i (cap): a joint's rank and count on its two volumes' sides
+    own_turned: wp.array    # float32 (cap): how far the cell has turned past the calm turn
     box_quanta: wp.array    # int32 (cap, boxes)
     box_phase: wp.array     # float32 (cap, boxes)
-    pattern: wp.array       # vec2d (4, boxes): each box's share and phase in the four layings
+    pattern: wp.array       # vec2d (2, boxes): each box's share and phase, a volume's and a joint's
     side: int = 0           # places along a direction; 0: the cells keep no places
     leaks: bool = False     # whether the volumes leak: only in a universe that grows
     step: int = 0

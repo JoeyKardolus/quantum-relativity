@@ -1,5 +1,4 @@
-"""Two volumes stand their half widths and their joint's thickness apart, never closer; the pull
-across falls with it and grows with the pull felt at the two volumes; the push rises steeply."""
+"""Two volumes stand their half widths and their joint's thickness apart; the pull across falls with it; the push rises steeply."""
 import numpy as np
 import warp as wp
 

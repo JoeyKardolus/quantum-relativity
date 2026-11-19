@@ -1,10 +1,9 @@
 # View, logic
 
-`tracers.py`, `tracers_across.py` (dots the flow carries), `lay_tracers.py` (`trace`, `move_into`), `line_streaks.py` (their marks), `placed.py`, `fit.py` (middles from the joints), `strays.py`, `scene.py`, `swirl_painter.py`, `picture.py`, `cell_window.py` (keys), `window.py` (the door), `save_png.py`, `title_line.py`.
+`tracers.py`, `tracers_across.py`, `lay_tracers.py`, `line_streaks.py` (marks, the phase's crest, one ring alone), `placed.py`, `fit.py`, `strays.py`, `scene.py`, `cell_keys.py`, `swirl_painter.py`, `picture.py`, `cell_window.py`, `window.py`, `save_png.py`, `title_line.py`.
 
-- A tracer moves before each of a step's six passes, or it drifts into the core.
+- A tracer's place is (layer, around the core, along the ring); it follows the engine's own pairs, pass by pass, with that pass's turn.
 - A tracer's second number names its slot in one float: past thousands of cells it loses it.
-- The joints' distances agree only in a crumpled grid; `HELD` keeps it a grid, some hundredths off.
-- A growing cluster's cells get tracers evenly, not by their quanta.
-- Drawing numbers (`COUNT`, `MARKS`, `AMOUNT`, `FITS`, `ROUNDS`, `HELD`, `WHOLE_UP_TO`, speeds): do not move them.
-- No kernel argument is a C++ name.
+- The crest is the fluid's phase, never painted motion. Marks under `FAINT` are drawn by share.
+- `HELD` keeps the grid a grid; the title says how far the drawing is off.
+- Drawing numbers (`COUNT`, `MARKS`, `AMOUNT`, `CREST`, `FAINT`, `FITS`, `ROUNDS`, `HELD`, `WHOLE_UP_TO`): do not move them.

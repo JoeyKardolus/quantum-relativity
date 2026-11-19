@@ -9,12 +9,11 @@ from physics.engine.axiom_3_structure.logic.take_own import take_own
 FIRST_QUANTA = 2 ** 30
 
 
-def first_volume(across: int = ACROSS, seed: int = 1, device: str = "cpu", layers: int = 8,
+def first_volume(across: int = ACROSS, device: str = "cpu", layers: int = 8,
                  quanta: int = FIRST_QUANTA) -> Store:
     """One energy volume and no joint, with room for `layers` layers of cells round it."""
     side, wide = 4 * layers + 1, 2 * layers + 1
-    store = calm_cells(side ** 3, wide ** 3 + 3 * wide * wide * (wide - 1), across, seed=seed,
-                       device=device)
+    store = calm_cells(side ** 3, wide ** 3 + 3 * wide * wide * (wide - 1), across, device=device)
     store.side, store.leaks = side, True
     store.cell_quanta.zero_()
     put(store.cell_quanta, side ** 3 // 2, quanta)

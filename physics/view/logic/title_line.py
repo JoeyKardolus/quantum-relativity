@@ -1,21 +1,23 @@
 """Title line: a scene's numbers in words, for the window's title and the pictures' log."""
 import numpy as np
 
+from physics.engine.axiom_2_swirls.logic.turn import turn_of
 from physics.engine.axiom_3_structure.definitions.kinds import QUANTA_A_BOX
 from physics.engine.axiom_3_structure.definitions.places import steps_of
+from physics.engine.axiom_3_structure.definitions.size_law import size_of
 from physics.engine.axiom_3_structure.definitions.store import Store, peek, slot_of
 from physics.engine.axiom_3_structure.logic.boxes_of import swirl_of
 from physics.view.logic.placed import joined
 
 
 def title_line(store: Store) -> str:
-    """Whole turns about each direction, total quanta, step, core, distance from the rule, the ledger, own or calm."""
-    seen = swirl_of(store, 0)
+    """Whole turns in each ring, quanta, size, the turn a step, distance from the rule, step, own or calm."""
+    seen, held = swirl_of(store, 0), peek(store.cell_quanta, 0)
     turns = "mixed" if None in seen["turns"] else " ".join(map(str, seen["turns"]))
     kept = "own" if slot_of(store, 0) >= 0 else "calm"
-    return (f"whole turns {turns}  quanta {peek(store.cell_quanta, 0):,}  step {store.step}  "
-            f"core {seen['core']:.3f} of the mean  off the rule {seen['off_rule']:.2f}  "
-            f"ledger {store.ledger:,}  {kept}")
+    turn = turn_of(held, store.across, store.turn_per_step)
+    return (f"whole turns {turns}  quanta {held:,}  size {size_of(held, store.across):.3g}  "
+            f"turns {turn:.4f} a step  off the rule {seen['off_rule']:.2f}  step {store.step}  {kept}")
 
 
 def _sizes(held: np.ndarray, calm: int) -> str:

@@ -16,4 +16,8 @@ def test_the_three_cells_sizes_follow_their_quanta_as_energy_crosses():
     for _ in range(100):
         step(store)
     left, joint, right = (size_of(int(held), 6) for held in store.cell_quanta.numpy()[list(line_cells())])
-    assert left > 2 / 3 and right < 2.0 and joint < 1.0  # A grew, B shrank, the squeezed joint too
+    assert left > 2 / 3 and right < 2.0 and joint == 1.0  # A grew, B shrank; the joint is not squeezed
+    even = three_cells(parts=(2, -2, 2))  # two calm volumes squeeze their joint: it shrinks
+    for _ in range(100):
+        step(even)
+    assert size_of(int(even.cell_quanta.numpy()[line_cells()[1]]), 6) < 0.99

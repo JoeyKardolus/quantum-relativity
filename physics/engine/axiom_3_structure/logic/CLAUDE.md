@@ -6,4 +6,4 @@
 - Dealing must sum to the cell's total to the quantum. The left-over quanta go one each from box 0 up.
 - `give_back` moves slots: never in a store with collapses.
 - A joint (minus total) is dealt like a volume, the sign kept.
-- A cell is laid by its place (`laid_at`), so neighbours' facing fluid agrees.
+- No cell is laid by its place: the sign alone says which way its whirls turn.

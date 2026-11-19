@@ -6,4 +6,4 @@
 - Emptied slots stay in the own set, holding nothing.
 - Plus lost at a tear is minus gained, to the quantum.
 - No joint is made but here: one wherever a new volume shares a side with a volume.
-- Each new cell is laid as a whole ball whirl of its total, by its place.
+- Each new cell is laid as whole ring whirls of its total.

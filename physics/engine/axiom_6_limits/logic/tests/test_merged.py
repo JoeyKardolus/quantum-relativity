@@ -4,7 +4,6 @@ import numpy as np
 from physics.engine import step
 from physics.engine.axiom_3_structure.definitions.store import put
 from physics.engine.axiom_3_structure.logic.boxes_of import swirl_of
-from physics.engine.axiom_3_structure.logic.give_back import whole_turns_laid
 from physics.engine.axiom_3_structure.logic.shared_sides import joints_of
 from physics.engine.axiom_5_packing.logic.lumps import grown
 from physics.engine.axiom_6_limits.logic.collapse import collapse
@@ -35,10 +34,10 @@ def test_the_merged_volume_holds_all_three_and_keeps_its_two_volumes_other_joint
     assert ((first == keep) | (second == keep)).sum() == mine - 1  # every other joint of the two
     shared = store.own_part.numpy()[joints]
     assert (shared[:, [1, 3]].max(axis=1) == 2).sum() == 8  # four sides hold two joints each now
-    assert swirl_of(store, int(own[keep]))["turns"] == whole_turns_laid(int(store.cell_laid.numpy()[own[keep]]))
+    assert swirl_of(store, int(own[keep]))["turns"] == (-1, -1, -1)
 
 
-def test_the_books_stay_exact_and_the_same_seed_gives_the_same_run_through_collapses():
+def test_the_books_stay_exact_and_the_same_start_gives_the_same_run_through_collapses():
     runs = [_staged()[0] for _ in range(2)]
     for store in runs:
         for _ in range(12):
@@ -47,5 +46,5 @@ def test_the_books_stay_exact_and_the_same_seed_gives_the_same_run_through_colla
         assert np.isfinite(store.cell_pull.numpy()).all()
     assert np.array_equal(runs[0].box_quanta.numpy(), runs[1].box_quanta.numpy())
     assert np.array_equal(runs[0].box_phase.numpy(), runs[1].box_phase.numpy())
-    first, again, other = (_fallen(seed)[0].box_quanta.numpy() for seed in (1, 1, 2))
-    assert np.array_equal(first, again) and not np.array_equal(first, other)
+    first, again = (_fallen()[0].box_quanta.numpy() for _ in range(2))
+    assert np.array_equal(first, again)
