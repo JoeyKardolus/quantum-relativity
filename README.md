@@ -12,7 +12,11 @@ Everything in the simulation has to follow from these seven sentences, and from 
 1. **Energy**: an always-moving quantum fluid, one whole signed number of quanta per Planck box at each
    moment of local time. The total is not fixed: a squeezed joint makes more minus energy out of itself,
    and when a joint collapses its minus energy flips to plus and joins the volumes beside it. Zero is empty space, which does nothing.
-2. **Cells are swirls**: plus only pulls, minus only pushes, both oscillate in whole steps.
+2. **Cells are swirls**: plus only pulls, minus only pushes, both oscillate in whole steps. Energy is how
+   fast a swirl turns: more energy, faster turn, smaller cell; plus and minus are the two directions of
+   the turn. Swirls turning the same way want to merge, which is the pull, but two turning the same way
+   would grind where they touch; so a swirl turning the other way, a joint, lies between them and they
+   mesh like gears. The swirl's empty core is a ring closed inside the cell, not a pipe.
 3. **Structure**: plus never touches plus; minus wraps every plus and forms one web. The cells are the
    grid, a perfect A B A B pattern. A cell has no geometry of its own, only relations to its neighbours
    and a size set by its energy alone: more energy, smaller, for energy volumes and joints alike. Lumps
