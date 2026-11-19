@@ -29,6 +29,7 @@ def calm_cells(cells: int, own_cap: int, across: int = ACROSS, laid: int = 0, se
             cell_quanta=wp.full(cells, QUANTA_A_BOX * boxes, dtype=wp.int32),
             cell_laid=wp.full(cells, laid, dtype=wp.uint8),
             cell_made=wp.zeros(cells, dtype=wp.int32),
+            cell_pull=wp.zeros(cells, dtype=wp.float32),
             tile_home=wp.full(tiles, -1, dtype=wp.int32),
             tile_slots=wp.full(rows * TILE, -1, dtype=wp.int32),
             own_cell=wp.full(own_cap, -1, dtype=wp.int32),

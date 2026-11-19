@@ -29,8 +29,8 @@ def test_the_joint_shrinks_under_the_squeeze_and_stops_where_push_equals_pull():
     store = _run((3, -2, 1), 1300)
     pull, push = pull_push(store, JOINT)
     made, joint = store.cell_made.numpy()[JOINT], int(store.cell_quanta.numpy()[JOINT])
-    assert abs(pull - push) < 0.001 * pull  # the balance, within a thousandth (measured: 2.689)
-    assert abs(size_of(joint, 6) - 1 / 1.2805) < 0.001 and abs(made - 181_800) < 300
+    assert abs(pull - push) < 0.001 * pull  # the balance, within a thousandth (measured: 2.696)
+    assert abs(size_of(joint, 6) - 1 / 1.2805) < 0.001 and abs(made - 182_150) < 300
     for _ in range(200):
         step(store)
     assert store.cell_made.numpy()[JOINT] - made < 10  # it has stopped

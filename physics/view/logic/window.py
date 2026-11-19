@@ -2,7 +2,7 @@
 
 Opens a window on one energy volume, drawn as its ball whirl; `--scene crossing` shows a
 volume, a joint and a volume, `--scene grow` one volume whose leak tears off layer after
-layer; `--pictures DIR` saves pictures, seen along a direction (`--along`) or turned
+layer, `--scene lumps` two fuller regions in a small grown patch; `--pictures DIR` saves pictures, seen along a direction (`--along`) or turned
 (`--turned`), `--cut` a growing cluster's flat cut through the middle. One process on the card: this one. `BOXES`,
 `SPEED` and `FRAMES` only draw.
 """
@@ -60,8 +60,9 @@ def main() -> None:
     parser.add_argument("--along", type=int, choices=(0, 1, 2), help="the direction looked along")
     parser.add_argument("--cut", action="store_true", help="the pictures show the flat cut")
     chosen = parser.parse_args()
-    chosen.boxes = chosen.boxes or {"one": BOXES, "grow": GROW_BOXES}.get(chosen.scene, LINE_BOXES)
-    chosen.speed = chosen.speed or (GROW_SPEED if chosen.scene == "grow" else SPEED)
+    grows = chosen.scene in ("grow", "lumps")
+    chosen.boxes = chosen.boxes or (GROW_BOXES if grows else BOXES if chosen.scene == "one" else LINE_BOXES)
+    chosen.speed = chosen.speed or (GROW_SPEED if grows else SPEED)
     wp.config.quiet = True
     device = "cuda:0" if wp.is_cuda_available() else "cpu"
     os.environ.setdefault("GALLIUM_DRIVER", "d3d12")  # under WSL2 Mesa draws on the CPU without

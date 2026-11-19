@@ -4,4 +4,4 @@
 
 - `least_whirl` is counted at the least boxes across, so it is the same share of a cell at any boxes: 1/60 of a calm volume.
 - `PARTS` is no setting: it counts a volume's sides.
-- Nothing here brakes the growth. It slows when the outer volumes hold too little for their leak to gather seven least whirls at a place.
+- Nothing here brakes the growth. It slows when the outer volumes hold too little for their leak to gather seven least whirls at a place; the pull slows it too.

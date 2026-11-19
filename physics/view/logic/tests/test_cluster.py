@@ -3,7 +3,7 @@ import numpy as np
 
 from physics.engine import first_volume, step
 from physics.engine.axiom_3_structure.definitions.places import steps_of
-from physics.view.logic.scene import Seen, cut, drawn, trace
+from physics.view.logic.scene import Seen, advance, cut, drawn, trace
 
 
 def _slots(seen: Seen) -> np.ndarray:
@@ -27,3 +27,18 @@ def test_new_cells_get_their_share_of_the_tracers_and_the_flat_cut_shows_the_mid
     middle = steps_of(store.own_cell.numpy()[:count], store.side)[:, 2] == store.side // 2
     assert cut(store, seen) and 0 < middle.sum() < count and middle[_slots(seen)].all()
     assert (marks[:, 3] != 0).all()
+
+
+def test_tracers_the_fluid_carries_off_the_flat_cut_are_laid_in_it_again_before_drawing():
+    store = first_volume(layers=3)
+    seen = Seen(trace(store), whole=False)
+    while store.count < 60:
+        step(store)
+    drawn(store, seen)  # fresh tracers, in the cut only
+    for _ in range(40):
+        advance(store, seen)
+    cells = store.own_cell.numpy()[:store.count]
+    in_cut = lambda: (steps_of(cells, store.side)[:, 2] == store.side // 2)[_slots(seen)]  # noqa: E731
+    assert 0 < (~in_cut()).sum()  # some crossed a joint out of the layer (measured: 8,896 of 32,000)
+    marks = drawn(store, seen).numpy()
+    assert in_cut().all() and (marks[:, :, 3] != 0).all()  # none is drawn off the cut, tail and all

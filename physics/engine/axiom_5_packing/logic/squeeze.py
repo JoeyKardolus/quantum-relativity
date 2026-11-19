@@ -1,4 +1,4 @@
-"""Squeeze: the pull across every own joint and its push back, read off the cells' quanta.
+"""Squeeze: the pull across every own joint, read off the pull at its two volumes, and its push back.
 
 One small launch over the own slots, before anything acts on a joint in a step, so every
 box of a joint sees the same numbers: the pull, the push, how far apart its two volumes
@@ -20,7 +20,8 @@ wp.set_module_options({"enable_backward": False})  # nothing here is ever run ba
 def _squeeze(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.int32),
              tile_slots: wp.array(dtype=wp.int32), side: wp.int32,
              calm: wp.float64,
-             cell_quanta: wp.array(dtype=wp.int32), own_squeeze: wp.array(dtype=wp.vec4d)):
+             cell_quanta: wp.array(dtype=wp.int32), cell_pull: wp.array(dtype=wp.float32),
+             own_squeeze: wp.array(dtype=wp.vec4d)):
     joint = own_cell[wp.tid()]
     slot, none = wp.tid(), wp.float64(0.0)
     own_squeeze[slot] = wp.vec4d(none, none, none, none)
@@ -35,8 +36,9 @@ def _squeeze(own_cell: wp.array(dtype=wp.int32), tile_home: wp.array(dtype=wp.in
     held = wp.float64(-cell_quanta[joint]) / calm
     left, right = wp.float64(cell_quanta[before]) / calm, wp.float64(cell_quanta[after]) / calm
     if held > none:
-        own_squeeze[slot] = wp.vec4d(pull_across(left, right, held), push_back(held),
-                                     apart_of(left, right, held), wp.float64(axis))
+        apart = apart_of(left, right, held)
+        pull = pull_across(wp.float64(cell_pull[before]), wp.float64(cell_pull[after]), apart)
+        own_squeeze[slot] = wp.vec4d(pull, push_back(held), apart, wp.float64(axis))
 
 
 def squeeze(store: Store) -> None:
@@ -44,7 +46,7 @@ def squeeze(store: Store) -> None:
     wp.launch(_squeeze, dim=store.count, device=store.box_quanta.device,
               inputs=[store.own_cell, store.tile_home, store.tile_slots, store.side,
                       wp.float64(QUANTA_A_BOX * store.across ** 3), store.cell_quanta,
-                      store.own_squeeze])
+                      store.cell_pull, store.own_squeeze])
 
 
 def pull_push(store: Store, joint: int) -> np.ndarray:

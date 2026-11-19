@@ -1,4 +1,5 @@
-"""Round volumes stand apart by their joint's room; the pull falls with it, the push rises steeply."""
+"""Round volumes stand apart by their joint's room; the pull across falls with it and grows with
+the pull felt at the two volumes; the push rises steeply."""
 import numpy as np
 import warp as wp
 
@@ -7,18 +8,20 @@ from physics.engine.axiom_5_packing.definitions.pull_push import (
 
 
 @wp.kernel
-def _read(held: wp.array(dtype=wp.vec3d), found: wp.array(dtype=wp.vec4d)):
+def _read(held: wp.array(dtype=wp.vec3d), felt: wp.float64, found: wp.array(dtype=wp.vec4d)):
     left, right, joint = held[wp.tid()][0], held[wp.tid()][1], held[wp.tid()][2]
-    pull, push = pull_across(left, right, joint), push_back(joint)
+    apart = apart_of(left, right, joint)
+    pull, push = pull_across(felt * left, felt * right, apart), push_back(joint)
     gives = given(wp.vec4d(pull, push, pull, pull), wp.float64(0.01))
-    found[wp.tid()] = wp.vec4d(pull, push, gives, apart_of(left, right, joint))
+    found[wp.tid()] = wp.vec4d(pull, push, gives, apart)
 
 
-def _forces(*held: tuple) -> np.ndarray:
-    """Pull, push, what is given in a hundredth of a turn and the distance, for each (left, right, joint)."""
+def _forces(*held: tuple, felt: float = 1.0) -> np.ndarray:
+    """Pull, push, what is given in a hundredth of a turn and the distance, for each (left, right,
+    joint) quanta; each volume feels a pull of `felt` times its own quanta."""
     found = wp.zeros(len(held), dtype=wp.vec4d, device="cpu")
     wp.launch(_read, dim=len(held), device="cpu",
-              inputs=[wp.array(held, dtype=wp.vec3d, device="cpu"), found])
+              inputs=[wp.array(held, dtype=wp.vec3d, device="cpu"), wp.float64(felt), found])
     return found.numpy()
 
 
@@ -30,7 +33,7 @@ def test_the_cube_on_the_distance_holds_one_round_volume_and_three_joints_room()
 
 
 def test_two_calm_volumes_hold_their_joint_a_quarter_thin():
-    pull, push, gives, apart = _forces((1, 1, 1.2803))[0]
+    pull, push, gives, apart = _forces((1, 1, 1.2803), felt=1.2)[0]  # alone, each feels 1.2
     assert abs(apart - 1.25) < 0.001 and abs(pull - push) < 0.01 * push  # 1.25 less two radii
 
 
@@ -39,7 +42,7 @@ def test_the_pull_grows_with_both_volumes_and_falls_with_the_distance():
     assert np.isclose(base[0], PULL / base[3] ** 2)
     assert more_left[0] > base[0] and np.isclose(more_left[0], more_right[0])
     assert fatter_joint[0] < base[0]  # a fatter joint holds its volumes further apart
-    assert (_forces((0, 1, 1), (1, 0, 1), (1, 1, 0))[:, [0, 2]] == 0).all()  # nothing to pull
+    assert (_forces((1, 1, 1), felt=0.0)[:, [0, 2]] == 0).all()  # no pull felt: no squeeze
 
 
 def test_the_push_rises_steeply_and_what_is_given_is_the_unanswered_share():

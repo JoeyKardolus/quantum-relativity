@@ -21,6 +21,7 @@ class Store:
     cell_quanta: wp.array   # int32 (cells)
     cell_laid: wp.array     # uint8 (cells)
     cell_made: wp.array     # int32 (cells): quanta a joint has made out of itself
+    cell_pull: wp.array     # float32 (cells): the pull there, handed on from cell to cell
     tile_home: wp.array     # int32 (cells / 512): the tile's row in tile_slots, -1: all calm
     tile_slots: wp.array    # int32 (tile rows * 512): the cell's slot, -1: calm
     own_cell: wp.array      # int32 (cap): which cell holds this slot

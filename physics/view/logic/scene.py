@@ -1,11 +1,9 @@
 """Scene: what the window shows. `one` is layer 1's energy volume; `crossing` a red volume,
 a blue joint and a red volume in a line; `grow` one volume whose leak tears off layer after
-layer of new volumes round it: a ball of red balls with blue joints between, growing outward.
-
-Every cell is drawn as wide as its size where its joints put it (`placed.py`), so a volume
-that gains energy is seen to shrink and one that loses it to grow. A growing cluster is
-drawn whole while it is `WHOLE_UP_TO` cells or fewer; beyond that only its flat cut, the
-cells in the middle layer across the third direction. `Seen` keeps what the picture needs.
+layer of new volumes round it; `lumps` a small grown patch with two fuller regions.
+Every cell is drawn as wide as its size where its joints put it (`placed.py`). A growing
+cluster is drawn whole while it is `WHOLE_UP_TO` cells or fewer; beyond that only its flat
+cut, the middle layer across the third direction, and no tracer that left it (`strays.py`).
 """
 from dataclasses import dataclass, field
 from functools import partial
@@ -16,16 +14,17 @@ import warp as wp
 from physics.engine import first_volume, one_cell, three_cells
 from physics.engine.axiom_3_structure.definitions.size_law import size_of
 from physics.engine.axiom_3_structure.definitions.store import Store, peek
+from physics.engine.axiom_5_packing.logic.lumps import two_lumps
 from physics.view.definitions.camera import DISTANCE, LINE_DISTANCE
 from physics.view.logic.lay_tracers import move_into, shown, trace  # noqa: F401, trace handed on
 from physics.view.logic.line_streaks import line_streaks
 from physics.view.logic.placed import placed, settle
+from physics.view.logic.strays import bring_back
 from physics.view.logic.title_line import cells_title, title_line
 from physics.view.logic.tracers import MARK_EVERY, Tracers, step_carrying
 
-SCENES = {"one": one_cell, "crossing": three_cells, "grow": partial(first_volume, layers=12)}
-FITS = 1.5  # how far from the middle the window shows; only draws
-WHOLE_UP_TO = 500  # cells drawn whole in 3D at a good pace; a drawing number
+SCENES = {"one": one_cell, "crossing": three_cells, "grow": partial(first_volume, layers=12), "lumps": two_lumps}
+FITS, WHOLE_UP_TO = 1.5, 500  # drawing numbers: how far out the window shows; cells drawn whole
 
 
 @dataclass
@@ -60,6 +59,7 @@ def drawn(store: Store, seen: Seen) -> wp.array:
     elif store.leaks and store.count != seen.traced[0]:
         move_into(store, seen.tracers, seen.traced[0], shown(store, flat))
     seen.traced = (store.count, flat)
+    bring_back(store, seen.tracers, shown(store, flat))
     seen.middle, size, joints, volumes = settle(store, seen.middle)
     reach = (np.abs(seen.middle[volumes]) + size[volumes, None] / 2).max() / FITS
     seen.span = reach if store.leaks else max(1.0, reach)

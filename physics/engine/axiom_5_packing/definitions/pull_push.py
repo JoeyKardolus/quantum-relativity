@@ -1,4 +1,4 @@
-"""Pull and push: the two forces on a joint, each from the cells' quanta alone.
+"""Pull and push: the two forces on a joint, from the pull at its two volumes and its own quanta.
 
 Quanta are counted in calm volumes' quanta: a calm volume holds 1 and is 1 long.
 Apart: an energy volume is round, a ball as wide as its size, and a joint fills the room
@@ -6,8 +6,8 @@ between its two. The cube on the distance between two volumes' middles holds one
 of each of the two) and three joints' room: a joint's room, its size to the power 3, sets
 how far apart its two volumes stand. More quanta, less room, closer together.
 
-Pull across: `PULL` times the one volume's quanta times the other's, over that distance
-squared. Push back: how packed the joint is, its quanta over its room: quanta to the
+Pull across: `PULL` times the pull at the one volume (`pull.py`: its own energy and what
+all the others hand on) times the pull at the other, over that distance squared. Push back: how packed the joint is, its quanta over its room: quanta to the
 power `STEEP`. A joint is squeezed while the pull is the bigger, and gives by `GIVE`.
 """
 import warp as wp
@@ -17,10 +17,11 @@ from physics.engine.axiom_3_structure.definitions.store import slot_at
 # The push's one setting, chosen before any run: 4, which is 1 for the quanta and 3 for the
 # room (a size in three directions). It is what the size law gives; nothing was fitted.
 STEEP = 4.0
-# The pull's one setting, chosen before any run of the round volumes (2026-11-18): two calm
-# volumes hold their joint a quarter of their own size thin where it is thinnest (assumed:
-# a fresh one is a half there). They are 1.25 apart, the joint holds 1.28: 1.28 ** 4 * 1.25 ** 2.
-PULL = 4.2
+# The squeeze's one setting, restated before any run of the spreading pull (2026-11-19): two
+# calm volumes alone hold their joint a quarter of their own size thin where it is thinnest.
+# They are 1.25 apart, the joint holds 1.28, and each feels a pull of 1.2 (its own 1 and
+# what comes back through the joint): 1.28 ** 4 * 1.25 ** 2 / 1.2 ** 2.
+PULL = 2.92
 # How fast a joint gives way, chosen before any run: to a wholly unanswered pull, a quarter
 # in one turn of a calm swirl.
 GIVE = 0.25
@@ -36,12 +37,9 @@ def apart_of(left: wp.float64, right: wp.float64, joint: wp.float64) -> wp.float
 
 
 @wp.func
-def pull_across(left: wp.float64, right: wp.float64, joint: wp.float64) -> wp.float64:
-    """The pull of two volumes across their joint: 0 where one of the three is empty."""
-    if left <= wp.float64(0.0) or right <= wp.float64(0.0) or joint <= wp.float64(0.0):
-        return wp.float64(0.0)
-    apart = apart_of(left, right, joint)
-    return wp.float64(PULL) * left * right / (apart * apart)
+def pull_across(before: wp.float64, after: wp.float64, apart: wp.float64) -> wp.float64:
+    """The pull across a joint whose volumes feel the pulls `before` and `after`, `apart` apart."""
+    return wp.float64(PULL) * before * after / (apart * apart)
 
 
 @wp.func

@@ -45,9 +45,15 @@ not work. The new one is small, built for a billion cells from the start, and gr
 something to look at. Built so far: one energy volume whose fluid turns as one whole swirl with an
 open core, every quantum counted exactly; energy crossing from volume to volume through a joint, and
 the squeeze; a universe that grows from one energy volume, whose whirl leaks: what leaks tears off as a
-layer of new volumes all round it, with joints between, and those shed the next layer. Measured: it
-grows fast and then ever slower, not exponentially, and the first flood of energy breaks the whirls
-for a while. Next: the pull spreading through the cells and the first gravity test; then a billion cells on one graphics card. Progress is tracked on
+layer of new volumes all round it, with joints between, and those shed the next layer; and one pull,
+a number a cell that every energy volume feeds and every cell hands on to its neighbours a step at a
+time, which squeezes the joints and bends crossing energy toward where it is deeper. Measured: the
+grid no longer stays even. Energy gathers at the middle of the cluster (its fullest volume holds 3.4
+calm volumes' energy at 16 turns against 0.3 with the pull off), the joints there are squeezed 200
+times thinner than at the rim, and the red volumes there touch from 14 turns on; the cluster still
+grows layer by layer, slower. Not yet: a region made fuller by hand spreads out within half a turn,
+two such regions do not fall toward each other, and one set going does not keep going; so no
+gravity between bodies yet. Next: joint collapse where the reds touch, then why lumps do not hold. Progress is tracked on
 [issue #1](https://github.com/JoeyKardolus/quantum-relativity/issues/1).
 Misses are reported as misses; nothing is tuned to look good.
 
@@ -58,7 +64,8 @@ uv sync --all-packages --all-extras --all-groups
 PYTHONPATH=. .venv/bin/python -m physics.view   # a window; Space starts, R resets, G calm/own, Esc quits
 PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing   # energy crossing from a volume through a joint into the next
 PYTHONPATH=. .venv/bin/python -m physics.view --scene grow       # one volume leaks and sheds layer after layer of new volumes; X Y Z look along, C whole or flat cut
-PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, 11 seconds
+PYTHONPATH=. .venv/bin/python -m physics.view --scene lumps      # two regions made fuller by hand in a small grown patch
+PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, 27 seconds
 ```
 
 Needs Linux or WSL2, Python 3.12+, [`uv`](https://docs.astral.sh/uv/) . The engine runs on

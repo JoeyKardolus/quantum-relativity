@@ -1,8 +1,9 @@
 # Axiom 5, definitions
 
-`pull_push.py`: `apart_of`, `pull_across`, `push_back`, `given` (what a squeezed joint gives in a step) and `pressed` (how hard the volumes' fluid presses on one row of the joint).
+`pull.py`: the pull's law, `differing`, `bent`, `BEND`. `pull_push.py`: `apart_of`, `pull_across`, `push_back`, `given`, `pressed`.
 
-- Quanta are counted in calm volumes' quanta: a calm volume holds 1 and is 1 long.
-- `PULL` was 36 while a joint was a straight piece between its volumes; with round volumes that balance cannot be reached, so it was restated before any run of them.
-- `PULL`, `STEEP` and `GIVE` were chosen with a reason before any run. Never move one to make a picture or a test look right.
-- `given` counts a turn of a calm swirl, not a step.
+- Quanta and pull are counted in calm volumes: a calm volume holds 1, is 1 long, pulls 1.
+- Apart: the cube on two volumes' distance holds one ball and three joints' room.
+- `PULL`, `STEEP`, `GIVE` and `BEND` were chosen with a reason before any run. Never move one to make a picture or a test look right.
+- The bend is stated a cell: `cross.py` hands `a_turn` over `layer_part`.
+- `given` counts a swirl's turn, not a step.
