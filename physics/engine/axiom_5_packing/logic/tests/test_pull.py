@@ -1,4 +1,4 @@
-"""The pull, pair by pair: each volume toward the other by what the other holds, late by the distance, never past the top speed."""
+"""The pull, pair by pair: each volume toward the other by what the other holds, late by the distance, and nothing of it is cut off."""
 import numpy as np
 
 from physics.engine import line_cells, three_cells
@@ -38,6 +38,7 @@ def test_a_volume_s_own_energy_does_not_move_it():
     assert np.allclose(np.array(gained) * np.array(far) ** 2, gained[0] * far[0] ** 2, rtol=1e-3)
 
 
-def test_nothing_is_set_going_faster_than_the_top_speed():
+def test_the_flow_keeps_all_the_pull_gives_it_even_past_the_top_speed():
     store = three_cells(parts=(2, -2000, 40_000))  # 20,000 calm volumes a thin joint away
-    assert _pulled(store, 3)[0] == int(648_000 * TOP_SPEED)
+    flow = _pulled(store, 3)
+    assert flow[0] > 648_000 * TOP_SPEED and abs(int(flow.sum())) <= 3  # equal and opposite still: the crossing holds the speed

@@ -1,11 +1,10 @@
 """Line: benches of calm volumes with a calm joint wherever two share a side, every rule on.
 
-Laid by hand, as the crossing bench is, to stage a check where no first volume stands: no
-universe, and nothing leaks out of it (`leaks` is off). `calm_block` lays a line, a sheet or
-a block; some volumes are made fuller, and `calm_line`'s first fuller one may be set going
-along the line. `gathering`, `coasting`, `falling` and `dense` are the scenes the window shows. A bench
-has ends, and every volume pulls every other, so a bench draws together toward its own
-middle: only its middle is calm.
+Laid by hand, as the crossing bench is, for quick tests only: no universe, nothing leaks
+out of it (`leaks` is off), and the window never shows one (its scenes are grown: `ball.py`).
+`calm_block` lays a line, a sheet or a block; some volumes are made fuller, and
+`calm_line`'s first fuller one may be set going along the line. A bench has ends, and every
+volume pulls every other, so a bench draws together toward its own middle.
 """
 import numpy as np
 
@@ -53,22 +52,3 @@ def calm_line(across: int = ACROSS, device: str = "cpu", fuller: tuple = (), goi
         moving(store, [line_of(store)[2 * fuller[0]]], 1, going)
     return store
 
-
-def gathering(across: int = ACROSS, device: str = "cpu") -> Store:
-    """The middle volume 4 times fuller: its neighbours' fluid falls into it."""
-    return calm_line(across, device, (VOLUMES // 2,))
-
-
-def coasting(across: int = ACROSS, device: str = "cpu") -> Store:
-    """The second volume 4 times fuller and going a calm length a turn: it travels down the line."""
-    return calm_line(across, device, (1,), 1.0)
-
-
-def falling(across: int = ACROSS, device: str = "cpu") -> Store:
-    """Two volumes 4 times fuller, four volumes apart, alike either side of the middle: they draw together."""
-    return calm_line(across, device, (3, 7))
-
-
-def dense(across: int = ACROSS, device: str = "cpu") -> Store:
-    """A sheet of 7 by 7 calm volumes, the middle nine 4 times fuller: they gather on their middle."""
-    return calm_block((1, 7, 7), {(0, row, column): FULLER for row in (2, 3, 4) for column in (2, 3, 4)}, across, device)

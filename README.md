@@ -95,14 +95,23 @@ each in 3 turns, a lone one drifts 1.11), the heavier moving less (`--scene fall
 gathers on its middle and its centre of mass stays put (`--scene dense`); a fuller volume gathers from
 its neighbours (4.0 to 6.62 calm volumes in 6 turns, `--scene gather`).
 
-Not right yet: in a grown universe the first volume holds longer but still pours out (1,649 calm
-volumes at 16 turns, 1,110 at 20, 34 at 24), not by its own pull but because a packed volume is tiny
-and the small speed its neighbours give it carries its fluid out; a lump set going no longer coasts
-(a bench with ends falls to its own middle; it stops at the fourth volume), nothing goes round
-anything, most volumes in a grown patch are no whole whirls, and no joint collapses by gathering
-(deepest pull 4,903 against the limit 6,050). The pull is summed over all pairs on the host, which is
-right for thousands of volumes and not for a billion. Whether the pull may be a law between pairs or
-must be carried from cell to cell is the owner's to rule. Progress is tracked on
+Gravity is now shown in a universe the engine grew, never on a hand-laid line. Two faults were mended
+first. Two flows that meet in a joint are set against each other: only what the one has over the other
+crosses, the rest presses and is handed on through the joint. And what crosses is drawn from the whole
+cell, not from one ring. The first volume now holds together: 1,651 calm volumes at 16 turns, 1,648 at
+40, 1,640 at 108, losing only its leak, and the ball grows by the leak alone (a second layer from 23
+turns, a third at 108). Of its 111 volumes 84 are whole whirls (27 of 91 before).
+
+Not right yet: that ball is one packed volume in a thin halo. The first volume holds 1,640 of its 1,646
+calm volumes, the others a fiftieth of a calm volume each in cells 30 calm lengths wide. So in the ball
+(`--scene fall`, `dense`, `coast`) two regions made 4 times fuller do not draw together (3.18 volumes
+apart, 3.27 after 3 turns): the first volume pulls each 16,000 times as hard as they pull each other,
+and what they were given falls to it. A fuller region does not hold (it keeps 0.5 to 0.8 of what it
+was given) and one set going gets a hundredth of a cell in 3 turns. On the hand-laid benches, kept as
+tests, lumps still fall together. No joint collapses by gathering (deepest pull 1,867 against the
+limit 6,050), nothing goes round anything, and the squeezed joints make minus without end. How strong
+the pull is, and how much of the universe's energy the first volume keeps, are the owner's to rule.
+Progress is tracked on
 [issue #1](https://github.com/JoeyKardolus/quantum-relativity/issues/1).
 Misses are reported as misses; nothing is tuned to look good.
 
@@ -114,12 +123,10 @@ PYTHONPATH=. .venv/bin/python -m physics.view   # one cell; Up Down energy, F si
 PYTHONPATH=. .venv/bin/python -m physics.view --scene crossing   # a volume, a joint, a volume: the leak passes slowly; M sets the first one's fluid going
 PYTHONPATH=. .venv/bin/python -m physics.view --scene grow       # one volume leaks and sheds layer after layer of new volumes; X Y Z look along, C whole or flat cut
 PYTHONPATH=. .venv/bin/python -m physics.view --scene hole       # a packed middle collapses, keeps what it holds and takes in more
-PYTHONPATH=. .venv/bin/python -m physics.view --scene lumps      # two regions made fuller by hand in a small grown patch
-PYTHONPATH=. .venv/bin/python -m physics.view --scene gather     # a line of volumes: the fuller one gains from its neighbours
-PYTHONPATH=. .venv/bin/python -m physics.view --scene coast      # a line of volumes: a fuller one set going (it stops at the fourth: not right yet)
-PYTHONPATH=. .venv/bin/python -m physics.view --scene fall       # a line of volumes: two fuller ones draw together
-PYTHONPATH=. .venv/bin/python -m physics.view --scene dense      # a sheet: the fuller middle nine gather on their middle; X looks at it face on
-PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, about 45 seconds
+PYTHONPATH=. .venv/bin/python -m physics.view --scene fall       # the grown ball, two regions made fuller (grown once, a minute, then kept)
+PYTHONPATH=. .venv/bin/python -m physics.view --scene dense      # the grown ball, one region made fuller
+PYTHONPATH=. .venv/bin/python -m physics.view --scene coast      # the same region set going
+PYTHONPATH=. .venv/bin/pytest -q physics                     # the tests, about 80 seconds
 ```
 
 Needs Linux or WSL2, Python 3.12+, [`uv`](https://docs.astral.sh/uv/) . The engine runs on

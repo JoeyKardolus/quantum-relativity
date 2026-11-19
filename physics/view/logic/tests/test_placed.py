@@ -34,8 +34,6 @@ def test_centre_and_rim_joints_are_drawn_at_the_engine_s_distance_and_volumes_at
     assert np.allclose(wide, 1 / 7.0, rtol=1e-5)  # every volume as wide as its size, one scale
 
 
-@pytest.mark.xfail(strict=True, reason="in the patch as it grows under the pair pull (91 volumes at 22.6 turns, the "
-                   "first volume pouring out) one joint is drawn 0.63 off the engine's distance; the mark is 0.5")
 def test_no_joint_is_drawn_more_than_half_off_the_engine_s_distance(grown_patch):
     _store, middle, _size, joints, _volumes, apart = _settled(grown_patch)
     _cell, before, after, _axis = joints.T

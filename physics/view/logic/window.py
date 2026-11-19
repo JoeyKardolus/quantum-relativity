@@ -2,8 +2,8 @@
 
 A window on one energy volume; `--scene crossing` a volume, a joint and a volume,
 `--scene grow` one volume whose leak tears off layer after
-layer, `--scene lumps` two fuller regions in a small grown patch, `--scene hole` a packed
-middle that collapses, `--scene gather`, `coast` and `fall` the line bench, `--scene dense` a sheet; `--pictures DIR` saves pictures (`--along`, `--turned`, `--cut`, `--ring`). One process on the card. `BOXES`, `SPEED`, `FRAMES` only draw.
+layer, `--scene hole` a packed middle that collapses, `--scene fall`, `dense` and `coast` a
+grown ball with a region made fuller (grown once, two minutes, then kept); `--pictures DIR` saves pictures (`--along`, `--turned`, `--cut`, `--ring`). One process on the card. `BOXES`, `SPEED`, `FRAMES` only draw.
 """
 import argparse
 import os

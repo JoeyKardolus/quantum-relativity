@@ -1,10 +1,10 @@
-"""Lumps: a small grown patch to stage a check in, and the two things a check stages by hand.
+"""Lumps: a universe grown to stage a check in, and the two things a check stages by hand.
 
 `grown` steps a first volume until a volume stands `layers` layers out: the patch is made
 by the leak, as every grid is. `fuller` makes chosen volumes hold `times` their quanta, box
 for box, so each whirl keeps its shape; `moving` sets their fluid going one way along a
 direction. `region` names a volume and the six at its sides. Only a check or a scene's
-start stages; no step ever does. `two_lumps` is the scene: two fuller regions in a patch.
+start stages; no step ever does. The scenes that stage in a grown ball are in `ball.py`.
 """
 import numpy as np
 
@@ -54,10 +54,3 @@ def moving(store: Store, cells: list, axis: int, speed: float) -> None:
     flow[cells, axis] = np.floor(held[cells] * speed).astype(np.int64)
     store.cell_flow.assign(flow)
 
-
-def two_lumps(across: int = ACROSS, device: str = "cpu", layers: int = 4, out: int = 2) -> Store:
-    """A patch grown `layers` layers out with two fuller regions, `out` volumes either side of the middle."""
-    store = grown(layers, layers + 4, across, device)
-    for way in (-out, out):
-        fuller(store, region(store, (0, way, 0)))
-    return store

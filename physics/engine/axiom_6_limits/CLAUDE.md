@@ -8,4 +8,4 @@ Assumed:
 - A joint is past the limit when both its volumes are.
 - A merged volume's cells stay at their places, each with its own number.
 
-Not right: nothing grown is that deep; a packed middle takes 54 joints and the grid beyond shifts; merged cells do not mix their fluid.
+Not right: nothing grown is that deep (1,867); a packed middle takes 54 joints and the grid beyond shifts; merged cells do not mix their fluid.

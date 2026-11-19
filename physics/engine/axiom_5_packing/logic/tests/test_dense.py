@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from physics.engine import step
-from physics.engine.axiom_5_packing.logic.line import calm_block, dense, volume_at
+from physics.engine.axiom_5_packing.logic.line import calm_block, volume_at
 from physics.engine.axiom_5_packing.logic.lumps import moving
 
 CALM = 648_000
@@ -23,7 +23,7 @@ def _middle_and_spread(held: np.ndarray) -> tuple:
 
 
 def test_a_dense_area_gathers_inward_on_its_middle_and_its_middle_stays_put():
-    store = dense()  # the window's scene: `--scene dense`
+    store = calm_block((1, 7, 7), {(0, row, column): 4 for row in (2, 3, 4) for column in (2, 3, 4)})  # a bench
     seen = [_sheet(store, 7)]
     for _ in range(3):
         for _ in range(25):
@@ -40,8 +40,7 @@ def test_a_dense_area_gathers_inward_on_its_middle_and_its_middle_stays_put():
 
 @pytest.mark.xfail(strict=True, reason="(6) no orbit. A volume 4 times fuller, three volumes from one 16 times fuller in "
                    "a sheet of 81 and set going sideways at 1.6 calm lengths a turn (the round-path speed for 16 at 6 "
-                   "lengths), is carried one volume sideways in the first turn and thins from 4 to 2.3; then it is no "
-                   "body any more, and by 2.6 turns the volume between the two holds 14: it fell in, it did not go round")
+                   "lengths), is no body after 3 turns: the fullest volume away from the big one holds 1.64, and 2 is the mark")
 def test_a_small_region_set_going_sideways_beside_a_big_one_goes_round_it():
     big, small = (0, 4, 4), (0, 4, 7)
     store = calm_block((1, 9, 9), {big: 16, small: 4})

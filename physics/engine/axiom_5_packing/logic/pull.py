@@ -5,8 +5,8 @@ volumes' energy is written into the past kept (`cell_past`, a ring of `REACH` st
 collapsed joint's plus counts half to each of the two volumes it merged. Then for each pair:
 the way between (`between`), how late the pull is (`steps_late`), the other's energy then.
 What comes of it is written twice: how deep each volume lies (`cell_pull`), and its fluid's
-flow, which gains its quanta times the pull on it times the step, in whole numbers, never
-past the top speed. A volume is in no sum of its own. Before a pull has had the time to
+flow, which gains its quanta times the pull on it times the step, in whole numbers (nothing
+is cut off: the crossing holds the speed under the top speed). A volume is in no sum of its own. Before a pull has had the time to
 arrive there is none.
 """
 import numpy as np
@@ -16,7 +16,6 @@ from physics.engine.axiom_3_structure.definitions.places import steps_of
 from physics.engine.axiom_3_structure.definitions.store import Store
 from physics.engine.axiom_5_packing.definitions.pull import REACH, steps_late
 from physics.engine.axiom_5_packing.logic.between import between, held_of, volumes_of
-from physics.engine.axiom_6_limits.definitions.collapse_limit import TOP_SPEED
 
 
 def _energy(held: np.ndarray, at: np.ndarray) -> np.ndarray:
@@ -53,7 +52,6 @@ def pull(store: Store) -> None:
     depth[cells] = deep
     quanta = store.cell_quanta.numpy()[cells].astype(np.float64)[:, None]
     gain = np.floor(quanta * drawn * store.turn_per_step / (2.0 * np.pi) + 0.5).astype(np.int64)
-    most = (quanta * TOP_SPEED).astype(np.int64)  # nothing goes faster than the top speed
-    flow[cells] = np.clip(flow[cells] + gain, -most, most)
+    flow[cells] += gain  # the flow keeps all it is given; the crossing holds its speed under the top speed
     store.cell_pull.assign(depth)
     store.cell_flow.assign(flow)

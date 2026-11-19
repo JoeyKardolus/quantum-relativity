@@ -9,8 +9,8 @@ from physics.engine.axiom_5_packing.logic.line import VOLUMES
 from physics.engine.axiom_5_packing.logic.tests.test_carried import CALM, _at, _held, _line, _turns
 
 
-@pytest.mark.xfail(strict=True, reason="(2) a lone fuller volume off the line's middle does not stay put: it goes 1.48 "
-                   "calm lengths toward the middle in 4 turns, pulled by the line's ten other volumes, more of them "
+@pytest.mark.xfail(strict=True, reason="(2) a lone fuller volume off the line's middle does not stay put: it goes 2.14 "
+                   "calm lengths toward the middle in 4 turns (1.48 before), pulled by the line's ten other volumes, more of them "
                    "on that side; a bench has ends, so only its middle is calm")
 def test_a_lone_fuller_volume_stays_put():
     store, cells = _line((7,))

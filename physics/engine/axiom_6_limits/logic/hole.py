@@ -11,12 +11,13 @@ merged volume. Only a scene's start stages; no step does.
 from physics.engine.axiom_3_structure.definitions.kinds import ACROSS
 from physics.engine.axiom_3_structure.definitions.store import Store
 from physics.engine.axiom_3_structure.logic.first_volume import FIRST_QUANTA
-from physics.engine.axiom_5_packing.logic.lumps import grown, region
+from physics.engine.axiom_5_packing.logic.ball import ball
+from physics.engine.axiom_5_packing.logic.lumps import region
 from physics.engine.axiom_5_packing.logic.staging import packed
 
 
-def hole(across: int = ACROSS, device: str = "cpu", layers: int = 3, times: float = 1.0) -> Store:
-    """A patch grown `layers` layers out, its middle region packed to `times` a first volume's quanta each."""
-    store = grown(layers, layers + 2, across, device)
+def hole(across: int = ACROSS, device: str = "cpu", times: float = 1.0) -> Store:
+    """The grown ball (`ball.py`), its middle region packed to `times` a first volume's quanta each."""
+    store = ball(across, device)
     packed(store, region(store, (0, 0, 0)), int(times * FIRST_QUANTA))
     return store

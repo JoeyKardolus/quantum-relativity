@@ -1,14 +1,14 @@
-"""Shared by the tests: one patch grown three layers out by its leak, made once a run (5 s on the CPU)."""
+"""Shared by the tests: the ball grown three layers out by its leak, grown once (two minutes on the CPU) and kept in the tmp folder."""
 import pytest
 
-from physics.engine.axiom_5_packing.logic.lumps import grown
+from physics.engine.axiom_5_packing.logic.ball import ball
 from physics.engine.axiom_5_packing.logic.staging import copy_of
 
 
 @pytest.fixture(scope="session")
 def grown_patch():
-    """The patch as it grew: 91 volumes at 22.6 turns, the first holding 283 calm volumes. Never staged in."""
-    return grown(3, 7)
+    """The ball as it grew: 111 volumes at 108 turns, the first holding 1,640 calm volumes. Never staged in."""
+    return ball()
 
 
 @pytest.fixture

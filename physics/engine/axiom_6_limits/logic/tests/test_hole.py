@@ -49,10 +49,9 @@ def test_a_packed_region_collapses_stays_small_and_keeps_its_energy(packed_middl
     assert (np.diff(kept) >= 0).all() and kept[-1] > kept[0]  # nothing leaves; it takes in (10,018 to 10,042 calm volumes)
 
 
-@pytest.mark.xfail(strict=True, reason="(7) the grid beyond a collapse does not stay as it was: of 244 joints 2 to 4 "
-                   "steps out the distances differ by up to 3.3 times from the same packing run with the collapse "
-                   "off (under 1% before): every volume now feels the packed middle directly, and out of the "
-                   "collapsed one nothing leaves while the uncollapsed one pours out")
+@pytest.mark.xfail(strict=True, reason="(7) the grid beyond a collapse is nearly as it was, not within the mark: of 249 joints 2 to 4 "
+                   "steps out one distance differs by 2.2% from the same packing run with the collapse off (the "
+                   "mark is 2%; up to 3.3 times while the uncollapsed middle poured out)")
 def test_a_collapse_leaves_the_grid_beyond_as_it_was(packed_middle, monkeypatch):
     store, plain, _middle, _joints, _inside, _fallen = packed_middle
     plain = copy_of(plain)

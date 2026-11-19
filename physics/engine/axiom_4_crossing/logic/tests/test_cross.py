@@ -55,3 +55,9 @@ def test_what_friction_holds_back_stays_in_the_volume_it_came_from_and_its_flow_
         assert store.cell_flow.numpy()[[A, B], 1].sum() == 972_000  # held back, the fluid's flow still goes on
         crossed[joint] = int(held[B]) - 324_000
     assert 0 < crossed[-8] < 0.7 * crossed[-2]  # measured: 125,460 and 199,500 quanta in a turn
+
+
+def test_no_fluid_crosses_faster_than_the_top_speed():
+    from physics.engine.axiom_6_limits.definitions.collapse_limit import TOP_SPEED
+    fast, top = (int(_crossed((3, -2, 1), speed, 5).cell_quanta.numpy()[B]) for speed in (10 * TOP_SPEED, TOP_SPEED))
+    assert fast == top > 324_000
